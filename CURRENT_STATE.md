@@ -3,8 +3,11 @@
 ## Status
 Playable and complete through all three phases of the brief: the full hotel story
 (4 rooms, 4 ghosts, intro, sunrise ending, results), random Replay mode, and the
-Phase 1 bedroom prototype kept as `?mode=practice`. Deployed from `main` to
-GitHub Pages by `.github/workflows/deploy-pages.yml`.
+Phase 1 bedroom prototype kept as `?mode=practice`. Pushed to the private repo
+`nolancasama/esl-haunted-hotel` (`main`). `.github/workflows/deploy-pages.yml`
+tests and builds on every push; its Pages deploy job is skipped while the repo
+is private. Publishing (making it public + enabling Pages) is the owner's call —
+commands are in the README.
 
 ## What Exists
 - **Game:** lobby + bedroom / dining / storage / library, unlocked in order (door

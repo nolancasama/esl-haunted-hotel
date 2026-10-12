@@ -10,8 +10,12 @@ mischievous ghosts are hiding. Boo gives each clue in English ("It's under the
 bed!"); you search the room, find the ghost, then say where it is. Catch all four
 and the front door opens at sunrise.
 
-**Play:** https://nolancasama.github.io/esl-haunted-hotel/ (Chrome on a computer,
-Chromebook or Android).
+**Play:** https://nolancasama.github.io/esl-haunted-hotel/ once the repository is
+published (Chrome on a computer, Chromebook or Android). To publish:
+`gh repo edit nolancasama/esl-haunted-hotel --visibility public --accept-visibility-change-consequences`,
+then `gh api -X POST repos/nolancasama/esl-haunted-hotel/pages -f build_type=workflow`
+and re-run the "Test and deploy to GitHub Pages" workflow. Until then, `npm run dev`
+or `npm run build && npm run preview` runs it locally.
 
 ## How it plays
 
