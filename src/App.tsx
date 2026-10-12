@@ -34,6 +34,8 @@ function useCameraDrag(ref: React.RefObject<HTMLDivElement | null>) {
       const g = getGame();
       if (g.screen !== "game" || g.phase !== "explore" || rt.camera.mode !== "follow") return;
       const s = g.settings.cameraSensitivity;
+      rt.camera.yawTarget = null;
+      rt.camera.inputLock = null;
       rt.camera.yaw -= dx * 0.0055 * s;
       rt.camera.pitch = Math.min(1.15, Math.max(0.62, rt.camera.pitch + dy * 0.0028 * s));
     };

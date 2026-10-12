@@ -80,7 +80,12 @@ export interface GameState {
   clueSpeaking: boolean;
   helpLevel: number;
   line: Line | null;
+  /** Standing hint for the current situation (go to the open door, walk out...). */
   hint: HintId | null;
+  /** A short message on top of it (locked door, microphone blocked); it expires by itself. */
+  toast: { id: HintId; key: number } | null;
+  /** Last toast shown (kept for tests). */
+  lastToast: HintId | null;
   caption: Caption | null;
   focusId: string | null;
   searchId: string | null;
@@ -164,6 +169,8 @@ export const useGame = create<GameState>(() => ({
   helpLevel: 0,
   line: null,
   hint: null,
+  toast: null,
+  lastToast: null,
   caption: null,
   focusId: null,
   searchId: null,

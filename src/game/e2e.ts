@@ -8,6 +8,7 @@ import { WORLD } from "./world/world";
 import { rectCenter, rotateXZ } from "./world/geometry";
 import { resolveCollisions } from "./world/collision";
 import { cameraRef } from "../scene/CameraRig";
+import { rendererRef } from "../scene/GameScene";
 
 /**
  * Test hook (only with ?e2e=1): read game state and put the player next to
@@ -38,8 +39,30 @@ export function installE2eHook() {
         selectedSpot: g.selectedSpot,
         helpLevel: g.helpLevel,
         player: { x: rt.player.x, z: rt.player.z },
-        ghostAnim: rt.ghost.anim.mode
+        ghostAnim: rt.ghost.anim.mode,
+        ghost: rt.ghost.id,
+        lantern: g.lantern,
+        line: g.line ? { en: g.line.en, wait: Boolean(g.line.wait) } : null,
+        hint: g.hint,
+        toast: g.toast?.id ?? null,
+        lastToast: g.lastToast,
+        beaconDoor: rt.beaconDoor,
+        doorsOpen: [...rt.doorsOpen.keys()],
+        sunrise: rt.sunriseT0 >= 0,
+        sunriseT0: rt.sunriseT0,
+        time: rt.time,
+        replayUnlocked: g.replayUnlocked,
+        ...director.debug()
       };
+    },
+    /** Put the player somewhere (collision-resolved). */
+    teleport(x: number, z: number) {
+      const p = resolveCollisions(x, z, (id) => rt.doorsOpen.has(id));
+      rt.player.x = p.x;
+      rt.player.z = p.z;
+      rt.player.vx = 0;
+      rt.player.vz = 0;
+      return p;
     },
     /** Stand in front of an object, facing it. */
     goTo(objectId: string) {
@@ -74,6 +97,24 @@ export function installE2eHook() {
     },
     setMic(on: boolean) {
       director.updateSettings({ mic: on });
+    },
+    finish() {
+      director.debugFinish();
+    },
+    /** Renderer workload for the last frame. */
+    stats() {
+      const gl = rendererRef.current;
+      if (!gl) return null;
+      return {
+        calls: gl.info.render.calls,
+        triangles: gl.info.render.triangles,
+        lines: gl.info.render.lines,
+        points: gl.info.render.points,
+        geometries: gl.info.memory.geometries,
+        textures: gl.info.memory.textures,
+        programs: gl.info.programs?.length ?? 0,
+        pixelRatio: gl.getPixelRatio()
+      };
     },
     select(spotId: string) {
       setGame({ selectedSpot: spotId });

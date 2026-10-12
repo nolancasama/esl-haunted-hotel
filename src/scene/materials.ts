@@ -1,7 +1,20 @@
 import * as THREE from "three";
 import type { RoomId } from "../game/types";
-import { floorTexture, glowTexture, quiltTexture, rugTexture, nightWindowTexture, rainTexture, clockFaceTexture, wallTexture, type FloorStyle, type WallStyle } from "./textures";
-import type { TexKey } from "./furnitureModels";
+import {
+  clockFaceTexture,
+  floorTexture,
+  glowTexture,
+  nightWindowTexture,
+  paintingTexture,
+  quiltTexture,
+  rainTexture,
+  rugTexture,
+  runnerTexture,
+  wallTexture,
+  type FloorStyle,
+  type WallStyle
+} from "./textures";
+import type { TexKey } from "./models";
 
 export const ROOM_STYLE: Record<RoomId, { wall: WallStyle; floor: FloorStyle }> = {
   bedroom: {
@@ -50,6 +63,21 @@ export function texturedMaterial(key: TexKey): THREE.Material {
     case "rugBedroom":
       m = new THREE.MeshLambertMaterial({ map: rugTexture("#6c3f8f", "#e0b45a") });
       break;
+    case "rugDining":
+      m = new THREE.MeshLambertMaterial({ map: rugTexture("#8a2f3a", "#d9b25a") });
+      break;
+    case "rugLibrary":
+      m = new THREE.MeshLambertMaterial({ map: rugTexture("#24406e", "#c9a24a") });
+      break;
+    case "runner":
+      m = new THREE.MeshLambertMaterial({ map: runnerTexture() });
+      break;
+    case "paintingA":
+      m = new THREE.MeshLambertMaterial({ map: paintingTexture("family") });
+      break;
+    case "paintingB":
+      m = new THREE.MeshLambertMaterial({ map: paintingTexture("hotel") });
+      break;
     case "night":
       m = new THREE.MeshBasicMaterial({ map: nightWindowTexture(), toneMapped: false });
       break;
@@ -67,12 +95,15 @@ export function texturedMaterial(key: TexKey): THREE.Material {
   return m;
 }
 
-/** Rain streak textures scroll; window glass flashes with lightning. */
-export function animateSharedMaterials(time: number, flash: number) {
+const DAWN_GLASS = new THREE.Color(2.2, 1.7, 1.2);
+
+/** Rain streak textures scroll; window glass flashes with lightning and warms at sunrise. */
+export function animateSharedMaterials(time: number, flash: number, sun = 0) {
   const rain = texMats.rain as THREE.MeshBasicMaterial | undefined;
   if (rain?.map) rain.map.offset.set(time * 0.15, time * 1.4);
+  if (rain) rain.opacity = 0.8 * (1 - sun);
   const night = texMats.night as THREE.MeshBasicMaterial | undefined;
-  if (night) night.color.setScalar(1 + flash * 2.2);
+  if (night) night.color.setScalar(1 + flash * 2.2).lerp(DAWN_GLASS, sun);
 }
 
 export function floorMaterial(room: RoomId, w: number, d: number): THREE.MeshLambertMaterial {
@@ -97,8 +128,4 @@ export function glowSpriteMaterial(color: THREE.ColorRepresentation, opacity = 0
     blending: THREE.AdditiveBlending,
     toneMapped: false
   });
-}
-
-export function resetMaterialCache() {
-  texMats = {};
 }

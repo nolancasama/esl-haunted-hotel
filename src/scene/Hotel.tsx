@@ -1,11 +1,14 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { DOORS, DOOR_H, ROOMS, WALL_H, WALL_LINES, WALL_T, type DoorDef, type WallLine, type WallPiece } from "../game/world/rooms";
+import { DOORS, ROOMS, WALL_H, WALL_LINES, type WallLine, type WallPiece } from "../game/world/rooms";
 import { WORLD } from "../game/world/world";
 import { rt } from "../game/runtime";
 import { floorMaterial, wallMaterial, WALL_CAP } from "./materials";
-import { PartBuilder } from "./partBuilder";
+import { Beacon, Door } from "./Doors";
+import { GhostBoard } from "./GhostBoard";
+import { Outside } from "./Outside";
+import { lineFade } from "./wallFade";
 import type { RoomId } from "../game/types";
 
 const TILE = 1.6;
@@ -46,9 +49,6 @@ interface WallView {
   mats: THREE.MeshLambertMaterial[];
   pos: [number, number, number];
 }
-
-/** Current opacity of each wall line (doors fade with the wall they sit in). */
-export const lineFade = new Map<string, number>();
 
 /**
  * Cutaway walls: a whole wall line fades when the camera is on the other
@@ -162,70 +162,6 @@ function Floors() {
           </mesh>
         );
       })}
-      {/* the night outside */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.03, 0]}>
-        <planeGeometry args={[80, 80]} />
-        <meshBasicMaterial color="#0d0719" />
-      </mesh>
-    </group>
-  );
-}
-
-function doorGeometry(width: number): THREE.BufferGeometry {
-  const b = new PartBuilder(0.2);
-  const h = DOOR_H - 0.04;
-  b.box(width, h, 0.06, width / 2, 0, 0, "#6b3d2a");
-  for (const y of [0.25, 1.2]) {
-    b.box(width - 0.36, 0.8, 0.02, width / 2, y, 0.035, "#7e4a33");
-    b.box(width - 0.36, 0.8, 0.02, width / 2, y, -0.035, "#7e4a33");
-  }
-  b.sphere(0.05, width - 0.14, 1.0, 0.07, "#d4ad55");
-  b.sphere(0.05, width - 0.14, 1.0, -0.07, "#d4ad55");
-  return b.build();
-}
-
-function frameGeometry(door: DoorDef): THREE.BufferGeometry {
-  const b = new PartBuilder(0);
-  const width = door.to - door.from;
-  const t = WALL_T + 0.08;
-  b.box(0.12, DOOR_H + 0.1, t, -0.04, 0, 0, "#c9b28c");
-  b.box(0.12, DOOR_H + 0.1, t, width + 0.04, 0, 0, "#c9b28c");
-  b.box(width + 0.2, 0.12, t, width / 2, DOOR_H, 0, "#c9b28c");
-  return b.build();
-}
-
-function Door({ door }: { door: DoorDef }) {
-  const width = door.to - door.from;
-  const geo = useMemo(() => doorGeometry(width), [width]);
-  const frame = useMemo(() => frameGeometry(door), [door]);
-  const hinge = useRef<THREE.Group>(null);
-  const root = useRef<THREE.Group>(null);
-  const mat = useMemo(() => new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true }), []);
-  const lineId = useMemo(() => WALL_LINES.find((l) => l.openings?.some((o) => o.door === door.id))?.id ?? "", [door.id]);
-  // Local frame: x runs along the opening from `from`, z across the wall.
-  const rotY = door.axis === "x" ? 0 : -Math.PI / 2;
-  const origin: [number, number, number] = door.axis === "x" ? [door.from, 0, door.at] : [door.at, 0, door.from];
-  // Swing into the room the door leads to.
-  const room = ROOMS[door.room]!;
-  const roomSide = door.axis === "x" ? Math.sign((room.bounds.z0 + room.bounds.z1) / 2 - door.at) : Math.sign((room.bounds.x0 + room.bounds.x1) / 2 - door.at);
-  useFrame(() => {
-    const t0 = rt.doorsOpen.get(door.id);
-    const open = t0 === undefined ? 0 : Math.min(1, (rt.time - t0) / 1.1);
-    const ease = 1 - Math.pow(1 - open, 3);
-    // z+ of the local frame is world +z (axis x) or world +x (axis z, after -90deg)
-    const dir = door.axis === "x" ? roomSide : -roomSide;
-    if (hinge.current) hinge.current.rotation.y = -dir * ease * 1.75;
-    const o = lineFade.get(lineId) ?? 1;
-    mat.opacity = o;
-    mat.depthWrite = o > 0.98;
-    if (root.current) root.current.visible = o > 0.02;
-  });
-  return (
-    <group ref={root} position={origin} rotation={[0, rotY, 0]}>
-      <mesh geometry={frame} material={mat} />
-      <group ref={hinge}>
-        <mesh geometry={geo} material={mat} />
-      </group>
     </group>
   );
 }
@@ -238,6 +174,9 @@ export function Hotel() {
       {DOORS.map((d) => (
         <Door key={d.id} door={d} />
       ))}
+      <Beacon />
+      <GhostBoard />
+      <Outside />
     </group>
   );
 }

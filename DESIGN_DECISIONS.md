@@ -107,6 +107,69 @@ network that blocks or slows them. Fixed light set (hemisphere, moon, one warm
 "room light" that moves to the player's room, the lantern) because changing light
 counts recompiles shaders on Chromebooks.
 
+## 2026-10-13 — Phase 3: polish for classrooms and phones
+
+- **Lens shift while answering.** The answer panel covers up to ~45% of a
+  landscape phone; the camera's view is shifted up by half the panel height (no
+  perspective change), so the found ghost stays visible above it. Rejected:
+  shrinking the panel (the four words must stay big enough to tap).
+- **Short screens** (≤ 520 px high) get compact title and results cards, and
+  the results buttons are sticky at the bottom of the card.
+- **Adaptive pixel ratio:** starts at up to 1.5×; if frames stay under ~28 fps
+  for 4 s it drops to 1× once and never flips back. Renderer load is ~100–200
+  draw calls and ~25k triangles. Rejected: a graphics setting (teachers should
+  not need to tune it).
+- **Cobwebs** in upper room corners (thin line webs, fade with their walls) —
+  the last atmosphere item from the brief.
+- **Replay** is Play Again after the story and a title button once unlocked;
+  `?mode=replay` jumps to it.
+
+## 2026-10-13 — Phase 2: the hotel and the story
+
+- **A lobby hub with four rooms, opened one at a time** (bedroom → dining →
+  storage → library). The current room's door swings open with a creak, a
+  golden arrow and floor ring mark it, other doors show a padlock (bumping one
+  says "まだ あかないよ"). The clue starts when the student walks in, so a clue
+  can only ever mean the room they are standing in. Cleared rooms stay open and
+  their objects stay searchable for fun (a search there never counts as a miss).
+  Rejected: all rooms open at once (clues would need room names; "the window"
+  exists in three rooms).
+- **Storage boxes carry colours** (red / blue / yellow box). It is Sneaky's
+  "careful listening" twist with words grade 3 already taught, and the only way
+  to have several boxes and still one referent per clue.
+- **Personalities are behaviour, not harder English:** Sleepy never moves and
+  shows the picture hint from the start (tutorial); Hungry slips away after 2
+  empty searches; Sneaky after 3 and makes other objects rattle (never its own
+  hiding place); Mischief after 2, and needs four answers with four different
+  prepositions. Each announces itself on entry (snore, "Yum yum!", rattle,
+  "Catch me!") and makes the same harmless noise now and then.
+- **The story's starting spots are fixed** (under / on / in / by, then
+  Mischief's scripted rounds), so a class shares one story; Replay randomises.
+- **Intro:** walk in from the rain, the door slams, lights flicker, Boo appears
+  and says the brief's three lines (each waits for ▶ / Space or the voice plus a
+  moment; Skip is always there). **Ending:** fade to the lobby, "Great job! / You
+  found four ghosts!", the front door unlocks, the sun comes up (warm light,
+  rain stops, birds), the student walks out (auto-walk after 9 s) → results.
+- **Replay** unlocks after the story (stored on the device) and is what Play
+  Again starts: random predefined spots, three different starting prepositions
+  for the first three ghosts, Mischief's four in random order. Plan tests run a
+  random student through 200 stories and 200 replays without a dead end.
+- **The camera turns once, gently, when a ghost's room starts,** so the room is
+  in front of the student (library and storage are entered heading "down").
+  Keys held through the turn keep walking the way they were going (input basis
+  is locked until released); dragging cancels the turn. Rejected: continuous
+  auto-follow rotation (dizzying), never turning (south rooms were seen
+  backwards from the doorway).
+- **Things hung on a wall disappear with it** in the cutaway view (paintings,
+  the ghost board, windows); each knows its wall line.
+- **Hats are pressed flat in tight "under" spots** and the geometry test
+  includes the flattened hat height, so nothing pokes through a bed or desk.
+- **Students can search while Boo is still reading the clue.** Entering a room
+  no longer locks the controls (E was silently ignored for the first seconds).
+- **Hints vs. toasts.** The standing hint (go to the open door, walk out) and
+  short messages (locked, microphone blocked) are separate, so a short message
+  never erases the standing hint.
+
 ## 2026-10-12 — Phase 1 practice ghost
 
 Phase 1 is one ghost in the bedroom that must be answered four times (it escapes

@@ -11,6 +11,8 @@
 /** Ghost body: origin at the bottom of the hem. */
 export const GHOST_H = 0.8;
 export const GHOST_R = 0.32;
+/** Top of a ghost's hat once pressed flat under furniture (Ghosts.tsx: base 0.7, squash 0.35). */
+export const HAT_FLAT_TOP = 0.85;
 
 export interface Area {
   x0: number;
@@ -87,7 +89,7 @@ export const KINDS = {
     d: 2.2,
     solid: true,
     on: { y: 0.68, at: { x: 0, z: 0.3 }, area: { x0: -0.76, x1: 0.76, z0: -0.55, z1: 1.05 }, scale: 1 },
-    under: { clearance: 0.38, area: { x0: -0.7, x1: 0.7, z0: -0.95, z1: 0.95 }, scale: [0.8, 0.43, 0.8] },
+    under: { clearance: 0.38, area: { x0: -0.7, x1: 0.7, z0: -0.95, z1: 0.95 }, scale: [0.8, 0.42, 0.8] },
     by: BY_FLOOR
   },
   desk: {
@@ -226,7 +228,12 @@ export const KINDS = {
   coffeetable: { w: 1.1, h: 0.45, d: 0.6, solid: true },
   plant: { w: 0.6, h: 1.4, d: 0.6, solid: true },
   reception: { w: 2.6, h: 1.1, d: 0.8, solid: true },
-  stairs: { w: 2.4, h: 2.8, d: 3.4, solid: true },
+  stairs: { w: 2.4, h: 2.8, d: 2.8, solid: true },
+  luggage: { w: 0.9, h: 0.9, d: 0.6, solid: true },
+  umbrellastand: { w: 0.35, h: 0.8, d: 0.35, solid: true },
+  chandelier: { w: 1.2, h: 0.8, d: 1.2, solid: false, flat: true },
+  runner: { w: 6.4, h: 0.02, d: 1.5, solid: false, flat: true },
+  bigrug: { w: 4.4, h: 0.02, d: 3.2, solid: false, flat: true },
   cabinet: { w: 1.3, h: 1.9, d: 0.5, solid: true },
   sidetable: { w: 0.6, h: 0.7, d: 0.5, solid: true },
   barrel: { w: 0.7, h: 0.95, d: 0.7, solid: true },

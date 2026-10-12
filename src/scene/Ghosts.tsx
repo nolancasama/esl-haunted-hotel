@@ -46,12 +46,18 @@ type Mats = ReturnType<typeof useGhostMaterials>;
 interface Rig {
   root: THREE.Group | null;
   squash: THREE.Group | null;
+  /** Hat pivot at the top of the head: squashed flat in tight "under" spots. */
+  acc: THREE.Group | null;
   armL: THREE.Mesh | null;
   armR: THREE.Mesh | null;
   mats: Mats | null;
 }
 
-const newRig = (): Rig => ({ root: null, squash: null, armL: null, armR: null, mats: null });
+/** Height (ghost units) where hats sit; a flattened hat stays below HAT_FLAT_TOP (see spots.test.ts). */
+const HAT_BASE = 0.7;
+const HAT_FLAT = 0.35;
+
+const newRig = (): Rig => ({ root: null, squash: null, acc: null, armL: null, armR: null, mats: null });
 
 function GhostMesh({ look, rig }: { look: GhostLook; rig: Rig }) {
   const mats = useGhostMaterials(look);
@@ -66,7 +72,9 @@ function GhostMesh({ look, rig }: { look: GhostLook; rig: Rig }) {
       <group ref={(g) => void (rig.squash = g)}>
         <mesh geometry={body} material={mats.body} renderOrder={1} />
         <mesh geometry={face} material={mats.face} renderOrder={2} />
-        <mesh geometry={acc} material={mats.acc} renderOrder={1} />
+        <group ref={(g) => void (rig.acc = g)} position={[0, HAT_BASE, 0]}>
+          <mesh geometry={acc} material={mats.acc} position={[0, -HAT_BASE, 0]} renderOrder={1} />
+        </group>
         <mesh ref={(m) => void (rig.armL = m)} geometry={arm} material={mats.body} position={[-0.31, 0.36, 0.04]} renderOrder={1} />
         <mesh ref={(m) => void (rig.armR = m)} geometry={arm} material={mats.body} position={[0.31, 0.36, 0.04]} renderOrder={1} />
       </group>
@@ -160,6 +168,8 @@ function animateGhost(r: Rig, look: GhostLook, dt: number) {
   if (r.armL) r.armL.position.y = 0.36 + wave * 0.03;
   if (r.armR) r.armR.position.y = 0.36 - wave * 0.03;
   const squashed = spot.prep === "under";
+  // Under low furniture the hat is pressed flat too, so it never pokes through.
+  let hatFlat = squashed ? 1 : 0;
 
   switch (anim.mode) {
     case "found":
@@ -212,6 +222,7 @@ function animateGhost(r: Rig, look: GhostLook, dt: number) {
         root.rotation.y += dt * 12;
         const s = Math.max(0.001, 1 - e * 0.97);
         const un = Math.min(1, k * 3);
+        if (squashed) hatFlat = 1 - un;
         squash.scale.set(THREE.MathUtils.lerp(sx, 1, un) * s, THREE.MathUtils.lerp(sy, 1, un) * s, THREE.MathUtils.lerp(sz, 1, un) * s);
         setExpression(mats, "dizzy", look.mask);
         setOpacity(mats, k > 0.92 ? Math.max(0, (1 - k) / 0.08) : 1);
@@ -249,9 +260,11 @@ function animateGhost(r: Rig, look: GhostLook, dt: number) {
         setOpacity(mats, 1 - k);
         if (k >= 1) rt.ghost.anim = { mode: "hidden" };
       }
+      hatFlat = 0;
       break;
     }
   }
+  if (r.acc) r.acc.scale.y = 1 - (1 - HAT_FLAT) * hatFlat;
 }
 
 /** Boo, the friendly guide who floats beside the player. */

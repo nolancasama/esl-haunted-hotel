@@ -23,7 +23,8 @@ export const LINE_JA: Record<string, string> = {
   "Let's go!": "いこう！",
   "Next room!": "つぎの へやへ いこう！",
   "Look!": "みて！",
-  "Go home!": "おうちへ かえろう！"
+  "Go home!": "おうちへ かえろう！",
+  "Yum yum!": "もぐもぐ！"
 };
 
 export const HINT = {

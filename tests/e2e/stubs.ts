@@ -13,8 +13,11 @@ export const BROWSER_STUBS = `
   w.__speech = { say: null, error: null, starts: 0 };
   const synth = w.speechSynthesis;
   if (synth) {
-    synth.speak = (u) => { setTimeout(() => { u.onend && u.onend(); }, 120); };
-    synth.cancel = () => {};
+    // Like Chrome: speaking ends after a while, and cancel() ends it at once.
+    const pending = new Set();
+    const end = (u) => { if (!pending.has(u)) return; pending.delete(u); u.onend && u.onend(); };
+    synth.speak = (u) => { pending.add(u); setTimeout(() => end(u), w.__ttsMs ?? 120); };
+    synth.cancel = () => { [...pending].forEach(end); };
     synth.getVoices = () => [];
   }
   class FakeRecognition {

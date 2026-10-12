@@ -95,7 +95,7 @@ export function Player() {
   const stuck = useRef({ t: 0, x: 0, z: 0 });
 
   useFrame((_, rawDt) => {
-    const dt = Math.min(rawDt, 1 / 20);
+    const dt = Math.min(rawDt, 0.1); // real time down to 10 fps (slow Chromebooks)
     const p = rt.player;
     const game = getGame();
     const canMove = game.screen === "game" && game.phase === "explore" && !game.settingsOpen && !p.frozen;
@@ -111,7 +111,8 @@ export function Player() {
       p.walkTo = null;
     }
 
-    const yaw = rt.camera.yaw;
+    if (mx === 0 && my === 0) rt.camera.inputLock = null;
+    const yaw = rt.camera.inputLock ?? rt.camera.yaw;
     const fx = -Math.sin(yaw);
     const fz = -Math.cos(yaw);
     const rx = Math.cos(yaw);

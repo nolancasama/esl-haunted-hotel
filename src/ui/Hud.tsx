@@ -106,15 +106,31 @@ function Subtitle() {
   const ja = useGame((s) => s.settings.japanese);
   if (!line) return null;
   return (
-    <div className={`subtitle ${line.speaker}`} key={line.id} data-testid="subtitle">
-      {line.speaker === "boo" && <GhostPortrait boo size={36} face="happy" />}
+    <div className={`subtitle ${line.speaker} ${line.wait ? "wait" : ""}`} key={line.id} data-testid="subtitle">
+      {line.speaker === "boo" && <GhostPortrait boo size={line.wait ? 52 : 36} face="happy" />}
       <div>
         <div className="subtitle-en">
           <PrepText text={line.en} />
         </div>
         {line.ja && <Ja on={ja}>{line.ja}</Ja>}
       </div>
+      {line.wait && (
+        <button className="next-button" onClick={() => director.next()} aria-label="Next" data-testid="next">
+          ▶
+        </button>
+      )}
     </div>
+  );
+}
+
+function SkipButton() {
+  const phase = useGame((s) => s.phase);
+  const ja = useGame((s) => s.settings.japanese);
+  if (phase !== "intro") return null;
+  return (
+    <button className="skip-button" onClick={() => director.skipIntro()} data-testid="skip">
+      {ja ? "スキップ" : "Skip"} ▶▶
+    </button>
   );
 }
 
@@ -133,6 +149,7 @@ function HintBar() {
   const phase = useGame((s) => s.phase);
   const focus = useGame((s) => s.focusId);
   const hint = useGame((s) => s.hint);
+  const toast = useGame((s) => s.toast?.id ?? null);
   const touch = useGame((s) => s.touch);
   const ja = useGame((s) => s.settings.japanese);
   const [moveHintGone, setMoveHintGone] = useState(false);
@@ -144,8 +161,11 @@ function HintBar() {
   }, [hint]);
 
   let h: { en: string; ja: string } | null = null;
-  if (hint === "micBlocked") h = HINT.micBlocked;
+  if (toast === "micBlocked") h = HINT.micBlocked;
+  else if (toast === "locked") h = HINT.locked;
+  else if (phase === "explore" && hint === "exit") h = HINT.exit;
   else if (phase === "explore" && focus) h = touch ? HINT.searchTouch : HINT.searchKeys;
+  else if (phase === "explore" && hint === "goDoor") h = HINT.goDoor;
   else if (phase === "explore" && hint === "move" && !moveHintGone) h = touch ? HINT.moveTouch : HINT.moveKeys;
   else if (phase === "search") h = touch ? HINT.chooseTouch : HINT.chooseKeys;
   if (!h) return null;
@@ -174,6 +194,7 @@ export function Hud() {
         </button>
       </div>
       <Caption />
+      <SkipButton />
       <div className="bottom">
         <Subtitle />
         <AnswerPanel />

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { PREPS, type Rot, type Vec3 } from "../types";
 import { circleHitsRect, rectContains, rectDistance, rotateXZ } from "./geometry";
-import { GHOST_H, GHOST_R } from "./kinds";
-import { ROOMS, WALL_T } from "./rooms";
+import { GHOST_H, GHOST_R, HAT_FLAT_TOP } from "./kinds";
+import { ROOMS, WALL_T, roomAt } from "./rooms";
 import { WORLD, type HidingSpot, type WorldObject } from "./world";
-import { INTERACT_RANGE, PLAYER_R, PRACTICE_START } from "./constants";
+import { INTERACT_RANGE, PLAYER_R, PRACTICE_START, STORY_START } from "./constants";
 
 const EPS = 1e-6;
 
@@ -56,6 +56,8 @@ describe("hiding spots are physically what the clue says", () => {
           const u = spec.under!;
           expect(local.y).toBeGreaterThanOrEqual(0);
           expect(local.y + h).toBeLessThanOrEqual(u.clearance - 0.01);
+          // ...and so does a hat, pressed flat.
+          expect(local.y + HAT_FLAT_TOP * spot.scale[1]).toBeLessThanOrEqual(u.clearance + 0.005);
           expect(inArea(u.area, local, r)).toBe(true);
           if (spec.wallMounted) {
             // Below a window: in front of the wall, under its lowest edge.
@@ -157,54 +159,78 @@ describe("clues are unambiguous", () => {
     }
   });
 
-  it("the bedroom offers all four prepositions", () => {
-    const preps = new Set(WORLD.spots.filter((s) => s.room === "bedroom").map((s) => s.prep));
-    for (const p of PREPS) expect(preps.has(p), p).toBe(true);
+  it("every ghost room offers all four prepositions (random replays and Mischief's four rounds)", () => {
+    for (const room of ["bedroom", "dining", "storage", "library"] as const) {
+      const preps = new Set(WORLD.spots.filter((s) => s.room === room).map((s) => s.prep));
+      for (const p of PREPS) expect(preps.has(p), `${room} ${p}`).toBe(true);
+    }
+  });
+
+  it("everything hung on a wall knows its wall (so it fades with it in the cutaway view)", () => {
+    for (const o of WORLD.objects) {
+      if (o.spec.wallMounted) expect(o.wallLines.length, o.id).toBeGreaterThan(0);
+      else expect(o.wallLines, o.id).toEqual([]);
+    }
+  });
+
+  it("the lobby has nothing to search (ghosts hide only in the four rooms)", () => {
+    expect(WORLD.spots.some((s) => s.room === "lobby")).toBe(false);
   });
 });
 
-describe("every searchable object can be reached", () => {
-  it("from the bedroom start", () => {
-    const room = ROOMS.bedroom!;
-    const step = 0.1;
-    const solid = WORLD.colliders; // door blocker included: the bedroom door is shut in Phase 1
-    const nx = Math.round((room.bounds.x1 - room.bounds.x0) / step);
-    const nz = Math.round((room.bounds.z1 - room.bounds.z0) / step);
-    const free = (i: number, k: number) => {
-      const x = room.bounds.x0 + i * step;
-      const z = room.bounds.z0 + k * step;
-      return !solid.some((c) => circleHitsRect(c.rect, x, z, PLAYER_R));
-    };
-    const seen = new Set<number>();
-    const si = Math.round((PRACTICE_START.x - room.bounds.x0) / step);
-    const sk = Math.round((PRACTICE_START.z - room.bounds.z0) / step);
-    expect(free(si, sk)).toBe(true);
-    const queue: Array<[number, number]> = [[si, sk]];
-    seen.add(si * 10000 + sk);
-    while (queue.length) {
-      const [i, k] = queue.pop()!;
-      for (const [di, dk] of [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1]
-      ]) {
-        const a = i + di;
-        const b = k + dk;
-        if (a < 0 || b < 0 || a > nx || b > nz) continue;
-        const key = a * 10000 + b;
-        if (seen.has(key) || !free(a, b)) continue;
-        seen.add(key);
-        queue.push([a, b]);
-      }
+/** Flood-fill the walkable floor from a start point; returns reachable cell centres. */
+function reachable(start: { x: number; z: number }, openDoors: (id: string) => boolean) {
+  const b = { x0: -8, x1: 8, z0: -11, z1: 11 };
+  const step = 0.1;
+  const nx = Math.round((b.x1 - b.x0) / step);
+  const nz = Math.round((b.z1 - b.z0) / step);
+  const solid = WORLD.colliders.filter((c) => !(c.door && openDoors(c.door)));
+  const free = (i: number, k: number) => !solid.some((c) => circleHitsRect(c.rect, b.x0 + i * step, b.z0 + k * step, PLAYER_R));
+  const si = Math.round((start.x - b.x0) / step);
+  const sk = Math.round((start.z - b.z0) / step);
+  expect(free(si, sk), "start is free").toBe(true);
+  const seen = new Set<number>([si * 10000 + sk]);
+  const queue: Array<[number, number]> = [[si, sk]];
+  while (queue.length) {
+    const [i, k] = queue.pop()!;
+    for (const [di, dk] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ]) {
+      const a = i + di;
+      const c = k + dk;
+      if (a < 0 || c < 0 || a > nx || c > nz) continue;
+      const key = a * 10000 + c;
+      if (seen.has(key) || !free(a, c)) continue;
+      seen.add(key);
+      queue.push([a, c]);
     }
-    const cells = [...seen].map((key) => ({
-      x: room.bounds.x0 + Math.floor(key / 10000) * step,
-      z: room.bounds.z0 + (key % 10000) * step
-    }));
+  }
+  return [...seen].map((key) => ({ x: b.x0 + Math.floor(key / 10000) * step, z: b.z0 + (key % 10000) * step }));
+}
+
+describe("every searchable object can be reached", () => {
+  it("in practice mode, from the bedroom start with the door shut", () => {
+    const cells = reachable(PRACTICE_START, () => false);
     for (const o of WORLD.objects.filter((x) => x.searchable && x.room === "bedroom")) {
       const best = Math.min(...cells.map((c) => rectDistance(o.rect, c.x, c.z)));
       expect(best, o.id).toBeLessThanOrEqual(INTERACT_RANGE - 0.2);
     }
+  });
+
+  it("in the story, from the lobby once each room's door is open", () => {
+    const cells = reachable(STORY_START, (id) => id !== "entrance");
+    for (const o of WORLD.objects.filter((x) => x.searchable)) {
+      const inRoom = cells.filter((c) => roomAt(c.x, c.z) === o.room);
+      const best = Math.min(...inRoom.map((c) => rectDistance(o.rect, c.x, c.z)));
+      expect(best, o.id).toBeLessThanOrEqual(INTERACT_RANGE - 0.2);
+    }
+  });
+
+  it("closed doors really close the rooms off", () => {
+    const cells = reachable(STORY_START, () => false);
+    for (const c of cells) expect(roomAt(c.x, c.z), `${c.x},${c.z}`).toBe("lobby");
   });
 });

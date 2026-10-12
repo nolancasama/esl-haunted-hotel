@@ -39,7 +39,7 @@ const waitPhase = async (phase, timeout = 20000) => {
   await page.waitForFunction((p) => window.__hh.state().phase === p, phase, { timeout });
 };
 
-await page.goto(`${base}?e2e=1&seed=3`);
+await page.goto(`${base}?e2e=1&seed=3&mode=practice`);
 await page.waitForTimeout(2500);
 await shot("title");
 

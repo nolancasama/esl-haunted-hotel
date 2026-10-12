@@ -6,8 +6,9 @@ import { rotRadians } from "../game/world/geometry";
 import { rt } from "../game/runtime";
 import { getGame } from "../game/store";
 import { director } from "../game/director";
-import { buildObject, type AnimatedPart } from "./furnitureModels";
+import { buildObject, type AnimatedPart } from "./models";
 import { furnitureMaterial, glowPartMaterial, glowSpriteMaterial, texturedMaterial } from "./materials";
+import { lineFade } from "./wallFade";
 
 const HIGHLIGHT = new THREE.Color("#8f7bff");
 const HELP = new THREE.Color("#ffd36b");
@@ -64,7 +65,7 @@ function FurnitureItem({ obj }: { obj: WorldObject }) {
           g.rotation.x = -k * 1.85;
           break;
         case "door":
-          g.rotation.y = k * 1.9;
+          g.rotation.y = -k * 1.9;
           break;
         case "blanket":
           g.rotation.x = -k * 0.55;
@@ -83,6 +84,8 @@ function FurnitureItem({ obj }: { obj: WorldObject }) {
       const shaking = r.objectId === obj.id && rt.time - r.t0 < 0.8;
       root.current.position.x = obj.x + (shaking ? Math.sin(rt.time * 70) * 0.025 : 0);
       root.current.rotation.z = shaking ? Math.sin(rt.time * 55) * 0.02 : 0;
+      // Things hanging on a wall disappear with it in the cutaway view.
+      if (obj.wallLines.length) root.current.visible = Math.min(...obj.wallLines.map((id) => lineFade.get(id) ?? 1)) > 0.4;
     }
   });
 

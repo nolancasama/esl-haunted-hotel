@@ -74,7 +74,7 @@ function Sparkles() {
     []
   );
   useFrame((_, rawDt) => {
-    const dt = Math.min(rawDt, 1 / 20);
+    const dt = Math.min(rawDt, 0.1);
     const pos = geo.attributes.position as THREE.BufferAttribute;
     const col = geo.attributes.color as THREE.BufferAttribute;
     let n = 0;

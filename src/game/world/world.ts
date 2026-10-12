@@ -2,13 +2,26 @@ import type { Prep, Rect, RoomId, Vec3 } from "../types";
 import { footprint, localToWorld } from "./geometry";
 import { GHOST_H, GHOST_R, KINDS, type KindSpec } from "./kinds";
 import { PLACEMENTS, type Placement, type SpotRule } from "./furniture";
-import { DOORS, ROOMS, WALL_T, wallPieces, type DoorId, type WallPiece } from "./rooms";
+import { DOORS, ROOMS, WALL_LINES, WALL_T, wallPieces, type DoorId, type WallPiece } from "./rooms";
 
 export interface WorldObject extends Placement {
   spec: KindSpec;
   /** Floor footprint in world space. */
   rect: Rect;
   searchable: boolean;
+  /** Wall lines a wall-mounted object hangs on (it fades with them in the cutaway view). */
+  wallLines: string[];
+}
+
+/** The wall line(s) a wall-mounted object hangs on. */
+function wallLinesFor(p: Placement, spec: KindSpec): string[] {
+  if (!spec.wallMounted) return [];
+  const alongX = p.rot === 0 || p.rot === 180;
+  const coord = alongX ? p.z : p.x;
+  const pos = alongX ? p.x : p.z;
+  return WALL_LINES.filter(
+    (l) => l.axis === (alongX ? "x" : "z") && Math.abs(l.at - coord) <= 0.15 && pos + spec.w / 2 > l.from && pos - spec.w / 2 < l.to
+  ).map((l) => l.id);
 }
 
 export interface HidingSpot {
@@ -35,7 +48,7 @@ function objectFrom(p: Placement): WorldObject {
     const centre = localToWorld(p, p.rot, { x: 0, y: 0, z: spec.d / 2 });
     rect = footprint(centre, p.rot, spec.w, spec.d);
   }
-  return { ...p, spec, rect, searchable: Boolean(p.noun && p.spots?.length) };
+  return { ...p, spec, rect, searchable: Boolean(p.noun && p.spots?.length), wallLines: wallLinesFor(p, spec) };
 }
 
 function spotFor(obj: WorldObject, rule: SpotRule): HidingSpot {

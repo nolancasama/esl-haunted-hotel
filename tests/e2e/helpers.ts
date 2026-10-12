@@ -71,7 +71,12 @@ export async function setSpeech(page: Page, plan: { say?: string | null; error?:
 /** Walk up to an object (teleport next to it) and open the close-up with E. */
 export async function openCloseUp(page: Page, objectId: string) {
   await hook(page, "goTo", objectId);
-  await page.waitForTimeout(150);
+  // The object in reach is worked out every frame; slow software rendering can take a while.
+  await page.waitForFunction(
+    (id) => (window as unknown as { __hh: { state(): { focusId: string | null; phase: string } } }).__hh.state().focusId === id,
+    objectId,
+    { timeout: 15_000 }
+  );
   await page.keyboard.press("KeyE");
   await waitPhase(page, "search");
   // Let the camera settle so markers sit where they will be clicked.
@@ -83,6 +88,15 @@ export async function clickMarker(page: Page, spotId: string) {
   const p = await hook<{ x: number; y: number } | null>(page, "screenOf", spotId);
   if (!p) throw new Error(`no marker for ${spotId}`);
   await page.mouse.click(p.x, p.y);
+}
+
+/** Wait until the answer with this preposition has been accepted (the panel itself may already be gone). */
+export async function waitAnswered(page: Page, prep: string) {
+  await page.waitForFunction(
+    (p) => (window as unknown as { __hh: { state(): { answer: { filled: string | null } } } }).__hh.state().answer.filled === p,
+    prep,
+    { timeout: 15_000 }
+  );
 }
 
 /** Search the current clue's spot and wait for the answer phase. */

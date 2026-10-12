@@ -57,6 +57,13 @@ export const rt = {
     shot: null as CameraShot | null,
     /** Jump to the wanted pose next frame (scene cuts). */
     snap: false,
+    /** A gentle automatic turn (entering a ghost's room); dragging cancels it. */
+    yawTarget: null as number | null,
+    /**
+     * While keys are held through an automatic turn, walking keeps the
+     * direction it had when the turn began (no accidental U-turn).
+     */
+    inputLock: null as number | null,
     /** Set by the camera each frame: real camera position (for wall fading). */
     pos: { x: 0, y: 6, z: 6 } as Vec3,
     target: { x: 0, y: 1, z: 0 } as Vec3
@@ -76,6 +83,14 @@ export const rt = {
   rattle: { objectId: null as string | null, t0: -10 },
   /** Doors that are open (id -> time opened). */
   doorsOpen: new Map<string, number>(),
+  /** Doors that bang shut instead of swinging closed. */
+  doorSlam: new Set<string>(),
+  /** The door to walk to next (a beacon floats over it). */
+  beaconDoor: null as string | null,
+  /** Lights flicker from this time (intro). */
+  flickerT0: -100,
+  /** Sunrise started at this time (ending); negative = night. */
+  sunriseT0: -1,
   timeScale: 1
 };
 
@@ -91,5 +106,12 @@ export function resetRuntime() {
   rt.camera.mode = "follow";
   rt.camera.shot = null;
   rt.player.frozen = true;
+  rt.player.walkTo = null;
+  rt.player.stepTo = null;
   rt.doorsOpen.clear();
+  rt.doorSlam.clear();
+  rt.beaconDoor = null;
+  rt.flickerT0 = -100;
+  rt.sunriseT0 = -1;
+  rt.rattle.objectId = null;
 }

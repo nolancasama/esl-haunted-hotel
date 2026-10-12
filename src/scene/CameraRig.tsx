@@ -12,7 +12,8 @@ export const cameraRef: { current: THREE.PerspectiveCamera | null } = { current:
  * with smoothing; eases to scripted shots for close-ups and cutscenes.
  */
 export function CameraRig() {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
+  const shift = useRef(0);
   const pos = useRef(new THREE.Vector3(0, 6, 6));
   const look = useRef(new THREE.Vector3());
   const want = useRef(new THREE.Vector3());
@@ -20,10 +21,17 @@ export function CameraRig() {
   const ready = useRef(false);
 
   useFrame((_, rawDt) => {
-    const dt = Math.min(rawDt, 1 / 20);
+    const dt = Math.min(rawDt, 0.1);
     cameraRef.current = camera as THREE.PerspectiveCamera;
     const c = rt.camera;
     const screen = getGame().screen;
+    if (c.yawTarget !== null) {
+      let d = c.yawTarget - c.yaw;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      c.yaw += d * (1 - Math.exp(-dt * 2.2));
+      if (Math.abs(d) < 0.01) c.yawTarget = null;
+    }
     if (screen === "title" || screen === "results") {
       // Slow orbit around the bedroom behind the title card.
       const t = rt.time * 0.07;
@@ -53,6 +61,19 @@ export function CameraRig() {
     look.current.lerp(wantLook.current, k);
     camera.position.copy(pos.current);
     camera.lookAt(look.current);
+
+    // Lens shift: while the answer panel covers the bottom of the screen, move the
+    // picture up so the found ghost stays in the visible part (matters on short screens).
+    const game = getGame();
+    let wantShift = 0;
+    if (game.screen === "game" && (game.phase === "answer" || game.answer.status === "correct")) {
+      const panel = document.querySelector('[data-testid="answer-panel"]');
+      if (panel) wantShift = Math.min(0.3, (panel.getBoundingClientRect().height + 24) / 2 / size.height);
+    }
+    shift.current += (wantShift - shift.current) * Math.min(1, dt * 5);
+    const cam = camera as THREE.PerspectiveCamera;
+    if (shift.current > 0.002) cam.setViewOffset(size.width, size.height, 0, shift.current * size.height, size.width, size.height);
+    else if (cam.view?.enabled) cam.clearViewOffset();
     c.pos.x = pos.current.x;
     c.pos.y = pos.current.y;
     c.pos.z = pos.current.z;

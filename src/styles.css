@@ -314,6 +314,55 @@ small[lang="ja"] {
   }
 }
 
+.subtitle.wait {
+  padding: 10px 12px 10px 12px;
+  font-size: clamp(22px, 2.8vw, 32px);
+  max-width: min(760px, calc(100vw - 24px));
+}
+
+.next-button {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-strong);
+  color: #fff;
+  font-size: 20px;
+  margin-left: 6px;
+  animation: nudge 1s ease-in-out infinite;
+}
+
+@keyframes nudge {
+  50% {
+    transform: translateX(3px);
+  }
+}
+
+.skip-button {
+  position: absolute;
+  right: 16px;
+  bottom: 18px;
+  pointer-events: auto;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 2px solid var(--panel-border);
+  background: var(--panel);
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.unlocked {
+  margin: -6px 0 14px;
+  font-weight: 800;
+  color: var(--gold);
+}
+
+.unlocked small {
+  display: block;
+  margin: 2px 0 0;
+}
+
 .hint-bar {
   display: flex;
   align-items: center;
@@ -916,6 +965,84 @@ button.secondary {
   .title-card,
   .results-card {
     padding: 14px 20px;
+  }
+}
+
+/* Results: the buttons stay in view even when the card scrolls. */
+.results-card .modal-buttons {
+  position: sticky;
+  bottom: -26px;
+  padding: 10px 0 4px;
+  background: linear-gradient(rgba(26, 15, 50, 0), var(--panel-solid) 35%);
+}
+
+@media (max-height: 520px) {
+  .title-card {
+    gap: 6px;
+    padding: 10px 20px;
+  }
+  .title-ghosts svg {
+    width: 40px;
+    height: 40px;
+  }
+  .title-ghosts svg:nth-child(3) {
+    width: 54px;
+    height: 54px;
+  }
+  .title-card h1 {
+    font-size: 36px;
+  }
+  .tagline {
+    font-size: 16px;
+  }
+  button.primary.big {
+    font-size: 22px;
+    padding: 8px 30px;
+  }
+  button.secondary {
+    font-size: 16px;
+    padding: 6px 18px;
+  }
+  .results-card h1 {
+    font-size: 30px;
+  }
+  .results-ghosts {
+    gap: 8px;
+    margin: 6px 0;
+  }
+  .results-ghost {
+    min-width: 120px;
+  }
+  .results-ghost svg {
+    width: 42px;
+    height: 42px;
+  }
+  .results-name {
+    font-size: 15px;
+  }
+  .results-ghost ul {
+    font-size: 13px;
+  }
+  .stats {
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .stats > div {
+    padding: 4px 10px;
+    min-width: 96px;
+  }
+  .stats b {
+    font-size: 24px;
+  }
+  .stats span {
+    font-size: 12px;
+  }
+  .unlocked {
+    font-size: 13px;
+    margin: 0 0 4px;
+  }
+  .results-card .modal-buttons {
+    bottom: -14px;
   }
 }
 

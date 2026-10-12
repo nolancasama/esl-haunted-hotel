@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { boot, clickMarker, findGhost, hook, openCloseUp, PREPS, setSpeech, state, waitPhase } from "./helpers";
+import { boot, clickMarker, findGhost, hook, openCloseUp, PREPS, setSpeech, state, waitAnswered, waitPhase } from "./helpers";
 
 // Phase 1: the bedroom prototype (one ghost, four rounds: in / on / under / by).
 const PRACTICE = "&mode=practice";
@@ -31,7 +31,7 @@ test("a full practice round: clue, search, spoken answers, escapes, capture, res
 
     await setSpeech(page, { say: `It's ${clue.prep} the ${clue.noun}.` });
     await page.keyboard.press("Space");
-    await expect(page.getByTestId("blank")).toHaveText(clue.prep);
+    await waitAnswered(page, clue.prep);
     if (round < 3) await waitPhase(page, "explore");
   }
 
@@ -106,7 +106,7 @@ test("a blocked microphone falls back to the word buttons", async ({ page }) => 
   await expect(page.getByTestId(`word-${clue.prep}`)).toBeEnabled();
   expect((await state(page)).micState).toBe("blocked");
   await page.getByTestId(`word-${clue.prep}`).click();
-  await expect(page.getByTestId("blank")).toHaveText(clue.prep);
+  await waitAnswered(page, clue.prep);
   expect(errors).toEqual([]);
 });
 
@@ -121,8 +121,12 @@ test("mic-free mode: wrong buttons grey out, the right one fills the sentence", 
   await page.getByTestId(`word-${wrong}`).click();
   await expect(page.getByTestId(`word-${wrong}`)).toBeDisabled();
   await expect(page.getByTestId("blank")).toHaveClass(/wrong/);
+  // Slow the stub voice so the filled sentence stays on screen long enough to check.
+  await page.evaluate(() => ((window as unknown as { __ttsMs: number }).__ttsMs = 2500));
   await page.keyboard.press(`Digit${PREPS.indexOf(clue.prep as (typeof PREPS)[number]) + 1}`);
   await expect(page.getByTestId("blank")).toHaveText(clue.prep);
+  await expect(page.getByTestId("blank")).toHaveClass(/filled/);
+  await expect(page.getByTestId(`word-${clue.prep}`)).toHaveClass(/right/);
   expect(errors).toEqual([]);
 });
 

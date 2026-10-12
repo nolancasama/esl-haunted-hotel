@@ -495,6 +495,168 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
+/** Long red hallway runner with a gold border. */
+export function runnerTexture(): THREE.Texture {
+  return cached("runner", () => {
+    const [c, ctx] = canvas(512, 128);
+    ctx.fillStyle = "#c9a24a";
+    ctx.fillRect(0, 0, 512, 128);
+    ctx.fillStyle = "#8a2333";
+    ctx.fillRect(8, 8, 496, 112);
+    ctx.strokeStyle = "#c9a24a";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(18, 18, 476, 92);
+    ctx.fillStyle = "#c9a24a";
+    for (let x = 50; x < 480; x += 60) {
+      ctx.beginPath();
+      ctx.moveTo(x, 64 - 14);
+      ctx.lineTo(x + 14, 64);
+      ctx.lineTo(x, 64 + 14);
+      ctx.lineTo(x - 14, 64);
+      ctx.closePath();
+      ctx.fill();
+    }
+    return finish("runner", c);
+  });
+}
+
+/** Lobby paintings: a ghost family portrait, or the hotel under the moon. */
+export function paintingTexture(kind: "family" | "hotel"): THREE.Texture {
+  const key = `painting:${kind}`;
+  return cached(key, () => {
+    const [c, ctx] = canvas(160, 200);
+    if (kind === "family") {
+      const g = ctx.createLinearGradient(0, 0, 0, 200);
+      g.addColorStop(0, "#3a2a5a");
+      g.addColorStop(1, "#1f1636");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 160, 200);
+      const ghost = (x: number, y: number, s: number, col: string) => {
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(x, y, 18 * s, Math.PI, 0);
+        ctx.lineTo(x + 18 * s, y + 26 * s);
+        for (let i = 0; i < 4; i++) ctx.lineTo(x + 18 * s - (i + 0.5) * 9 * s, y + (i % 2 ? 26 : 20) * s);
+        ctx.lineTo(x - 18 * s, y + 26 * s);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#231a33";
+        ctx.beginPath();
+        ctx.ellipse(x - 6 * s, y - 2 * s, 2.5 * s, 3.5 * s, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 6 * s, y - 2 * s, 2.5 * s, 3.5 * s, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#231a33";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y + 5 * s, 5 * s, 0.2, Math.PI - 0.2);
+        ctx.stroke();
+      };
+      ghost(52, 92, 1.3, "#f4f1ff");
+      ghost(110, 96, 1.15, "#e8dcff");
+      ghost(82, 140, 0.8, "#fff4d6");
+      ctx.fillStyle = "#c9a24a";
+      ctx.font = "bold 14px serif";
+      ctx.textAlign = "center";
+      ctx.fillText("THE BOOS", 80, 186);
+    } else {
+      const g = ctx.createLinearGradient(0, 0, 0, 200);
+      g.addColorStop(0, "#15123a");
+      g.addColorStop(1, "#4a3a7a");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 160, 200);
+      ctx.fillStyle = "#fff6d8";
+      ctx.beginPath();
+      ctx.arc(118, 40, 16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#1a1230";
+      ctx.fillRect(30, 90, 100, 90);
+      ctx.beginPath();
+      ctx.moveTo(22, 92);
+      ctx.lineTo(80, 50);
+      ctx.lineTo(138, 92);
+      ctx.fill();
+      ctx.fillStyle = "#ffd36b";
+      for (const [x, y] of [
+        [45, 110],
+        [75, 110],
+        [105, 110],
+        [45, 140],
+        [105, 140]
+      ])
+        ctx.fillRect(x, y, 12, 14);
+      ctx.fillStyle = "#2e7d4a";
+      ctx.fillRect(0, 178, 160, 22);
+    }
+    return finish(key, c);
+  });
+}
+
+/** Glowing icons: a padlock on locked doors, a down-arrow over the door to go to. */
+export function iconTexture(kind: "lock" | "arrow"): THREE.Texture {
+  const key = `icon:${kind}`;
+  return cached(key, () => {
+    const [c, ctx] = canvas(128, 128);
+    const g = ctx.createRadialGradient(64, 64, 8, 64, 64, 62);
+    g.addColorStop(0, kind === "lock" ? "rgba(190,150,255,0.55)" : "rgba(255,226,140,0.6)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+    if (kind === "lock") {
+      ctx.strokeStyle = "#e8dcff";
+      ctx.lineWidth = 9;
+      ctx.beginPath();
+      ctx.arc(64, 54, 16, Math.PI, 0);
+      ctx.stroke();
+      ctx.fillStyle = "#c9b4ff";
+      ctx.fillRect(40, 54, 48, 38);
+      ctx.fillStyle = "#4a2f8a";
+      ctx.beginPath();
+      ctx.arc(64, 70, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(61, 70, 6, 12);
+    } else {
+      ctx.fillStyle = "#ffe08a";
+      ctx.strokeStyle = "#7a4a00";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(40, 30);
+      ctx.lineTo(88, 30);
+      ctx.lineTo(88, 62);
+      ctx.lineTo(108, 62);
+      ctx.lineTo(64, 106);
+      ctx.lineTo(20, 62);
+      ctx.lineTo(40, 62);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    return finish(key, c);
+  });
+}
+
+/** A shaft of light: bright at one end, fading along its length, soft at the sides. */
+export function beamTexture(): THREE.Texture {
+  return cached("beam", () => {
+    const [c, ctx] = canvas(256, 64);
+    const along = ctx.createLinearGradient(0, 0, 256, 0);
+    along.addColorStop(0, "rgba(255,255,255,0.95)");
+    along.addColorStop(0.7, "rgba(255,255,255,0.35)");
+    along.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = along;
+    ctx.fillRect(0, 0, 256, 64);
+    // soften the long edges
+    ctx.globalCompositeOperation = "destination-in";
+    const across = ctx.createLinearGradient(0, 0, 0, 64);
+    across.addColorStop(0, "rgba(0,0,0,0)");
+    across.addColorStop(0.3, "rgba(0,0,0,1)");
+    across.addColorStop(0.7, "rgba(0,0,0,1)");
+    across.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = across;
+    ctx.fillRect(0, 0, 256, 64);
+    return finish("beam", c);
+  });
+}
+
 /** Clock face for the grandfather clock. */
 export function clockFaceTexture(): THREE.Texture {
   return cached("clockface", () => {
