@@ -107,6 +107,35 @@ network that blocks or slows them. Fixed light set (hemisphere, moon, one warm
 "room light" that moves to the player's room, the lantern) because changing light
 counts recompiles shaders on Chromebooks.
 
+## 2026-10-14 — Chapter 2: upstairs, eight ghosts
+
+- **Two stacked floors with walkable ramp stairs** (lobby → landing, the floor
+  flips halfway up). Only the floor you are on is drawn, plus the stairs, the
+  lobby seen through the stairwell and one cheap `GroundShell` for the outer
+  walls, so upstairs stays in the same ~100–200 draw-call budget. Rejected: a
+  separate scene or level load (breaks the walk-in story), drawing both floors
+  (doubles the draw calls on Chromebooks).
+- **An iron gate closes the stairs until the 4th ghost** in the full adventure;
+  the Chapter 2 cutscene (skippable) opens it. The HUD and lobby board show 4
+  ghosts and then 8 (two rows), so Chapter 1 never feels "half done".
+- **Four upstairs rooms with familiar clue nouns** (toy box, table, bathtub,
+  sink, basket, piano, drum, sofa, clock, window...), following the same one
+  noun per room rule. Room tricks are atmosphere only: Bouncy's toys move,
+  Melody's instruments play, Shadow's attic blacks out and rattles while Shadow
+  escapes after each of its first three answers. The fourth answer is the capture,
+  with no blackout, so the finale is never hidden in the dark.
+- **The bathroom steam silhouette never marks a spot.** It drifts on its own
+  path; a fan switch clears the steam. A silhouette pointing at the ghost would
+  replace listening.
+- **Shadow is the finale:** four rounds in the attic, all four prepositions, like
+  Mischief. After the 8th ghost the lantern blazes and the existing sunrise
+  ending plays.
+- **Chapter 1 on its own keeps its four-ghost ending.** Chapter 2 unlocks after
+  Chapter 1 is finished (stored on the device). Title chips: All 8 / Chapter 1 /
+  Chapter 2 / Practice, plus "Random hiding places" once replay is unlocked.
+  `?chapter=1|2` for teachers who split it over two lessons. Rejected: forcing
+  the full 20-minute run (too long for one lesson).
+
 ## 2026-10-13 — Phase 3: polish for classrooms and phones
 
 - **Lens shift while answering.** The answer panel covers up to ~45% of a

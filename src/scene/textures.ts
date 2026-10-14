@@ -52,12 +52,37 @@ export interface FloorStyle {
   base: string;
   seam: string;
   seed: number;
+  /** Checkerboard tiles (the bathroom) instead of planks. */
+  tiles?: boolean;
 }
 
 export function floorTexture(style: FloorStyle): THREE.Texture {
   return cached(`floor:${style.base}:${style.seed}`, () => {
     const [c, ctx] = canvas(512, 512);
     const rand = prng(style.seed);
+    if (style.tiles) {
+      const t = 64;
+      for (let y = 0; y < 512; y += t) {
+        for (let x = 0; x < 512; x += t) {
+          const dark = ((x + y) / t) % 2 === 1;
+          ctx.fillStyle = shade(dark ? style.seam : style.base, 0.94 + rand() * 0.1);
+          ctx.fillRect(x, y, t, t);
+          ctx.fillStyle = "rgba(255,255,255,0.08)";
+          ctx.fillRect(x + 4, y + 4, t - 8, 6);
+        }
+      }
+      ctx.strokeStyle = "rgba(30,40,45,0.5)";
+      ctx.lineWidth = 3;
+      for (let i = 0; i <= 512; i += t) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, 512);
+        ctx.moveTo(0, i);
+        ctx.lineTo(512, i);
+        ctx.stroke();
+      }
+      return finish(`floor:${style.base}:${style.seed}`, c, { repeat: true });
+    }
     const plankH = 64;
     for (let row = 0; row < 512 / plankH; row++) {
       let x = -Math.floor(rand() * 200);
@@ -92,9 +117,68 @@ export function floorTexture(style: FloorStyle): THREE.Texture {
 export interface WallStyle {
   paper: string;
   pattern: string;
-  kind: "stripes" | "damask" | "dots" | "bricks";
+  kind: "stripes" | "damask" | "dots" | "bricks" | "stars" | "tiles" | "planks";
   wainscot: string;
   trim: string;
+}
+
+function drawStar(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rr = i % 2 ? r * 0.45 : r;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+/** Bare vertical boards from floor to ceiling (the attic). */
+function drawPlanks(ctx: CanvasRenderingContext2D, style: WallStyle, W: number, H: number) {
+  const rand = prng(19);
+  const bw = 42;
+  for (let x = 0; x < W; x += bw) {
+    ctx.fillStyle = shade(style.paper, 0.8 + rand() * 0.35);
+    ctx.fillRect(x, 0, bw, H);
+    ctx.strokeStyle = shade(style.paper, 0.7);
+    ctx.lineWidth = 1;
+    for (let g = 0; g < 3; g++) {
+      const gx = x + 6 + rand() * (bw - 12);
+      ctx.beginPath();
+      ctx.moveTo(gx, 0);
+      ctx.bezierCurveTo(gx + rand() * 6 - 3, H * 0.3, gx + rand() * 6 - 3, H * 0.7, gx, H);
+      ctx.stroke();
+    }
+    // a knot now and then
+    if (rand() < 0.5) {
+      ctx.fillStyle = shade(style.paper, 0.6);
+      ctx.beginPath();
+      ctx.ellipse(x + bw / 2, rand() * H, 4, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = style.pattern;
+    ctx.fillRect(x, 0, 3, H);
+    // nails at the cross beams
+    ctx.fillStyle = "#2a2018";
+    for (const y of [H * 0.18, H * 0.62]) {
+      ctx.beginPath();
+      ctx.arc(x + bw / 2, y, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  // two horizontal battens
+  for (const y of [H * 0.16, H * 0.6]) {
+    ctx.fillStyle = shade(style.paper, 0.72);
+    ctx.fillRect(0, y, W, 14);
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillRect(0, y + 14, W, 3);
+  }
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, "rgba(0,0,0,0.25)");
+  grad.addColorStop(0.5, "rgba(0,0,0,0)");
+  grad.addColorStop(1, "rgba(0,0,0,0.2)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
 }
 
 /** Canvas bottom = floor. Lower third wood panels, chair rail, patterned wallpaper above. */
@@ -105,11 +189,44 @@ export function wallTexture(style: WallStyle): THREE.Texture {
     const H = 512;
     const [c, ctx] = canvas(W, H);
     const rand = prng(7);
+    if (style.kind === "planks") {
+      drawPlanks(ctx, style, W, H);
+      return finish(key, c, { repeat: true });
+    }
     const railY = Math.round(H * 0.64); // from top
     // wallpaper
     ctx.fillStyle = style.paper;
     ctx.fillRect(0, 0, W, railY);
-    if (style.kind === "stripes") {
+    if (style.kind === "stars") {
+      // night-sky nursery paper: stars and little moons
+      ctx.fillStyle = style.pattern;
+      for (let y = 26; y < railY; y += 58) {
+        for (let x = 20; x < W + 32; x += 64) {
+          const ox = (Math.floor(y / 58) % 2) * 32;
+          if ((x / 64 + Math.floor(y / 58)) % 3 === 0) {
+            ctx.beginPath();
+            ctx.arc((x + ox) % W, y, 9, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = style.paper;
+            ctx.beginPath();
+            ctx.arc(((x + ox) % W) + 4, y - 3, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = style.pattern;
+          } else drawStar(ctx, (x + ox) % W, y, 8);
+        }
+      }
+    } else if (style.kind === "tiles") {
+      const t = 32;
+      for (let y = 0; y < railY; y += t) {
+        for (let x = 0; x < W; x += t) {
+          ctx.fillStyle = shade(style.paper, 0.92 + rand() * 0.14);
+          ctx.fillRect(x, y, t, t);
+        }
+      }
+      ctx.fillStyle = style.pattern;
+      for (let i = 0; i <= W; i += t) ctx.fillRect(i - 1, 0, 2, railY);
+      for (let i = 0; i <= railY; i += t) ctx.fillRect(0, i - 1, W, 2);
+    } else if (style.kind === "stripes") {
       ctx.fillStyle = style.pattern;
       for (let x = 0; x < W; x += 64) ctx.fillRect(x + 20, 0, 22, railY);
       ctx.fillStyle = shade(style.pattern, 1.1);
@@ -160,18 +277,25 @@ export function wallTexture(style: WallStyle): THREE.Texture {
     ctx.fillRect(0, railY, W, 12);
     ctx.fillStyle = shade(style.trim, 1.3);
     ctx.fillRect(0, railY, W, 3);
-    // wainscot panels
+    // wainscot panels (big white tiles in the bathroom)
     ctx.fillStyle = style.wainscot;
     ctx.fillRect(0, railY + 12, W, H - railY - 12);
-    ctx.strokeStyle = shade(style.wainscot, 0.7);
-    ctx.lineWidth = 4;
-    for (let x = 0; x < W; x += 128) {
-      ctx.strokeRect(x + 14, railY + 30, 100, H - railY - 70);
-    }
-    ctx.strokeStyle = shade(style.wainscot, 1.25);
-    ctx.lineWidth = 2;
-    for (let x = 0; x < W; x += 128) {
-      ctx.strokeRect(x + 18, railY + 34, 92, H - railY - 78);
+    if (style.kind === "tiles") {
+      const t = 42;
+      ctx.fillStyle = shade(style.wainscot, 0.75);
+      for (let x = 0; x <= W; x += t) ctx.fillRect(x - 1, railY + 12, 2, H - railY - 12);
+      for (let y = railY + 12; y < H; y += t) ctx.fillRect(0, y - 1, W, 2);
+    } else {
+      ctx.strokeStyle = shade(style.wainscot, 0.7);
+      ctx.lineWidth = 4;
+      for (let x = 0; x < W; x += 128) {
+        ctx.strokeRect(x + 14, railY + 30, 100, H - railY - 70);
+      }
+      ctx.strokeStyle = shade(style.wainscot, 1.25);
+      ctx.lineWidth = 2;
+      for (let x = 0; x < W; x += 128) {
+        ctx.strokeRect(x + 18, railY + 34, 92, H - railY - 78);
+      }
     }
     // baseboard
     ctx.fillStyle = style.trim;
@@ -366,14 +490,14 @@ export type Expression = "happy" | "surprised" | "giggle" | "sleepy" | "dizzy" |
 
 /**
  * Ghost face drawn for a sphere-segment decal (u = left->right, v = top->bottom).
- * `mask` paints Sneaky's bandit mask across the eyes.
+ * `mask` paints Sneaky's bandit mask across the eyes; `glow` gives Shadow glowing eyes.
  */
-export function faceTexture(expr: Expression, mask = false): THREE.Texture {
-  const key = `face:${expr}:${mask}`;
+export function faceTexture(expr: Expression, mask = false, glow = false): THREE.Texture {
+  const key = `face:${expr}:${mask}:${glow}`;
   return cached(key, () => {
     const [c, ctx] = canvas(256, 256);
     ctx.clearRect(0, 0, 256, 256);
-    const ink = "#231a33";
+    const ink = glow ? "#1a1030" : "#231a33";
     const eyeY = 104;
     const lx = 92;
     const rx = 164;
@@ -382,8 +506,13 @@ export function faceTexture(expr: Expression, mask = false): THREE.Texture {
       roundRect(ctx, 40, eyeY - 30, 176, 58, 26);
       ctx.fill();
     }
-    ctx.fillStyle = mask ? "#f2fff6" : ink;
-    ctx.strokeStyle = mask ? "#f2fff6" : ink;
+    const eyeInk = mask ? "#f2fff6" : glow ? "#fff27a" : ink;
+    ctx.fillStyle = eyeInk;
+    ctx.strokeStyle = eyeInk;
+    if (glow) {
+      ctx.shadowColor = "#ffd84a";
+      ctx.shadowBlur = 16;
+    }
     ctx.lineCap = "round";
     ctx.lineWidth = 9;
     const eye = (x: number) => {
@@ -422,7 +551,7 @@ export function faceTexture(expr: Expression, mask = false): THREE.Texture {
           ctx.ellipse(x, eyeY, 12, 17, 0, 0, Math.PI * 2);
           ctx.fill();
       }
-      if (!mask && (expr === "happy" || expr === "surprised" || expr === "talk")) {
+      if (!mask && !glow && (expr === "happy" || expr === "surprised" || expr === "talk")) {
         ctx.fillStyle = "#ffffff";
         ctx.beginPath();
         ctx.arc(x + 4, eyeY - 6, expr === "surprised" ? 6 : 4.5, 0, Math.PI * 2);
@@ -432,6 +561,7 @@ export function faceTexture(expr: Expression, mask = false): THREE.Texture {
     };
     eye(lx);
     eye(rx);
+    ctx.shadowBlur = 0;
     // cheeks
     ctx.fillStyle = "rgba(255,120,150,0.35)";
     ctx.beginPath();
@@ -654,6 +784,89 @@ export function beamTexture(): THREE.Texture {
     ctx.fillStyle = across;
     ctx.fillRect(0, 0, 256, 64);
     return finish("beam", c);
+  });
+}
+
+/** A soap bubble: clear middle, bright rim and a highlight. */
+export function bubbleTexture(): THREE.Texture {
+  return cached("bubble", () => {
+    const [c, ctx] = canvas(64, 64);
+    const g = ctx.createRadialGradient(32, 32, 18, 32, 32, 30);
+    g.addColorStop(0, "rgba(255,255,255,0.05)");
+    g.addColorStop(0.75, "rgba(220,250,255,0.35)");
+    g.addColorStop(0.92, "rgba(255,255,255,0.95)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(32, 32, 30, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.beginPath();
+    ctx.ellipse(23, 21, 6, 4, -0.6, 0, Math.PI * 2);
+    ctx.fill();
+    return finish("bubble", c);
+  });
+}
+
+/** A soft lumpy cloud of steam. */
+export function steamTexture(): THREE.Texture {
+  return cached("steam", () => {
+    const [c, ctx] = canvas(128, 128);
+    const rand = prng(31);
+    for (let i = 0; i < 9; i++) {
+      const x = 34 + rand() * 60;
+      const y = 40 + rand() * 50;
+      const r = 22 + rand() * 20;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, "rgba(255,255,255,0.7)");
+      g.addColorStop(0.6, "rgba(255,255,255,0.3)");
+      g.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 128, 128);
+    }
+    return finish("steam", c);
+  });
+}
+
+/** An eighth note, drawn (no font needed). */
+export function noteTexture(): THREE.Texture {
+  return cached("note", () => {
+    const [c, ctx] = canvas(64, 64);
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = "rgba(255,255,255,0.8)";
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.ellipse(24, 46, 10, 7.5, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(31, 12, 4.5, 34);
+    ctx.beginPath();
+    ctx.moveTo(35, 12);
+    ctx.quadraticCurveTo(50, 18, 47, 32);
+    ctx.quadraticCurveTo(45, 22, 35, 22);
+    ctx.closePath();
+    ctx.fill();
+    return finish("note", c);
+  });
+}
+
+/** A ghost-shaped shadow glimpsed through the steam. */
+export function silhouetteTexture(): THREE.Texture {
+  return cached("silhouette", () => {
+    const [c, ctx] = canvas(128, 128);
+    ctx.fillStyle = "rgba(30,90,110,0.9)";
+    ctx.beginPath();
+    ctx.arc(64, 54, 34, Math.PI, 0);
+    ctx.lineTo(98, 104);
+    for (let k = 0; k < 6; k++) ctx.lineTo(98 - (k + 0.5) * (68 / 6), k % 2 ? 104 : 94);
+    ctx.lineTo(30, 104);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(170,250,255,0.9)";
+    ctx.beginPath();
+    ctx.ellipse(52, 56, 5, 7, 0, 0, Math.PI * 2);
+    ctx.ellipse(76, 56, 5, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    return finish("silhouette", c);
   });
 }
 

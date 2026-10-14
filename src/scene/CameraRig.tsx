@@ -42,7 +42,7 @@ export function CameraRig() {
     } else if (c.mode === "follow" || !c.shot) {
       const tx = rt.player.x;
       const tz = rt.player.z;
-      const ty = 0.85;
+      const ty = rt.player.y + 0.85;
       const horiz = c.dist * Math.cos(c.pitch);
       want.current.set(tx + Math.sin(c.yaw) * horiz, ty + c.dist * Math.sin(c.pitch), tz + Math.cos(c.yaw) * horiz);
       wantLook.current.set(tx, ty, tz);
@@ -60,6 +60,13 @@ export function CameraRig() {
     pos.current.lerp(want.current, k);
     look.current.lerp(wantLook.current, k);
     camera.position.copy(pos.current);
+    // A short shake (the bang upstairs, the last capture).
+    const st = rt.time - c.shake.t0;
+    if (st >= 0 && st < 0.9) {
+      const s = c.shake.amp * (1 - st / 0.9);
+      camera.position.x += Math.sin(rt.time * 61) * s;
+      camera.position.y += Math.sin(rt.time * 47 + 1) * s * 0.6;
+    }
     camera.lookAt(look.current);
 
     // Lens shift: while the answer panel covers the bottom of the screen, move the

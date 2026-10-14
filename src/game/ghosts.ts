@@ -7,11 +7,13 @@ export interface GhostDef {
   color: string;
   glow: string;
   room: RoomId;
-  accessory: "nightcap" | "bib" | "mask" | "tophat";
+  accessory: "nightcap" | "bib" | "mask" | "tophat" | "propeller" | "showercap" | "headphones" | "wings";
   /** Giggle pitch multiplier. */
   voice: number;
   /** Idle bobbing speed. */
   bob: number;
+  /** Glowing eyes (Shadow). */
+  glowEyes?: boolean;
   /** Short description for the results card (Japanese). */
   blurbJa: string;
 }
@@ -60,7 +62,56 @@ export const GHOSTS: Record<GhostId, GhostDef> = {
     voice: 1.3,
     bob: 1.5,
     blurbJa: "いたずらずきの おばけ"
+  },
+  bouncy: {
+    id: "bouncy",
+    name: "Bouncy",
+    color: "#ffd84a",
+    glow: "#ffe98a",
+    room: "playroom",
+    accessory: "propeller",
+    voice: 1.4,
+    bob: 1.8,
+    blurbJa: "おもちゃが だいすきな おばけ"
+  },
+  bubbles: {
+    id: "bubbles",
+    name: "Bubbles",
+    color: "#62e2ee",
+    glow: "#a8f4fa",
+    room: "bathroom",
+    accessory: "showercap",
+    voice: 1.1,
+    bob: 0.9,
+    blurbJa: "おふろが すきな おばけ"
+  },
+  melody: {
+    id: "melody",
+    name: "Melody",
+    color: "#ff8fcf",
+    glow: "#ffbfe4",
+    room: "music",
+    accessory: "headphones",
+    voice: 1.2,
+    bob: 1.1,
+    blurbJa: "おんがくが すきな おばけ"
+  },
+  shadow: {
+    id: "shadow",
+    name: "Shadow",
+    color: "#6a4bb4",
+    glow: "#9b7cff",
+    room: "attic",
+    accessory: "wings",
+    voice: 0.7,
+    bob: 1.3,
+    glowEyes: true,
+    blurbJa: "やねうらの かくれんぼ めいじん"
   }
 };
 
-export const GHOST_ORDER: GhostId[] = ["sleepy", "hungry", "sneaky", "mischief"];
+export const GHOST_ORDER: GhostId[] = ["sleepy", "hungry", "sneaky", "mischief", "bouncy", "bubbles", "melody", "shadow"];
+export const CHAPTER_GHOSTS: Record<1 | 2, GhostId[]> = {
+  1: ["sleepy", "hungry", "sneaky", "mischief"],
+  2: ["bouncy", "bubbles", "melody", "shadow"]
+};

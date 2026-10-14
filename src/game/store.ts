@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import type { GhostId, Prep } from "./types";
 import type { HuntState } from "./logic/hunt";
+import type { Scope } from "./logic/plans";
+
+export type { Scope };
 
 export type Screen = "title" | "game" | "results";
 export type Mode = "practice" | "story" | "replay";
@@ -66,7 +69,17 @@ export type HintId =
   | "goDoor"
   | "locked"
   | "micBlocked"
-  | "exit";
+  | "exit"
+  | "goStairs"
+  | "fan";
+
+/** The full-screen chapter title ("CHAPTER 2 — UPSTAIRS"). */
+export interface ChapterCard {
+  key: number;
+  title: string;
+  sub: string;
+  ja: string;
+}
 
 export interface GameState {
   screen: Screen;
@@ -97,6 +110,16 @@ export interface GameState {
   touch: boolean;
   fade: number;
   replayUnlocked: boolean;
+  /** Which part of the hotel this game covers. */
+  scope: Scope;
+  /** The chapter being played (the HUD shows only this chapter's ghosts until Chapter 2 opens). */
+  chapter: 1 | 2;
+  /** Chapter 2 on its own is offered once Chapter 1 has been finished on this device. */
+  ch2Unlocked: boolean;
+  chapterCard: ChapterCard | null;
+  /** performance.now() when the hunt started and when the last ghost was caught. */
+  startedAt: number | null;
+  finishedAt: number | null;
 }
 
 const SETTINGS_KEY = "hh.settings.v1";
@@ -121,12 +144,27 @@ function loadSettings(): Settings {
   return { ...DEFAULT_SETTINGS };
 }
 
-function loadReplay(): boolean {
+const CH2_KEY = "hh.ch2.v1";
+
+function loadFlag(key: string): boolean {
   try {
-    return localStorage.getItem(REPLAY_KEY) === "1";
+    return localStorage.getItem(key) === "1";
   } catch {
     return false;
   }
+}
+
+function saveFlag(key: string) {
+  try {
+    localStorage.setItem(key, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Chapter 1 has been finished on this device: Chapter 2 can be played on its own. */
+export function saveCh2Unlocked() {
+  saveFlag(CH2_KEY);
 }
 
 export function saveSettings(s: Settings) {
@@ -138,11 +176,7 @@ export function saveSettings(s: Settings) {
 }
 
 export function saveReplayUnlocked() {
-  try {
-    localStorage.setItem(REPLAY_KEY, "1");
-  } catch {
-    /* ignore */
-  }
+  saveFlag(REPLAY_KEY);
 }
 
 export const EMPTY_ANSWER: AnswerUi = {
@@ -181,8 +215,25 @@ export const useGame = create<GameState>(() => ({
   settingsOpen: false,
   touch: false,
   fade: 0,
-  replayUnlocked: loadReplay()
+  replayUnlocked: loadFlag(REPLAY_KEY),
+  scope: "all",
+  chapter: 1,
+  ch2Unlocked: loadFlag(CH2_KEY),
+  chapterCard: null,
+  startedAt: null,
+  finishedAt: null
 }));
 
 export const setGame = useGame.setState;
 export const getGame = useGame.getState;
+
+/**
+ * The ghosts the HUD and the lobby board show. In the full adventure the
+ * four upstairs ghosts stay a surprise until Chapter 2 opens.
+ */
+export function visibleGhosts(g: Pick<GameState, "hunt" | "scope" | "chapter" | "mode">): GhostId[] {
+  if (!g.hunt) return [];
+  const all = g.hunt.encounters.map((e) => e.ghost);
+  if (g.mode !== "practice" && g.scope === "all" && g.chapter === 1) return all.slice(0, 4);
+  return all;
+}

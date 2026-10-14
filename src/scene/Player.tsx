@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { rt } from "../game/runtime";
 import { getGame, setGame } from "../game/store";
 import { keyboardMove } from "../input/keyboard";
-import { nearestSearchable, resolveCollisions } from "../game/world/collision";
+import { floorState, moveBody, nearestSearchable } from "../game/world/collision";
 import { rectDistance } from "../game/world/geometry";
 import { INTERACT_RANGE } from "../game/world/constants";
 import { WORLD } from "../game/world/world";
@@ -82,6 +82,7 @@ export function Player() {
     []
   );
   const root = useRef<THREE.Group>(null);
+  const halo = useRef<THREE.Sprite>(null);
   const bob = useRef<THREE.Group>(null);
   const legL = useRef<THREE.Group>(null);
   const legR = useRef<THREE.Group>(null);
@@ -120,10 +121,12 @@ export function Player() {
     let dx = rx * mx + fx * my;
     let dz = rz * mx + fz * my;
 
-    // Tap-to-walk towards an object.
+    // Tap-to-walk towards an object (on this floor).
     if (canMove && p.walkTo) {
       const w = p.walkTo;
-      const obj = w.objectId ? WORLD.objectById.get(w.objectId) : null;
+      const found = w.objectId ? WORLD.objectById.get(w.objectId) : null;
+      const obj = found && found.floor === p.floor ? found : null;
+      if (found && !obj) p.walkTo = null;
       const reached = obj ? rectDistance(obj.rect, p.x, p.z) < INTERACT_RANGE - 0.25 : Math.hypot(w.x - p.x, w.z - p.z) < 0.2;
       if (reached) {
         p.walkTo = null;
@@ -179,11 +182,18 @@ export function Player() {
     if (speed > 0.01) {
       const steps = Math.max(1, Math.ceil((speed * dt) / 0.08));
       for (let i = 0; i < steps; i++) {
-        const r = resolveCollisions(p.x + (p.vx * dt) / steps, p.z + (p.vz * dt) / steps, (id) => rt.doorsOpen.has(id));
+        const r = moveBody(p.x + (p.vx * dt) / steps, p.z + (p.vz * dt) / steps, p.floor, (id) => rt.doorsOpen.has(id));
         p.x = r.x;
         p.z = r.z;
+        p.floor = r.floor;
       }
     }
+    // Height follows the stairs; the floor you are on is the floor that is drawn.
+    const fs = floorState(p.x, p.z, p.floor);
+    p.floor = fs.floor;
+    p.stairs = fs.stairs;
+    p.y += (fs.y - p.y) * (Math.abs(fs.y - p.y) > 1.5 ? 1 : Math.min(1, dt * 18));
+    rt.view.floor = p.floor;
     if (speed > 0.2) {
       const target = Math.atan2(p.vx, p.vz);
       let d = target - p.yaw;
@@ -208,7 +218,7 @@ export function Player() {
     }
 
     if (root.current) {
-      root.current.position.set(p.x, 0, p.z);
+      root.current.position.set(p.x, p.y, p.z);
       root.current.rotation.y = p.yaw;
     }
 
@@ -219,12 +229,13 @@ export function Player() {
     const sy = tgt.y - cam.y;
     const sz = tgt.z - cam.z;
     const sl = sx * sx + sy * sy + sz * sz || 1;
-    const t = ((p.x - cam.x) * sx + (0.75 - cam.y) * sy + (p.z - cam.z) * sz) / sl;
+    const chest = p.y + 0.75;
+    const t = ((p.x - cam.x) * sx + (chest - cam.y) * sy + (p.z - cam.z) * sz) / sl;
     const cx = cam.x + sx * Math.min(1, Math.max(0, t)) - p.x;
-    const cy = cam.y + sy * Math.min(1, Math.max(0, t)) - 0.75;
+    const cy = cam.y + sy * Math.min(1, Math.max(0, t)) - chest;
     const cz = cam.z + sz * Math.min(1, Math.max(0, t)) - p.z;
     const blocking = rt.camera.mode !== "follow" && t > 0.02 && t < 0.98 && Math.hypot(cx, cy, cz) < 0.8;
-    const tooClose = Math.hypot(cam.x - p.x, cam.z - p.z) < 1.0 && cam.y < 2.2;
+    const tooClose = Math.hypot(cam.x - p.x, cam.z - p.z) < 1.0 && cam.y < p.y + 2.2;
     const wantOpacity = blocking || tooClose ? 0 : 1;
     fade.current += (wantOpacity - fade.current) * Math.min(1, dt * 9);
     const o = fade.current;
@@ -248,11 +259,20 @@ export function Player() {
       rt.lantern.y = tmp.y;
       rt.lantern.z = tmp.z;
     }
-    if (light.current) light.current.intensity = 2.6 + Math.sin(rt.time * 7) * 0.15 + caught.length * 0.25;
+    // The ending: the lantern blazes with every ghost inside, cycling their colours quickly.
+    const burst = rt.time - rt.lanternBurstT0;
+    const blaze = burst >= 0 && burst < 4.5 ? Math.sin(Math.min(1, burst / 0.6) * Math.PI * 0.5) * Math.min(1, (4.5 - burst) / 1.2) : 0;
+    if (blaze > 0 && caught.length) {
+      const c = GHOSTS[caught[Math.floor(rt.time * 6) % caught.length]].glow;
+      coreMat.color.lerp(tmpColor.set(c), 0.3);
+      haloMat.color.copy(coreMat.color);
+    }
+    if (halo.current) halo.current.scale.setScalar(0.55 * (1 + blaze * 3.5));
+    if (light.current) light.current.intensity = 2.6 + Math.sin(rt.time * 7) * 0.15 + caught.length * 0.25 + blaze * 9;
 
     // Which object can be searched from here.
     if (game.screen === "game" && game.phase === "explore") {
-      const focus = nearestSearchable(p.x, p.z, p.yaw);
+      const focus = p.stairs ? null : nearestSearchable(p.x, p.z, p.yaw, p.floor);
       if (focus !== game.focusId) setGame({ focusId: focus });
     }
   });
@@ -277,7 +297,7 @@ export function Player() {
             <mesh position={[0, 0.07, 0]} material={coreMat}>
               <sphereGeometry args={[0.05, 12, 10]} />
             </mesh>
-            <sprite material={haloMat} position={[0, 0.07, 0]} scale={[0.55, 0.55, 1]} />
+            <sprite ref={halo} material={haloMat} position={[0, 0.07, 0]} scale={[0.55, 0.55, 1]} />
             <pointLight ref={light} position={[0, 0.1, 0]} color="#ffcf8a" intensity={2.6} distance={4.5} decay={1.6} />
           </group>
         </group>

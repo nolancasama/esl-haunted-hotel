@@ -1,14 +1,33 @@
 import * as THREE from "three";
 import { director } from "./director";
 import { getGame, setGame } from "./store";
-import { rt } from "./runtime";
+import { rattle, rt } from "./runtime";
 import { currentSpot } from "./logic/hunt";
 import { clueText } from "./logic/clues";
 import { WORLD } from "./world/world";
 import { rectCenter, rotateXZ } from "./world/geometry";
-import { resolveCollisions } from "./world/collision";
+import { collidersFor, floorState, resolveCollisions } from "./world/collision";
+import { FLOOR_Y } from "./world/rooms";
+import type { Floor } from "./types";
 import { cameraRef } from "../scene/CameraRig";
 import { rendererRef } from "../scene/GameScene";
+import { audio } from "../audio/audio";
+
+/** Put the player at (x, z) on a floor, collision-resolved for wherever that is (the stairs included). */
+function place(x: number, z: number, floor: Floor) {
+  const st = floorState(x, z, floor);
+  const p = resolveCollisions(x, z, (id) => rt.doorsOpen.has(id), collidersFor(st.floor, st.stairs));
+  const fs = floorState(p.x, p.z, st.floor);
+  rt.player.x = p.x;
+  rt.player.z = p.z;
+  rt.player.floor = fs.floor;
+  rt.player.y = fs.y;
+  rt.player.stairs = fs.stairs;
+  rt.player.vx = 0;
+  rt.player.vz = 0;
+  rt.view.floor = fs.floor;
+  return { ...p, floor: fs.floor };
+}
 
 /**
  * Test hook (only with ?e2e=1): read game state and put the player next to
@@ -38,7 +57,18 @@ export function installE2eHook() {
         searchId: g.searchId,
         selectedSpot: g.selectedSpot,
         helpLevel: g.helpLevel,
-        player: { x: rt.player.x, z: rt.player.z },
+        player: { x: rt.player.x, z: rt.player.z, y: rt.player.y, floor: rt.player.floor, stairs: rt.player.stairs },
+        viewFloor: rt.view.floor,
+        scope: g.scope,
+        chapter: g.chapter,
+        chapterCard: g.chapterCard?.title ?? null,
+        ch2Unlocked: g.ch2Unlocked,
+        steam: rt.steam.level,
+        fanOn: rt.time < rt.steam.fanUntil,
+        blackout: rt.time - rt.blackoutT0 < 2.2,
+        rattles: rt.rattles.filter((r) => rt.time - r.t0 < r.dur).map((r) => r.objectId),
+        startedAt: g.startedAt,
+        finishedAt: g.finishedAt,
         ghostAnim: rt.ghost.anim.mode,
         ghost: rt.ghost.id,
         lantern: g.lantern,
@@ -55,29 +85,25 @@ export function installE2eHook() {
         ...director.debug()
       };
     },
-    /** Put the player somewhere (collision-resolved). */
-    teleport(x: number, z: number) {
-      const p = resolveCollisions(x, z, (id) => rt.doorsOpen.has(id));
-      rt.player.x = p.x;
-      rt.player.z = p.z;
-      rt.player.vx = 0;
-      rt.player.vz = 0;
-      return p;
+    /** Put the player somewhere (collision-resolved), on a floor (default: the one they are on). */
+    teleport(x: number, z: number, floor?: number) {
+      const f = (floor === 1 ? 1 : floor === 0 ? 0 : rt.player.floor) as Floor;
+      return place(x, z, f);
     },
-    /** Stand in front of an object, facing it. */
+    /** Stand in front of an object, facing it (on its floor). */
     goTo(objectId: string) {
       const obj = WORLD.objectById.get(objectId);
       if (!obj) throw new Error(`no object ${objectId}`);
       const c = rectCenter(obj.rect);
       const front = rotateXZ(0, 1, obj.rot);
       const half = obj.spec.wallMounted ? obj.spec.d : Math.abs(front.x) > 0.5 ? (obj.rect.x1 - obj.rect.x0) / 2 : (obj.rect.z1 - obj.rect.z0) / 2;
-      const p = resolveCollisions(c.x + front.x * (half + 0.55), c.z + front.z * (half + 0.55), (id) => rt.doorsOpen.has(id));
-      rt.player.x = p.x;
-      rt.player.z = p.z;
-      rt.player.vx = 0;
-      rt.player.vz = 0;
+      const p = place(c.x + front.x * (half + 0.55), c.z + front.z * (half + 0.55), obj.floor);
       rt.player.yaw = Math.atan2(c.x - p.x, c.z - p.z);
       return p;
+    },
+    /** Floor heights, for tests that check the player really went up the stairs. */
+    floorY() {
+      return FLOOR_Y;
     },
     /** Screen position (CSS px) of a search marker or any world point. */
     screenOf(spotId: string) {
@@ -100,6 +126,43 @@ export function installE2eHook() {
     },
     finish() {
       director.debugFinish();
+    },
+    /** Jump to encounter `index` (0-based), at round `round` of a finale ghost. */
+    jump(index: number, round = 0) {
+      director.debugJump(index, round);
+    },
+    /** Turn the follow camera. */
+    setYaw(yaw: number, pitch?: number) {
+      rt.camera.yaw = yaw;
+      rt.camera.yawTarget = null;
+      if (pitch !== undefined) rt.camera.pitch = pitch;
+    },
+    /** Visual checks: fill the bathroom with steam (or clear it). */
+    steam(level: number) {
+      rt.steam.target = level;
+      rt.steam.level = level;
+      rt.steam.silhouetteT0 = rt.time;
+    },
+    /** Exercise the reachable fan switch while keeping forced maximum steam within one frame. */
+    fanSwitchTest() {
+      rt.steam.target = 1;
+      rt.steam.level = 1;
+      const before = { steam: rt.steam.level, fanOn: rt.time < rt.steam.fanUntil };
+      const play = audio.play;
+      audio.play = () => {};
+      try {
+        director.tapObject("bathroom.switch");
+      } finally {
+        audio.play = play;
+      }
+      rt.steam.level = rt.steam.target;
+      const after = { steam: rt.steam.level, fanOn: rt.time < rt.steam.fanUntil };
+      rt.steam.fanUntil = -100;
+      return { before, after };
+    },
+    /** Visual checks: make an object wobble. */
+    wobble(objectId: string) {
+      rattle(objectId, 2, 1);
     },
     /** Renderer workload for the last frame. */
     stats() {

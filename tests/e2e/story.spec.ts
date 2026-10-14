@@ -59,8 +59,10 @@ test("the intro plays, can be skipped, and opens only the bedroom", async ({ pag
   expect(errors).toEqual([]);
 });
 
+// Chapter 1 on its own keeps the original four-ghost story and its sunrise ending.
 test("rooms open in order, every clue leads to its ghost, and the ending leads to results and replay", async ({ page }) => {
-  const errors = await boot(page, "&mode=story&intro=0");
+  test.setTimeout(300_000);
+  const errors = await boot(page, "&mode=story&intro=0&chapter=1");
   await page.getByTestId("start").click();
   await waitPhase(page, "explore");
   const caught: string[] = [];

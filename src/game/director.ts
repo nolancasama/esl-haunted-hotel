@@ -1,33 +1,46 @@
 import { audio, type SfxName } from "../audio/audio";
 import { tts } from "../audio/tts";
 import { HARD_ERRORS, recognition, requestMicPermission } from "../audio/recognition";
-import { EMPTY_ANSWER, getGame, saveReplayUnlocked, saveSettings, setGame, type AnswerUi, type HintId, type Mode, type Settings } from "./store";
-import { resetRuntime, rt, type Gag } from "./runtime";
+import {
+  EMPTY_ANSWER,
+  getGame,
+  saveCh2Unlocked,
+  saveReplayUnlocked,
+  saveSettings,
+  setGame,
+  type AnswerUi,
+  type HintId,
+  type Mode,
+  type Scope,
+  type Settings
+} from "./store";
+import { rattle, resetRuntime, rt, type Gag } from "./runtime";
 import { answerPrep, createHunt, currentEncounter, currentSpot, searchHelpLevel, searchSpot, type Encounter, type HuntState } from "./logic/hunt";
-import { practicePlan, storyPlan } from "./logic/plans";
+import { chapterBreakAfter, practicePlan, storyPlan } from "./logic/plans";
 import { replayPlan } from "./logic/replay";
 import { clueSpoken, emptyCaption, QUESTION, sentenceWith } from "./logic/clues";
 import { judgeSpeech, type Judgement } from "./logic/speechMatch";
 import { mulberry32, pick, type Rng } from "./logic/rng";
-import { WORLD, type HidingSpot } from "./world/world";
-import { INTERACT_RANGE, OUTSIDE, PRACTICE_START, STORY_START } from "./world/constants";
+import { WORLD, type HidingSpot, type WorldObject } from "./world/world";
+import { INTERACT_RANGE, OUTSIDE, PRACTICE_START, STAIRS_FOOT, STORY_START, UPSTAIRS_START } from "./world/constants";
 import { rectCenter, rectDistance } from "./world/geometry";
-import { DOORS, ROOMS, ROOM_DOOR, roomAt } from "./world/rooms";
-import { GHOSTS } from "./ghosts";
-import { PREPS, type GhostId, type Prep, type RoomId } from "./types";
+import { DOORS, FLOOR_Y, ROOMS, ROOM_DOOR, STAIRS, roomAt } from "./world/rooms";
+import { CHAPTER_GHOSTS, GHOSTS } from "./ghosts";
+import { PREPS, type Floor, type GhostId, type Prep, type RoomId } from "./types";
 import { LINE_JA } from "../ui/i18n";
 import { captureShot, revealShot, searchShot, standPoint, viewDir } from "../scene/framing";
-import { resolveCollisions } from "./world/collision";
+import { collidersFor, resolveCollisions } from "./world/collision";
 import { cameraRef } from "../scene/CameraRig";
-import { sparkle } from "../scene/Effects";
+import { bubbles, sparkle } from "../scene/Effects";
 import * as THREE from "three";
 
 /**
  * The director turns the pure hunt state machine into a game: it plays
  * Boo's lines, camera moves, search animations, the answer interaction, the
- * capture, the story's rooms and its opening and ending. Every async
- * sequence is tied to a generation number, so going back to the title (or
- * skipping the intro) cancels whatever was playing.
+ * capture, the story's rooms, the Chapter 2 cinematic, the upstairs ghosts'
+ * tricks and the opening and ending. Every async sequence is tied to a
+ * generation number, so going back to the title (or skipping a cutscene)
+ * cancels whatever was playing.
  */
 
 class Cancelled extends Error {}
@@ -50,6 +63,12 @@ let outroWalkT0 = 0;
 let nextAmbient = 0;
 let lastLockedBump = 0;
 let pendingNext: (() => void) | null = null;
+/** Which cutscene the Skip button skips. */
+let cutscene: "intro" | "chapter2" | null = null;
+/** Bubbles' bathroom: when the steam next rises, and whether the fan hint was shown. */
+let nextSteam = 0;
+let fanHinted = false;
+let chapterCardKey = 0;
 
 const params = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
 const fixedSeed = params.has("seed") ? Number(params.get("seed")) || 1 : null;
@@ -74,10 +93,27 @@ function run(fn: () => Promise<void>) {
 const hunt = (): HuntState => getGame().hunt!;
 const setAnswer = (patch: Partial<AnswerUi>) => setGame({ answer: { ...getGame().answer, ...patch } });
 const isStory = () => getGame().mode !== "practice";
+const playerRoom = (): RoomId | null => roomAt(rt.player.x, rt.player.z, rt.player.floor);
+const isOpen = (id: string) => rt.doorsOpen.has(id);
 
 function micUsable(): boolean {
   const g = getGame();
   return g.settings.mic && recognition.supported && g.micState !== "blocked" && g.micState !== "unsupported";
+}
+
+/** Put the player somewhere (a scene cut), on a floor, facing `yaw`. */
+function placePlayer(x: number, z: number, floor: Floor, yaw: number) {
+  rt.player.x = x;
+  rt.player.z = z;
+  rt.player.floor = floor;
+  rt.player.y = FLOOR_Y[floor];
+  rt.player.stairs = false;
+  rt.player.vx = 0;
+  rt.player.vz = 0;
+  rt.player.yaw = yaw;
+  rt.player.stepTo = null;
+  rt.player.walkTo = null;
+  rt.view.floor = floor;
 }
 
 let toastKey = 0;
@@ -160,6 +196,20 @@ function caption(text: string, tone: "empty" | "info" | "good" = "info", ms = 22
   }, ms * pace);
 }
 
+/** The chapter title card ("CHAPTER 2 — UPSTAIRS"). */
+function chapterCard(chapter: 1 | 2, ms: number) {
+  const key = ++chapterCardKey;
+  const card =
+    chapter === 1
+      ? { key, title: "CHAPTER 1", sub: "THE GROUND FLOOR", ja: "だい1しょう ・ 1かい" }
+      : { key, title: "CHAPTER 2", sub: "UPSTAIRS", ja: "だい2しょう ・ 2かい" };
+  setGame({ chapterCard: card });
+  audio.play("chapter");
+  window.setTimeout(() => {
+    if (getGame().chapterCard?.key === key) setGame({ chapterCard: null });
+  }, ms * pace);
+}
+
 function touchActivity() {
   lastActivity = performance.now();
 }
@@ -172,6 +222,16 @@ function applyHelp() {
   setGame({ helpLevel: tutorial ? Math.max(level, 2) : level });
   rt.helpObject = level >= 3 && s.status === "hunting" ? currentSpot(s).objectId : null;
   rt.helpSpot = level >= 4 && s.status === "hunting" ? s.spotId : null;
+}
+
+/** Stereo position and loudness of a sound coming from a point in the room. */
+function placeSound(p: { x: number; z: number }): { pan: number; gain: number } {
+  const cam = rt.camera.pos;
+  const yaw = rt.camera.yaw;
+  const dx = p.x - cam.x;
+  const dz = p.z - cam.z;
+  const d = Math.hypot(dx, dz) || 1;
+  return { pan: Math.max(-0.9, Math.min(0.9, (dx * Math.cos(yaw) - dz * Math.sin(yaw)) / d)), gain: Math.max(0.45, Math.min(1, 1.25 - d / 14)) };
 }
 
 // ------------------------------------------------------------------ clues
@@ -226,10 +286,132 @@ async function entryCue(ghost: GhostId) {
       await sleep(400);
       await say("Catch me!", { speaker: "ghost", pitch: 1.75 });
       break;
+    case "bouncy":
+      // the toys hop to say hello
+      for (const id of PLAYROOM_TOYS) rattle(id, 1.2, 1);
+      audio.play("boing", { pitch: 1.2 });
+      await sleep(450);
+      await say("Play with me!", { speaker: "ghost", pitch: 1.8 });
+      break;
+    case "bubbles":
+      audio.play("bubbles");
+      await sleep(400);
+      await say("Splish splash!", { speaker: "ghost", pitch: 1.6 });
+      nextSteam = rt.time + 7;
+      break;
+    case "melody":
+      audio.play("flourish");
+      await sleep(500);
+      await say("La la la!", { speaker: "ghost", pitch: 1.7 });
+      break;
+    case "shadow":
+      rt.flickerT0 = rt.time;
+      audio.play("laugh", { pitch: 0.85 });
+      await sleep(1100);
+      await say("Find me!", { speaker: "ghost", pitch: 1.3 });
+      break;
   }
 }
 
+// --------------------------------------------------- upstairs ghost tricks
+
+/** Playroom toys that move by themselves (never a clue to where Bouncy is). */
+const PLAYROOM_TOYS = ["playroom.horse", "playroom.train", "playroom.teddy", "playroom.blocks", "playroom.box", "playroom.chair1", "playroom.chair2"];
+/** Instruments that play by themselves in the music room, and their sounds. */
+const INSTRUMENTS: Array<[string, SfxName]> = [
+  ["music.piano", "piano"],
+  ["music.drum", "drum"],
+  ["music.gramophone", "gramophone"],
+  ["music.guitar", "strum"],
+  ["music.cello", "cello"],
+  ["music.box", "musicbox"]
+];
+const NOTE_COLORS = ["#ffbfe4", "#ffe98a", "#a8f4fa", "#c9b8ff"];
+let noteId = 0;
+
+function toySound(obj: WorldObject) {
+  const where = placeSound(obj);
+  switch (obj.kind) {
+    case "rockinghorse":
+      audio.play("creak", { pitch: 1.7, ...where });
+      break;
+    case "toytrain":
+      audio.play("toot", where);
+      break;
+    case "teddy":
+      audio.play("boing", { pitch: 0.7, ...where });
+      break;
+    default:
+      audio.play("knock", where);
+  }
+}
+
+/** One toy wiggles (Bouncy): `near` prefers the toy closest to a searched spot. Never Bouncy's own hiding place. */
+function wiggleToy(near?: HidingSpot) {
+  const s = hunt();
+  const ghostObj = currentSpot(s).objectId;
+  const toys = PLAYROOM_TOYS.filter((id) => id !== ghostObj && id !== near?.objectId).map((id) => WORLD.objectById.get(id)!);
+  if (!toys.length) return;
+  let toy = pick(rng, toys);
+  if (near) {
+    toy = toys.reduce((a, b) => (rectDistance(a.rect, near.pos.x, near.pos.z) <= rectDistance(b.rect, near.pos.x, near.pos.z) ? a : b));
+  }
+  rattle(toy.id, toy.kind === "rockinghorse" ? 2.2 : 1.4, 1);
+  toySound(toy);
+}
+
+/** An instrument plays by itself (Melody). Any of them - sometimes even the one she hides by. */
+function playInstrument() {
+  const [id, sfx] = pick(rng, INSTRUMENTS);
+  const obj = WORLD.objectById.get(id)!;
+  rattle(id, 1.6, 1);
+  audio.play(sfx, placeSound(obj));
+  const c = rectCenter(obj.rect);
+  for (let i = 0; i < 3; i++) {
+    rt.notes.push({ id: ++noteId, x: c.x + (i - 1) * 0.2, y: obj.y + obj.spec.h + 0.1, z: c.z, t0: rt.time + i * 0.25, color: pick(rng, NOTE_COLORS) });
+  }
+}
+
+/** Shadow makes the attic's furniture rattle. */
+function atticRattles(count: number) {
+  const ghostObj = currentSpot(hunt()).objectId;
+  const things = WORLD.objects.filter((o) => o.room === "attic" && o.id !== ghostObj && !o.spec.flat && !o.spec.wallMounted);
+  for (let i = 0; i < count; i++) {
+    window.setTimeout(() => {
+      const o = pick(rng, things);
+      rattle(o.id, o.kind === "rockingchair" ? 2.4 : 0.9, 1.2);
+      audio.play(o.kind === "rockingchair" ? "creak" : "rattle", { pitch: 0.8, ...placeSound(o) });
+    }, i * 380 * pace);
+  }
+}
+
+/** The fan switch in the bathroom: the fan runs for a while and blows the steam away. */
+function useFan() {
+  const sw = WORLD.objectById.get("bathroom.switch")!;
+  audio.play("click", placeSound(sw));
+  audio.play("fan", placeSound(WORLD.objectById.get("bathroom.fan")!));
+  rt.steam.fanOnT0 = rt.time;
+  rt.steam.fanUntil = rt.time + 25;
+  rt.steam.target = 0;
+  rt.attention = null;
+  nextSteam = Math.max(nextSteam, rt.steam.fanUntil + 6);
+  touchActivity();
+}
+
 // ------------------------------------------------------------- encounters
+
+/** Beacon and standing hint: the door of the next room - or the stairs, if it is on the other floor. */
+function pointTheWay() {
+  const enc = currentEncounter(hunt());
+  const upstairs = ROOMS[enc.room].floor === 1;
+  if (upstairs && rt.player.floor === 0) {
+    rt.beaconDoor = "stairs";
+    showHint("goStairs");
+  } else {
+    rt.beaconDoor = ROOM_DOOR[enc.room] ?? null;
+    showHint("goDoor");
+  }
+}
 
 /** The current ghost's turn begins: open its room and wait for the student to walk in. */
 async function beginEncounter(first: boolean) {
@@ -237,7 +419,10 @@ async function beginEncounter(first: boolean) {
   const enc = currentEncounter(s);
   rt.ghost.id = enc.ghost;
   rt.ghost.anim = { mode: "hidden" };
+  rt.steam.target = 0;
+  rt.attention = null;
   setGame({ clueShown: false });
+  if (getGame().startedAt === null) setGame({ startedAt: performance.now() });
   if (!isStory()) {
     awaitingEntry = false;
     await giveClue("first");
@@ -250,13 +435,12 @@ async function beginEncounter(first: boolean) {
     rt.doorsOpen.set(door, rt.time);
     audio.play("creak");
   }
-  if (roomAt(rt.player.x, rt.player.z) === enc.room) {
+  if (playerRoom() === enc.room) {
     await startEncounter();
   } else {
     awaitingEntry = true;
-    rt.beaconDoor = door ?? null;
+    pointTheWay();
     if (!first) await say("Next room!");
-    showHint("goDoor");
   }
 }
 
@@ -276,7 +460,8 @@ function faceIntoRoom(room: RoomId) {
 async function startEncounter() {
   awaitingEntry = false;
   rt.beaconDoor = null;
-  if (getGame().hint === "goDoor") showHint(null);
+  const hint = getGame().hint;
+  if (hint === "goDoor" || hint === "goStairs") showHint(null);
   const enc = currentEncounter(hunt());
   faceIntoRoom(enc.room);
   nextAmbient = rt.time + 10;
@@ -288,8 +473,8 @@ async function startEncounter() {
 
 function canReach(objectId: string): boolean {
   const obj = WORLD.objectById.get(objectId);
-  if (!obj) return false;
-  const room = roomAt(rt.player.x, rt.player.z);
+  if (!obj || obj.floor !== rt.player.floor || rt.player.stairs) return false;
+  const room = playerRoom();
   if (room && obj.room !== room) return false;
   return rectDistance(obj.rect, rt.player.x, rt.player.z) <= INTERACT_RANGE + 0.05;
 }
@@ -298,7 +483,12 @@ function enterSearch(objectId: string) {
   const g = getGame();
   if (g.phase !== "explore" || busy) return;
   const obj = WORLD.objectById.get(objectId);
-  if (!obj?.searchable) return;
+  if (!obj) return;
+  if (obj.action === "fan") {
+    useFan();
+    return;
+  }
+  if (!obj.searchable) return;
   const c = rectCenter(obj.rect);
   rt.player.yaw = Math.atan2(c.x - rt.player.x, c.z - rt.player.z);
   rt.player.walkTo = null;
@@ -308,7 +498,7 @@ function enterSearch(objectId: string) {
   // Step aside so the player does not stand between the camera and the object.
   const by = spots.find((s) => s.prep === "by");
   const stand = standPoint(obj, viewDir(obj, rt.player), rt.player, by ? by.pos : null);
-  const safe = resolveCollisions(stand.x, stand.z, (id) => rt.doorsOpen.has(id));
+  const safe = resolveCollisions(stand.x, stand.z, isOpen, collidersFor(obj.floor, false));
   rt.player.stepTo = { x: safe.x, z: safe.z, face: c };
   setGame({ phase: "search", searchId: objectId, selectedSpot: spots[0]?.id ?? null, focusId: objectId });
   audio.play("tick");
@@ -320,10 +510,12 @@ let gagId = 0;
 
 function searchSound(spot: HidingSpot): SfxName {
   const obj = WORLD.objectById.get(spot.objectId)!;
-  if (spot.prep === "in") return obj.kind === "clock" ? "chime" : "lid";
+  if (spot.prep === "in") return obj.kind === "clock" ? "chime" : obj.kind === "bathtub" ? "bubbles" : "lid";
   if (spot.prep === "under") return "flashlight";
   if (spot.prep === "by") return "rustle";
-  return obj.kind === "piano" ? "piano" : "knock";
+  if (obj.kind === "piano") return "piano";
+  if (obj.kind === "drum") return "drum";
+  return "knock";
 }
 
 async function doSearch(spotId: string) {
@@ -357,6 +549,10 @@ async function doSearch(spotId: string) {
     rt.gags.push({ id: ++gagId, spotId, item: pick(rng, GAG_ITEMS), t0: rt.time });
     audio.play("poof");
     caption(emptyCaption(spot), "empty", 2000);
+    // Bouncy makes a toy nearby move - atmosphere, never the answer.
+    if (result.kind === "empty" && currentEncounter(before).ghost === "bouncy" && rng() < 0.6) {
+      window.setTimeout(() => wiggleToy(spot), 450 * pace);
+    }
     await sleep(1150);
     rt.search = { spotId, t0: rt.time, open: false };
 
@@ -390,7 +586,27 @@ async function reveal(spot: HidingSpot) {
   audio.play("boo");
   window.setTimeout(() => audio.play("giggle", { pitch: ghost.voice }), 450 * pace);
   sparkle({ x: spot.pos.x, y: spot.pos.y + 0.4, z: spot.pos.z }, ghost.glow, 36, { speed: 1.8, up: 1.4 });
+  switch (ghost.id) {
+    case "bubbles":
+      bubbles({ x: spot.pos.x, y: spot.pos.y + 0.3, z: spot.pos.z }, 34);
+      audio.play("bubbles");
+      break;
+    case "bouncy":
+      audio.play("boing", { pitch: 1.3 });
+      break;
+    case "shadow":
+      audio.play("laugh", { pitch: 1.2 });
+      break;
+  }
   await sleep(900);
+  if (ghost.id === "melody") {
+    // A little musical flourish before the answer.
+    audio.play("flourish");
+    for (let i = 0; i < 5; i++) {
+      rt.notes.push({ id: ++noteId, x: spot.pos.x + (i - 2) * 0.18, y: spot.pos.y + 0.7, z: spot.pos.z, t0: rt.time + i * 0.12, color: NOTE_COLORS[i % 4] });
+    }
+    await sleep(900);
+  }
   networkErrors = 0;
   setGame({ phase: "answer", answer: { ...EMPTY_ANSWER, spotId: spot.id, buttons: !micUsable() } });
   // The answer panel shows the question; no subtitle.
@@ -527,6 +743,7 @@ function resolveCorrect(prep: Prep) {
     stopListening?.();
     tts.cancel();
     const spot = currentSpot(g.hunt!);
+    const capturedIndex = g.hunt!.index;
     const { state, result } = answerPrep(g.hunt!, prep, rng);
     if (result.kind !== "correct") return;
     const ghost = GHOSTS[result.record.ghost];
@@ -540,19 +757,37 @@ function resolveCorrect(prep: Prep) {
     }
 
     // Capture: surprised face, sparkles, sucked into the lantern (wider shot so the lantern is in view).
+    // The last ghost of the game gets a grander flight.
+    const last = result.next === "done";
+    const big = last && ghost.id === "shadow";
+    if (last) setGame({ finishedAt: performance.now() });
     rt.camera.shot = captureShot(rt.player, spot.pos);
-    rt.ghost.anim = { mode: "capture", spotId: spot.id, t0: rt.time };
-    sparkle({ x: spot.pos.x, y: spot.pos.y + 0.4, z: spot.pos.z }, ghost.glow, 40, { speed: 1.2, up: 1, swirl: 7, life: 1.2 });
+    rt.ghost.anim = { mode: "capture", spotId: spot.id, t0: rt.time, big };
+    sparkle({ x: spot.pos.x, y: spot.pos.y + 0.4, z: spot.pos.z }, ghost.glow, big ? 70 : 40, { speed: 1.2, up: 1, swirl: 7, life: 1.2 });
     await sleep(500);
-    audio.play("capture");
-    await sleep(950);
+    audio.play(big ? "bigcapture" : "capture");
+    if (big) {
+      rt.camera.shake = { t0: rt.time, amp: 0.05 };
+      for (const id of CHAPTER_GHOSTS[2]) sparkle(spot.pos, GHOSTS[id].glow, 14, { speed: 2, up: 1.8, swirl: 4, life: 1.4 });
+    }
+    await sleep(big ? 1600 : 950);
     sparkle(rt.lantern, ghost.glow, 30, { speed: 1, up: 1.2 });
     setGame({ lantern: [...getGame().lantern, ghost.id], revealed: null });
     rt.search = null;
     await say(pick(rng, PRAISE));
-    if (result.next === "done") {
+    if (last) {
       if (isStory()) await outro();
       else await finishGame();
+      return;
+    }
+    const plan = state.encounters;
+    if (isStory() && chapterBreakAfter(plan, capturedIndex)) {
+      // Chapter 1 is done: the stairs open.
+      await chapterTwo();
+      enterExplore();
+      setGame({ phase: "busy" });
+      await beginEncounter(true);
+      enterExplore();
       return;
     }
     enterExplore();
@@ -569,6 +804,27 @@ async function escapeAfterRound(spot: HidingSpot) {
   rt.ghost.anim = { mode: "escape", spotId: spot.id, t0: rt.time - 0.45 };
   setGame({ revealed: null });
   rt.search = null;
+  if (ghost.id === "shadow") {
+    // The great hide-and-seek: a laugh, the lights go out, Shadow flies off, the attic rattles.
+    audio.play("laugh", { pitch: 1.05 });
+    await say("Find me!", { speaker: "ghost", pitch: 1.3 });
+    // Pull back so the glowing eyes can be seen zooming round the dark attic.
+    rt.camera.mode = "follow";
+    rt.camera.shot = null;
+    rt.blackoutT0 = rt.time;
+    audio.play("blackout");
+    audio.play("whoosh");
+    atticRattles(4);
+    await sleep(1700);
+    audio.play("poof");
+    enterExplore();
+    setGame({ phase: "busy" });
+    await sleep(500);
+    await say("Oh no! It ran away!");
+    await giveClue("next");
+    enterExplore();
+    return;
+  }
   audio.play("giggle", { pitch: ghost.voice });
   await say("Catch me!", { speaker: "ghost", pitch: 1.7 });
   audio.play("whoosh");
@@ -606,13 +862,18 @@ async function relocate(fromSpotId: string) {
 const SHOT_ENTRANCE = { pos: { x: -3.4, y: 2.3, z: 3.1 }, target: { x: -7.4, y: 1.0, z: 0 } };
 const SHOT_BOO = { pos: { x: -3.0, y: 1.9, z: 2.3 }, target: { x: -5.6, y: 1.05, z: -0.1 } };
 const SHOT_BOARD = { pos: { x: 0.2, y: 1.85, z: 0.9 }, target: { x: 0, y: 1.85, z: -3.9 } };
+// Chapter 2: the lobby, the chandelier, the gate at the foot of the stairs.
+const SHOT_STAIRS = { pos: { x: -1.4, y: 2.7, z: 3.4 }, target: { x: 4.4, y: 1.5, z: -0.2 } };
+const SHOT_CHANDELIER = { pos: { x: 2.6, y: 1.35, z: 2.7 }, target: { x: 0, y: 2.35, z: 0 } };
+const SHOT_GATE = { pos: { x: 0.6, y: 1.7, z: 2.3 }, target: { x: 3.7, y: 0.9, z: 0 } };
+const SHOT_BOO_STAIRS = { pos: { x: -0.5, y: 1.95, z: 3.0 }, target: { x: 2.4, y: 1.35, z: 0.2 } };
+const BOO_BY_STAIRS = { x: 2.3, y: 1.5, z: -0.5 };
 
 async function intro() {
   const enc0 = currentEncounter(hunt());
+  cutscene = "intro";
   setGame({ phase: "intro", fade: 1 });
-  rt.player.x = OUTSIDE.x;
-  rt.player.z = OUTSIDE.z;
-  rt.player.yaw = Math.PI / 2;
+  placePlayer(OUTSIDE.x, OUTSIDE.z, 0, Math.PI / 2);
   rt.doorsOpen.set("entrance", rt.time - 5);
   rt.camera.mode = "shot";
   rt.camera.shot = SHOT_ENTRANCE;
@@ -655,6 +916,7 @@ async function intro() {
 
 /** Shared by the intro's end and "Skip". */
 async function afterIntro(enc0: Encounter) {
+  cutscene = null;
   rt.boo.visible = true;
   rt.boo.target = null;
   rt.camera.mode = "follow";
@@ -662,22 +924,136 @@ async function afterIntro(enc0: Encounter) {
   setGame({ line: null });
   rt.ghost.id = enc0.ghost;
   setGame({ phase: "busy" });
+  if (getGame().mode !== "practice") chapterCard(1, 2600);
   await say("Let's go!");
   await beginEncounter(true);
   enterExplore();
 }
 
+/**
+ * The fourth ghost is in the lantern... and then a bang upstairs. The lights
+ * flicker, the chandelier swings, the gate at the foot of the stairs swings
+ * open and Boo looks surprised. Chapter 2 begins in the lobby, by the stairs:
+ * the student walks up and finds the landing themselves.
+ */
+async function chapterTwo() {
+  cutscene = "chapter2";
+  saveCh2Unlocked();
+  setGame({ ch2Unlocked: true, phase: "intro", clueShown: false, hint: null });
+  rt.beaconDoor = null;
+  rt.player.frozen = true;
+  // The hotel goes quiet...
+  audio.stopMusic();
+  await sleep(1300);
+  setGame({ fade: 1 });
+  await sleep(700);
+  placePlayer(STAIRS_FOOT.x, STAIRS_FOOT.z, 0, Math.PI / 2);
+  rt.boo.visible = true;
+  rt.boo.appearT0 = rt.time;
+  rt.boo.target = BOO_BY_STAIRS;
+  rt.camera.mode = "shot";
+  rt.camera.shot = SHOT_STAIRS;
+  rt.camera.snap = true;
+  await sleep(300);
+  setGame({ fade: 0 });
+  await sleep(1100);
+  // ...a loud noise from upstairs.
+  audio.play("thud");
+  rt.camera.shake = { t0: rt.time, amp: 0.07 };
+  rt.boo.surprisedT0 = rt.time;
+  rattle("lobby.chandelier", 3.2, 1.5);
+  rt.flickerT0 = rt.time + 0.15;
+  await sleep(700);
+  rt.camera.shot = SHOT_CHANDELIER;
+  audio.play("rattle");
+  await sleep(1700);
+  // The gate swings open.
+  rt.camera.shot = SHOT_GATE;
+  await sleep(700);
+  audio.play("unlock");
+  await sleep(350);
+  rt.doorsOpen.set("stairs", rt.time);
+  audio.play("creak", { pitch: 0.75 });
+  sparkle({ x: STAIRS.gateX, y: 1.0, z: 0 }, "#ffd36b", 34, { speed: 1.3 });
+  await sleep(1200);
+  // Boo is surprised; a ghostly laugh from upstairs.
+  rt.camera.shot = SHOT_BOO_STAIRS;
+  rt.boo.surprisedT0 = rt.time;
+  await sayWait("Wait! What's that?");
+  audio.play("laugh", { pitch: 0.9, gain: 0.8 });
+  await sleep(1800);
+  await sayWait("Four more ghosts!");
+  await sayWait("Let's go upstairs!");
+  await afterChapterTwo();
+}
+
+/** The end of the Chapter 2 cutscene (also what "Skip" jumps to). */
+async function afterChapterTwo() {
+  cutscene = null;
+  rt.doorsOpen.set("stairs", rt.doorsOpen.get("stairs") ?? rt.time);
+  rt.boo.visible = true;
+  rt.boo.target = null;
+  rt.boo.surprisedT0 = -10;
+  rt.flickerT0 = -100;
+  setGame({ line: null, fade: 0, phase: "busy", chapter: 2 });
+  chapterCard(2, 2800);
+  audio.startMusic("upstairs");
+  rt.camera.mode = "follow";
+  rt.camera.shot = null;
+  // Looking along the stairs from behind and to the side.
+  rt.camera.yaw = -1.15;
+  rt.camera.yawTarget = null;
+  rt.player.frozen = false;
+  await sleep(600);
+}
+
+/** Chapter 2 on its own: start at the top of the stairs. */
+async function chapterTwoStart(enc0: Encounter) {
+  await sleep(500);
+  rt.boo.visible = true;
+  rt.boo.appearT0 = rt.time;
+  audio.play("sparkle");
+  chapterCard(2, 2800);
+  await sleep(600);
+  await say("Four more ghosts!");
+  rt.ghost.id = enc0.ghost;
+  await say("Let's go!");
+  await beginEncounter(true);
+  enterExplore();
+}
+
+/** The lantern blazes with every ghost inside (after the last capture upstairs). */
+async function lanternFinale() {
+  rt.lanternBurstT0 = rt.time;
+  audio.play("sparkle");
+  audio.play("fanfare");
+  const caught = getGame().lantern;
+  caught.forEach((g, i) => window.setTimeout(() => sparkle(rt.lantern, GHOSTS[g].glow, 16, { speed: 1.5, up: 1.5, swirl: 6, life: 1.3 }), i * 170 * pace));
+  rt.camera.mode = "shot";
+  const yaw = rt.camera.yaw;
+  rt.camera.shot = {
+    pos: { x: rt.player.x + Math.sin(yaw) * 2.2, y: rt.player.y + 1.6, z: rt.player.z + Math.cos(yaw) * 2.2 },
+    target: { x: rt.player.x, y: rt.player.y + 0.8, z: rt.player.z }
+  };
+  rt.boo.visible = true;
+  rt.boo.appearT0 = rt.time;
+  rt.boo.target = { x: rt.player.x + Math.cos(yaw) * 0.9, y: rt.player.y + 1.4, z: rt.player.z - Math.sin(yaw) * 0.9 };
+  await sleep(1500);
+  await say("Look!");
+  await sleep(1400);
+}
+
 async function outro() {
   rt.ghost.anim = { mode: "hidden" };
   setGame({ phase: "outro", clueShown: false, revealed: null });
+  const scope = getGame().scope;
+  if (scope !== "ch1") await lanternFinale();
   await sleep(500);
   setGame({ fade: 1 });
   await sleep(800);
   // Back in the lobby, facing the front door.
-  rt.player.x = -4.6;
-  rt.player.z = 0.3;
-  rt.player.yaw = -Math.PI / 2;
-  rt.player.stepTo = null;
+  placePlayer(-4.6, 0.3, 0, -Math.PI / 2);
+  rt.steam.target = 0;
   rt.boo.visible = true;
   rt.boo.target = { x: -5.7, y: 1.45, z: 1.2 };
   rt.boo.appearT0 = rt.time;
@@ -689,7 +1065,7 @@ async function outro() {
   setGame({ fade: 0 });
   await sleep(800);
   await sayWait("Great job!");
-  await sayWait("You found four ghosts!");
+  await sayWait(scope === "all" ? "You found eight ghosts!" : scope === "ch2" ? "You found all the ghosts!" : "You found four ghosts!");
   // The front door unlocks and the sun comes up.
   audio.play("unlock");
   sparkle({ x: -7.8, y: 1.3, z: 0 }, "#ffe08a", 30, { speed: 1.2 });
@@ -718,15 +1094,21 @@ async function outro() {
 async function finishGame() {
   outroWalk = false;
   rt.ghost.anim = { mode: "hidden" };
-  if (getGame().mode !== "practice") {
+  const g = getGame();
+  if (g.mode !== "practice") {
     saveReplayUnlocked();
     setGame({ replayUnlocked: true });
+    if (g.scope !== "ch2") {
+      saveCh2Unlocked();
+      setGame({ ch2Unlocked: true });
+    }
   }
+  if (getGame().finishedAt === null) setGame({ finishedAt: performance.now() });
   setGame({ fade: 1 });
   await sleep(700);
   audio.stopMusic();
   audio.play("fanfare");
-  setGame({ screen: "results", phase: "outro", clueShown: false, line: null, hint: null, toast: null, fade: 0 });
+  setGame({ screen: "results", phase: "outro", clueShown: false, line: null, hint: null, toast: null, fade: 0, chapterCard: null });
   await sleep(1200);
   audio.startMusic("victory");
 }
@@ -737,7 +1119,7 @@ async function finishGame() {
 function tick() {
   const g = getGame();
   if (g.screen !== "game" || !g.hunt) return;
-  const room = roomAt(rt.player.x, rt.player.z);
+  const room = playerRoom();
 
   if (outroWalk) {
     if (rt.player.x < -8.7) {
@@ -759,12 +1141,15 @@ function tick() {
       run(startEncounter);
       return;
     }
+    // Up (or back down) the stairs: the beacon moves between the stairs and the door.
+    const wantStairs = ROOMS[enc.room].floor === 1 && rt.player.floor === 0;
+    if (wantStairs !== (rt.beaconDoor === "stairs")) pointTheWay();
   }
 
-  // Bumping into a locked door.
+  // Bumping into a locked door (or the stairs gate) on this floor.
   if (g.phase === "explore" && performance.now() - lastLockedBump > 2500 && rt.player.speed > 0.5) {
     for (const d of DOORS) {
-      if (rt.doorsOpen.has(d.id)) continue;
+      if (rt.doorsOpen.has(d.id) || d.floor !== rt.player.floor) continue;
       const r =
         d.axis === "x" ? { x0: d.from, x1: d.to, z0: d.at - 0.1, z1: d.at + 0.1 } : { x0: d.at - 0.1, x1: d.at + 0.1, z0: d.from, z1: d.to };
       if (rectDistance(r, rt.player.x, rt.player.z) < 0.42) {
@@ -776,33 +1161,68 @@ function tick() {
     }
   }
 
-  // Each ghost's harmless mischief while you hunt in its room.
-  if (!awaitingEntry && g.hunt.status === "hunting" && rt.time > nextAmbient && !tts.isSpeaking() && !busy) {
-    const enc = currentEncounter(g.hunt);
-    if (room === enc.room) {
-      nextAmbient = rt.time + 8 + Math.random() * 5;
-      switch (enc.ghost) {
-        case "sleepy":
-          audio.play("snore");
-          break;
-        case "hungry":
-          audio.play("munch");
-          break;
-        case "sneaky": {
-          // Something else rattles: a distraction, never the ghost's own hiding place.
-          const ghostObj = currentSpot(g.hunt).objectId;
-          const others = WORLD.objects.filter((o) => o.room === "storage" && o.id !== ghostObj && !o.spec.flat && !o.spec.wallMounted);
-          const o = pick(rng, others);
-          rt.rattle.objectId = o.id;
-          rt.rattle.t0 = rt.time;
-          audio.play("rattle");
-          nextAmbient = rt.time + 6 + Math.random() * 4;
-          break;
-        }
-        case "mischief":
-          audio.play("giggle", { pitch: GHOSTS.mischief.voice });
-          break;
+  const enc = currentEncounter(g.hunt);
+  const hunting = !awaitingEntry && g.hunt.status === "hunting" && room === enc.room;
+
+  // Bubbles' steam rises now and then (unless the fan is running); a shape drifts through it.
+  if (hunting && enc.ghost === "bubbles") {
+    const st = rt.steam;
+    if (rt.time > nextSteam && st.target === 0 && rt.time > st.fanUntil) {
+      st.target = 1;
+      audio.play("steam", placeSound(WORLD.objectById.get("bathroom.tub")!));
+      nextSteam = rt.time + 24 + Math.random() * 8;
+    }
+    if (st.target > 0 && st.level > 0.6) {
+      rt.attention = "bathroom.switch";
+      if (!fanHinted) {
+        fanHinted = true;
+        toast("fan", 5000);
       }
+      if (rt.time - st.silhouetteT0 > 9 && Math.random() < 0.15) st.silhouetteT0 = rt.time;
+    }
+    if (rt.time > st.fanUntil && st.target === 0) rt.attention = null;
+  }
+
+  // Each ghost's harmless mischief while you hunt in its room.
+  if (hunting && rt.time > nextAmbient && !tts.isSpeaking() && !busy) {
+    nextAmbient = rt.time + 8 + Math.random() * 5;
+    switch (enc.ghost) {
+      case "sleepy":
+        audio.play("snore");
+        break;
+      case "hungry":
+        audio.play("munch");
+        break;
+      case "sneaky": {
+        // Something else rattles: a distraction, never the ghost's own hiding place.
+        const ghostObj = currentSpot(g.hunt).objectId;
+        const others = WORLD.objects.filter((o) => o.room === "storage" && o.id !== ghostObj && !o.spec.flat && !o.spec.wallMounted);
+        const o = pick(rng, others);
+        rattle(o.id);
+        audio.play("rattle");
+        nextAmbient = rt.time + 6 + Math.random() * 4;
+        break;
+      }
+      case "mischief":
+        audio.play("giggle", { pitch: GHOSTS.mischief.voice });
+        break;
+      case "bouncy":
+        wiggleToy();
+        nextAmbient = rt.time + 6 + Math.random() * 3;
+        break;
+      case "bubbles": {
+        const where = placeSound(WORLD.objectById.get("bathroom.tub")!);
+        audio.play("bubbles", { pan: where.pan, gain: where.gain * 0.6 });
+        break;
+      }
+      case "melody":
+        playInstrument();
+        nextAmbient = rt.time + 7 + Math.random() * 3;
+        break;
+      case "shadow":
+        atticRattles(1);
+        if (rng() < 0.5) audio.play("laugh", { pitch: 1.2, gain: 0.5 });
+        break;
     }
   }
 
@@ -893,10 +1313,10 @@ function onKey(code: string) {
   }
 }
 
-function planFor(mode: Mode): Encounter[] {
+function planFor(mode: Mode, scope: Scope): Encounter[] {
   if (mode === "practice") return practicePlan();
-  if (mode === "replay") return replayPlan(rng);
-  return storyPlan();
+  if (mode === "replay") return replayPlan(rng, WORLD, scope);
+  return storyPlan(scope);
 }
 
 // ------------------------------------------------------------------- API
@@ -908,8 +1328,11 @@ export const director = {
     pace = p;
   },
 
-  /** Start from the title screen (must be called from a click: unlocks audio and asks for the mic once). */
-  async startGame(mode: Mode = "story") {
+  /**
+   * Start from the title screen (must be called from a click: unlocks audio and asks for the mic once).
+   * `scope` picks the full adventure, Chapter 1 or Chapter 2 on its own.
+   */
+  async startGame(mode: Mode = "story", scope: Scope = "all") {
     audio.unlock();
     tts.setRate(getGame().settings.slowVoice ? 0.8 : 1);
     gen++;
@@ -917,12 +1340,16 @@ export const director = {
     awaitingEntry = false;
     outroWalk = false;
     pendingNext = null;
+    cutscene = null;
+    nextSteam = 0;
+    fanHinted = false;
     stopListening?.();
     resetRuntime();
     if (fixedSeed !== null) rng = mulberry32(fixedSeed);
+    if (mode === "practice") scope = "ch1";
     const settings = getGame().settings;
     audio.setVolumes(settings.music, settings.sfx);
-    setGame({ screen: "game", phase: "busy", mode, fade: 0 });
+    setGame({ screen: "game", phase: "busy", mode, scope, fade: 0 });
 
     let micState = getGame().micState;
     if (!recognition.supported) micState = "unsupported";
@@ -931,16 +1358,19 @@ export const director = {
       micState = p === "denied" || p === "unavailable" ? "blocked" : "ready";
     }
 
-    const state = createHunt(planFor(mode));
+    const state = createHunt(planFor(mode, scope));
     const enc0 = currentEncounter(state);
     rt.ghost.id = enc0.ghost;
-    const start = mode === "practice" ? PRACTICE_START : STORY_START;
-    rt.player.x = start.x;
-    rt.player.z = start.z;
-    rt.player.yaw = mode === "practice" ? Math.PI : Math.PI / 2;
-    rt.player.vx = 0;
-    rt.player.vz = 0;
-    rt.camera.yaw = mode === "practice" ? 0 : 0.35;
+    if (mode === "practice") placePlayer(PRACTICE_START.x, PRACTICE_START.z, 0, Math.PI);
+    else if (scope === "ch2") placePlayer(UPSTAIRS_START.x, UPSTAIRS_START.z, 1, -Math.PI / 2);
+    else placePlayer(STORY_START.x, STORY_START.z, 0, Math.PI / 2);
+    if (scope === "ch2") {
+      // Chapter 1 is done: its rooms and the stairs gate are open; the front door is shut.
+      for (const id of ["bedroom", "dining", "storage", "library", "stairs"]) rt.doorsOpen.set(id, rt.time - 5);
+      rt.doorSlam.add("entrance");
+    }
+    // Chapter 2 alone starts at the top of the stairs, looking west down the landing.
+    rt.camera.yaw = mode === "practice" ? 0 : scope === "ch2" ? Math.PI / 2 - 0.45 : 0.35;
     rt.camera.pitch = 0.9;
     rt.camera.mode = "follow";
     rt.camera.snap = true;
@@ -959,17 +1389,25 @@ export const director = {
       answer: EMPTY_ANSWER,
       lantern: [],
       hint: null,
-      toast: null
+      toast: null,
+      chapter: scope === "ch2" ? 2 : 1,
+      chapterCard: null,
+      startedAt: null,
+      finishedAt: null
     });
     if (micState === "blocked" && settings.mic) toast("micBlocked", 6000);
     audio.startRain();
-    audio.startMusic("night");
+    audio.startMusic(scope === "ch2" ? "upstairs" : "night");
     window.clearInterval(tickTimer);
     tickTimer = window.setInterval(tick, 200);
     touchActivity();
     run(async () => {
-      if (mode === "story" && params.get("intro") !== "0") {
+      if (mode === "story" && scope !== "ch2" && params.get("intro") !== "0") {
         await intro();
+        return;
+      }
+      if (scope === "ch2") {
+        await chapterTwoStart(enc0);
         return;
       }
       if (mode !== "practice") {
@@ -995,17 +1433,24 @@ export const director = {
     });
   },
 
-  /** Skip the opening cutscene. */
+  /** Skip the opening cutscene (or the Chapter 2 one). */
   skipIntro() {
     const g = getGame();
     if (g.phase !== "intro" || !g.hunt) return;
     gen++;
     tts.cancel();
     pendingNext = null;
+    if (cutscene === "chapter2") {
+      placePlayer(STAIRS_FOOT.x, STAIRS_FOOT.z, 0, Math.PI / 2);
+      run(async () => {
+        await afterChapterTwo();
+        await beginEncounter(true);
+        enterExplore();
+      });
+      return;
+    }
     const enc0 = currentEncounter(g.hunt);
-    rt.player.x = STORY_START.x;
-    rt.player.z = STORY_START.z;
-    rt.player.stepTo = null;
+    placePlayer(STORY_START.x, STORY_START.z, 0, Math.PI / 2);
     rt.doorsOpen.delete("entrance");
     rt.doorSlam.add("entrance");
     rt.flickerT0 = -100;
@@ -1026,6 +1471,7 @@ export const director = {
     awaitingEntry = false;
     outroWalk = false;
     pendingNext = null;
+    cutscene = null;
     stopListening?.();
     tts.cancel();
     audio.setListening(false);
@@ -1033,7 +1479,20 @@ export const director = {
     audio.stopRain(1);
     window.clearInterval(tickTimer);
     resetRuntime();
-    setGame({ screen: "title", phase: "intro", hunt: null, line: null, caption: null, clueShown: false, settingsOpen: false, hint: null, toast: null, fade: 0, lantern: [] });
+    setGame({
+      screen: "title",
+      phase: "intro",
+      hunt: null,
+      line: null,
+      caption: null,
+      clueShown: false,
+      settingsOpen: false,
+      hint: null,
+      toast: null,
+      fade: 0,
+      lantern: [],
+      chapterCard: null
+    });
   },
 
   /** E key / search button. */
@@ -1044,7 +1503,7 @@ export const director = {
     else if (g.phase === "search" && g.selectedSpot) run(() => doSearch(g.selectedSpot!));
   },
 
-  /** A searchable object was tapped/clicked in 3D. */
+  /** A searchable object (or the fan switch) was tapped/clicked in 3D. */
   tapObject(objectId: string) {
     const g = getGame();
     if (g.phase !== "explore" || g.settingsOpen) return;
@@ -1053,9 +1512,9 @@ export const director = {
       return;
     }
     const obj = WORLD.objectById.get(objectId);
-    if (!obj) return;
+    if (!obj || obj.floor !== rt.player.floor || rt.player.stairs) return;
     // Only walk to things in the room you are in (no walking through walls).
-    const room = roomAt(rt.player.x, rt.player.z);
+    const room = playerRoom();
     if (room && room !== obj.room) return;
     const c = rectCenter(obj.rect);
     rt.player.walkTo = { x: c.x, z: c.z, objectId, t0: rt.time };
@@ -1106,7 +1565,58 @@ export const director = {
 
   /** Read-only view for the e2e hook. */
   debug() {
-    return { busy, awaitingEntry, outroWalk };
+    return { busy, awaitingEntry, outroWalk, cutscene };
+  },
+
+  /**
+   * Test hook: jump straight to encounter `index` (earlier ghosts already caught, their rooms
+   * and - for an upstairs ghost - the stairs gate open), at round `round` of a finale ghost.
+   */
+  debugJump(index: number, round = 0) {
+    const g = getGame();
+    if (!g.hunt) return;
+    gen++;
+    busy = false;
+    pendingNext = null;
+    cutscene = null;
+    awaitingEntry = false;
+    const encs = g.hunt.encounters;
+    const enc = encs[Math.min(index, encs.length - 1)];
+    const captured = encs.slice(0, index).map((e) => e.ghost);
+    const path = [enc.start, ...(enc.roundSpots ?? [])];
+    const usedPreps = path.slice(0, round).map((id) => WORLD.spotById.get(id)!.prep);
+    for (const e of encs.slice(0, index)) {
+      const door = ROOM_DOOR[e.room];
+      if (door) rt.doorsOpen.set(door, rt.time - 5);
+    }
+    const upstairs = ROOMS[enc.room].floor === 1;
+    if (upstairs) rt.doorsOpen.set("stairs", rt.time - 5);
+    setGame({
+      hunt: {
+        ...g.hunt,
+        index,
+        round,
+        usedPreps,
+        spotId: path[Math.min(round, path.length - 1)],
+        status: "hunting",
+        captured,
+        clueId: g.hunt.clueId + 1,
+        wrongSearchesThisClue: 0,
+        relocationsThisRound: 0,
+        searchedThisClue: [],
+        answerMisses: 0
+      },
+      lantern: captured,
+      chapter: upstairs ? 2 : 1,
+      line: null,
+      fade: 0
+    });
+    run(async () => {
+      enterExplore();
+      setGame({ phase: "busy" });
+      await beginEncounter(true);
+      enterExplore();
+    });
   },
 
   /** Test hook: catch every ghost at once and play the ending. */
@@ -1114,7 +1624,7 @@ export const director = {
     const g = getGame();
     if (!g.hunt) return;
     const captured = g.hunt.encounters.map((e) => e.ghost);
-    setGame({ hunt: { ...g.hunt, status: "done", index: g.hunt.encounters.length, captured }, lantern: captured });
+    setGame({ hunt: { ...g.hunt, status: "done", index: g.hunt.encounters.length, captured }, lantern: captured, finishedAt: performance.now() });
     run(async () => (isStory() ? outro() : finishGame()));
   }
 };

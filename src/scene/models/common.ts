@@ -14,6 +14,10 @@ export type TexKey =
   | "rugBedroom"
   | "rugDining"
   | "rugLibrary"
+  | "rugPlay"
+  | "rugMusic"
+  | "rugAttic"
+  | "bathmat"
   | "runner"
   | "night"
   | "rain"
@@ -22,7 +26,8 @@ export type TexKey =
   | "paintingB";
 
 export interface AnimatedPart {
-  name: "lid" | "door" | "curtainL" | "curtainR" | "blanket";
+  /** fan: spins while switched on; lever: the fan switch's toggle. */
+  name: "lid" | "door" | "curtainL" | "curtainR" | "blanket" | "fan" | "lever";
   pivot: [number, number, number];
   geometry?: THREE.BufferGeometry;
   textured?: { key: TexKey; geometry: THREE.BufferGeometry };

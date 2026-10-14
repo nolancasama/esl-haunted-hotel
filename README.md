@@ -5,10 +5,10 @@ learning **in · on · under · by**.
 
 > **Where is the ghost?** — *It's under the bed.*
 
-You are trapped in an old hotel on a stormy night. Boo, a friendly ghost, says four
+You are trapped in an old hotel on a stormy night. Boo, a friendly ghost, says
 mischievous ghosts are hiding. Boo gives each clue in English ("It's under the
-bed!"); you search the room, find the ghost, then say where it is. Catch all four
-and the front door opens at sunrise.
+bed!"); you search the room, find the ghost, then say where it is. Catch the four
+downstairs and the stairs open; catch all eight and the front door opens at sunrise.
 
 **Play:** https://nolancasama.github.io/esl-haunted-hotel/ once the repository is
 published (Chrome on a computer, Chromebook or Android). To publish:
@@ -38,9 +38,15 @@ or `npm run build && npm run preview` runs it locally.
 | Hungry (orange) | Dining room | Sits by the cake; slips away after 2 empty searches |
 | Sneaky (green) | Storage room | Red / blue / yellow boxes; rattles other things to distract you |
 | Mischief (purple) | Library | Escapes after each answer until you have used all four prepositions |
+| Bouncy (yellow) | Playroom (upstairs) | Loves toys, which move by themselves; slips away after 2 empty searches |
+| Bubbles (aqua) | Bathroom | Hides in the steam; the fan switch clears it |
+| Melody (pink) | Music room | The instruments play; slips away after 2 empty searches |
+| Shadow (dark purple) | Attic | The finale: four answers, all four prepositions; the lights go out each time it escapes |
 
-A full game takes about 10 minutes. After you finish, **Replay** hides the ghosts
-in new places (always valid, unambiguous ones).
+**Chapter 1** (downstairs) and **Chapter 2** (upstairs) take about 10 minutes
+each. **All 8** plays both in one go. Chapter 2 on its own unlocks after Chapter 1
+is finished. After you finish, **Random hiding places** hides the ghosts in new
+places (always valid, unambiguous ones).
 
 ## Controls
 
@@ -65,9 +71,10 @@ in new places (always valid, unambiguous ones).
   tries, the word buttons appear automatically — nobody gets stuck.
 - English clues are spoken with the device's text-to-speech and always shown on
   screen.
-- **Links:** `?mode=practice` — one room, one ghost, all four prepositions
-  (about 3 minutes); `?mode=replay` — random hiding places straight away;
-  `?intro=0` — skip the opening.
+- **Links:** `?chapter=1` / `?chapter=2` — one floor only (for two lessons);
+  `?mode=practice` — one room, one ghost, all four prepositions (about 3
+  minutes); `?mode=replay` — random hiding places straight away; `?intro=0` —
+  skip the opening.
 - No accounts, no downloads, no tracking. Nothing is sent anywhere except the
   browser's own speech recognition.
 
@@ -83,7 +90,9 @@ npm run build      # production build in dist/ (relative paths, works on GitHub 
 
 Visual checks (dev server on port 5199): `node scripts/shots.mjs`,
 `node scripts/reveals.mjs` (every hiding spot's reveal) and
-`node scripts/story.mjs` (the whole story) save screenshots to `.tmp/`.
+`node scripts/story.mjs` (the whole story), `node scripts/upstairs.mjs`
+(stairs, upstairs rooms, tricks, cutscene) and `node scripts/ending.mjs` (the
+eight-ghost ending) save screenshots to `.tmp/`.
 
 React 19 + TypeScript + Three.js via React Three Fiber, zustand, Vite, Vitest,
 Playwright. Everything — models, textures, sound and music — is generated in

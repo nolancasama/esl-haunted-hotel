@@ -8,3 +8,7 @@ export const PRACTICE_START = { x: -3.6, z: -5.4 };
 export const STORY_START = { x: -6.3, z: 0 };
 /** Story: outside the entrance, where the intro walk-in begins. */
 export const OUTSIDE = { x: -9.9, z: 0 };
+/** Chapter 2 on its own: at the top of the stairs, on the landing. */
+export const UPSTAIRS_START = { x: 7.05, z: 0 };
+/** Chapter 2 cinematic: in the lobby, looking at the stairs. */
+export const STAIRS_FOOT = { x: 1.9, z: 0.9 };

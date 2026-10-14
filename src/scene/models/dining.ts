@@ -58,10 +58,11 @@ export const diningModels: BuilderSet = {
     b.cyl(0.04, 0.035, 0.08, 1.22, top, 0.2, "#ffffff", 10);
   },
 
-  piano(_obj, b, g) {
+  piano(obj, b, g) {
     const legH = KINDS.piano.under.clearance; // 0.62
-    const black = "#1d1a24";
-    const shine = "#3c3548";
+    const white = obj.variant === "white";
+    const black = white ? "#f2eee6" : "#1d1a24";
+    const shine = white ? "#ffffff" : "#3c3548";
     // case: square front part + half-disc tail
     b.box(1.45, 0.34, 0.95, 0, legH, 0.22, black);
     b.add(new THREE.CylinderGeometry(0.725, 0.725, 0.34, 22, 1, false, Math.PI / 2, Math.PI), black, [0, legH + 0.17, -0.25]);
@@ -92,10 +93,11 @@ export const diningModels: BuilderSet = {
     candle(b, g, 0.58, legH + 0.38, 0.55, 0.1);
   },
 
-  basket(_obj, b, _g, out) {
+  basket(obj, b, _g, out) {
     const { w, d, h } = KINDS.basket;
-    const wicker = "#c99a5b";
-    const dark = "#9c6f3c";
+    const laundry = obj.variant === "laundry";
+    const wicker = laundry ? "#e6dcc8" : "#c99a5b";
+    const dark = laundry ? "#b8aa90" : "#9c6f3c";
     b.box(w, 0.05, d, 0, 0, 0, dark);
     b.box(w, h - 0.05, 0.05, 0, 0.05, d / 2 - 0.025, wicker);
     b.box(w, h - 0.05, 0.05, 0, 0.05, -d / 2 + 0.025, wicker);
@@ -104,8 +106,15 @@ export const diningModels: BuilderSet = {
     for (const y of [0.12, 0.24, 0.36]) b.box(w + 0.01, 0.025, d + 0.01, 0, y, 0, dark);
     for (let x = -0.36; x <= 0.36; x += 0.12) b.box(0.02, h - 0.06, d + 0.012, x, 0.05, 0, dark);
     b.box(w - 0.1, 0.01, d - 0.1, 0, 0.05, 0, "#2a1b14");
-    // gingham napkin peeking out
-    b.boxAt(0.3, 0.12, 0.01, [0.2, h - 0.02, d / 2 - 0.02], [0.3, 0, 0.1], "#e05050");
+    if (laundry) {
+      // a striped towel and a sock hanging over the front
+      b.boxAt(0.26, 0.2, 0.012, [-0.18, h - 0.06, d / 2 + 0.01], [0.15, 0, -0.08], "#6fc3cf");
+      b.boxAt(0.26, 0.03, 0.014, [-0.18, h - 0.02, d / 2 + 0.012], [0.15, 0, -0.08], "#ffffff");
+      b.boxAt(0.06, 0.16, 0.012, [0.24, h - 0.06, d / 2 + 0.01], [0.1, 0, 0.25], "#ff9fb6");
+    } else {
+      // gingham napkin peeking out
+      b.boxAt(0.3, 0.12, 0.01, [0.2, h - 0.02, d / 2 - 0.02], [0.3, 0, 0.1], "#e05050");
+    }
     // side handles
     for (const sx of [-1, 1]) b.torus(0.1, 0.018, [(sx * w) / 2, h - 0.02, 0], [0, Math.PI / 2, 0], dark);
     const lid = new PartBuilder();

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { KINDS } from "../../game/world/kinds";
+import { WALL_H } from "../../game/world/rooms";
 import { C, candle, plane, type BuilderSet } from "./common";
 
 export const lobbyModels: BuilderSet = {
@@ -59,43 +60,56 @@ export const lobbyModels: BuilderSet = {
     candle(b, g, -0.25, h, 0, 0.12);
   },
 
+  /**
+   * Front (+z) is the bottom step; the steps rise towards local -z and reach
+   * the upstairs floor (WALL_H) at the back edge. Beyond the back edge, under
+   * the landing's top, is a panelled closet. Seen from both floors.
+   */
   stairs(_obj, b) {
-    // Front (+z) is the bottom step; the steps rise towards local -z.
     const { w, d } = KINDS.stairs;
-    const n = 8;
-    const step = d / n;
-    const rise = 0.32;
+    const H = WALL_H;
+    const n = 10;
+    const run = d / n;
+    const rise = H / n;
+    const stepW = w - 0.2;
     for (let i = 0; i < n; i++) {
-      const z = d / 2 - step * (i + 0.5);
-      b.box(w - 0.3, rise * (i + 1), step, 0, 0, z, i % 2 ? "#6a2a35" : "#702d38");
-      b.box(w - 0.3, 0.02, step, 0, rise * (i + 1), z, "#8a3a45");
+      const z = d / 2 - run * (i + 0.5);
+      b.box(stepW, rise * (i + 1), run, 0, 0, z, i % 2 ? "#5a3426" : "#623a2a");
+      b.box(stepW + 0.02, 0.025, run + 0.01, 0, rise * (i + 1) - 0.01, z + 0.005, C.woodDark);
+      // carpet runner up the middle
+      b.box(1.3, 0.012, run, 0, rise * (i + 1) + 0.012, z, i % 2 ? "#8a2a3a" : "#922e3e");
+      b.box(1.3, rise, 0.012, 0, rise * i, z + run / 2 + 0.006, "#7a2433");
+      b.box(1.34, 0.02, 0.02, 0, rise * (i + 1), z + run / 2 - 0.01, C.brass);
     }
-    // stringers and banisters
+    // sloped stringers, balusters, handrails; newel posts at the bottom and the top
+    const slope = Math.atan2(H, d);
+    const len = Math.hypot(d, H);
     for (const sx of [-1, 1]) {
-      const x = sx * (w / 2 - 0.1);
-      b.box(0.12, 0.5, d, x, 0, 0, C.woodDark);
-      for (let i = 0; i < n; i += 2) {
-        const z = d / 2 - step * (i + 0.5);
-        b.box(0.05, 0.85, 0.05, x, rise * (i + 1), z, C.woodLight);
+      const x = sx * (w / 2 - 0.06);
+      b.boxAt(0.12, 0.34, len, [x, H / 2 + 0.05, 0], [slope, 0, 0], C.woodDark);
+      for (let i = 0; i < n; i++) {
+        const z = d / 2 - run * (i + 0.5);
+        b.cyl(0.022, 0.026, 0.86, x, rise * (i + 1), z, C.woodLight, 6);
       }
-      b.boxAt(0.08, 0.06, Math.hypot(d, rise * n) * 0.98, [x, rise * n * 0.5 + 0.85, 0], [Math.atan2(rise * n, d), 0, 0], C.woodDark);
-      b.box(0.14, 1.1, 0.14, x, 0, d / 2 - 0.07, C.woodDark);
-      b.sphere(0.09, x, 1.15, d / 2 - 0.07, C.brass);
+      b.boxAt(0.09, 0.07, len, [x, H / 2 + 0.92, 0], [slope, 0, 0], C.woodDark);
+      b.box(0.15, 1.12, 0.15, x, 0, d / 2 - 0.08, C.woodDark);
+      b.sphere(0.09, x, 1.18, d / 2 - 0.08, C.brass);
+      b.box(0.15, 1.08, 0.15, x, H, -d / 2 + 0.08, C.woodDark);
+      b.sphere(0.09, x, H + 1.13, -d / 2 + 0.08, C.brass);
     }
-    // velvet rope: the stairs are closed
-    const zr = d / 2 + 0.12;
+    // the closet under the top of the stairs (local z -1.4 .. -2.9 = world x 6.4 .. 7.9)
+    const cz0 = -d / 2;
+    const cd = 1.5;
+    const cw = w + 0.2;
+    b.box(cw, H - 0.02, cd, 0, 0, cz0 - cd / 2, "#4c2a36");
     for (const sx of [-1, 1]) {
-      b.cyl(0.05, 0.08, 0.85, sx * 0.75, 0, zr, C.brass, 10);
-      b.sphere(0.06, sx * 0.75, 0.88, zr, C.brass);
+      b.box(0.02, 0.9, cd - 0.3, sx * (cw / 2 + 0.005), 0.25, cz0 - cd / 2, "#5e3442");
+      b.box(0.02, 0.9, cd - 0.3, sx * (cw / 2 + 0.005), 1.35, cz0 - cd / 2, "#5e3442");
+      b.box(0.03, 0.12, cd, sx * (cw / 2 + 0.01), 0, cz0 - cd / 2, "#2a1620");
     }
-    for (let i = 0; i < 10; i++) {
-      const t = i / 9;
-      const x = -0.72 + t * 1.44;
-      b.sphere(0.035, x, 0.8 - Math.sin(t * Math.PI) * 0.18, zr, "#c0263c", [1.6, 1, 1], 6);
-    }
-    b.boxAt(0.36, 0.2, 0.02, [0, 0.55, zr + 0.02], [0, 0, 0.06], "#f2e6c8");
-    b.boxAt(0.22, 0.03, 0.025, [0, 0.55, zr + 0.03], [0, 0, 0.7], "#c0263c");
-    b.boxAt(0.22, 0.03, 0.025, [0, 0.55, zr + 0.03], [0, 0, -0.6], "#c0263c");
+    // a little door on the south side of the closet
+    b.box(0.02, 1.7, 0.7, cw / 2 + 0.02, 0.04, cz0 - cd / 2, "#6b3d2a");
+    b.sphere(0.035, cw / 2 + 0.05, 0.95, cz0 - cd / 2 + 0.25, C.brass);
   },
 
   plant(_obj, b) {

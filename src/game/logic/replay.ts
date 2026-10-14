@@ -1,30 +1,35 @@
-import { PREPS, type Prep, type RoomId } from "../types";
+import { PREPS, type GhostId, type Prep, type RoomId } from "../types";
 import { spotsInRoom, WORLD, type World } from "../world/world";
 import type { Encounter } from "./hunt";
+import { chapter1Plan, chapter2Plan, type Scope } from "./plans";
 import { pick, shuffle, type Rng } from "./rng";
 
 /**
  * Replay mode: same rooms and ghost personalities, random hiding places.
  * Only predefined, tested spots are used, so every clue stays unambiguous.
- * Sleepy, Hungry and Sneaky start on three different prepositions; Mischief
- * still runs through all four, in a random order.
+ * In each chapter the first three ghosts start on three different
+ * prepositions; the finale ghost (Mischief, Shadow) still runs through all
+ * four, in a random order.
  */
-export function replayPlan(rng: Rng, world: World = WORLD): Encounter[] {
+function randomise(template: Encounter[], rng: Rng, world: World): Encounter[] {
   const spotFor = (room: RoomId, prep: Prep) => pick(rng, spotsInRoom(room, world).filter((s) => s.prep === prep)).id;
   const starts = shuffle(rng, PREPS);
   const rounds = shuffle(rng, PREPS);
-  return [
-    { ghost: "sleepy", room: "bedroom", start: spotFor("bedroom", starts[0]), rounds: 1, relocateAfter: null, maxRelocations: 0 },
-    { ghost: "hungry", room: "dining", start: spotFor("dining", starts[1]), rounds: 1, relocateAfter: 2, maxRelocations: 2 },
-    { ghost: "sneaky", room: "storage", start: spotFor("storage", starts[2]), rounds: 1, relocateAfter: 3, maxRelocations: 2 },
-    {
-      ghost: "mischief",
-      room: "library",
-      start: spotFor("library", rounds[0]),
-      rounds: 4,
-      relocateAfter: 2,
-      maxRelocations: 1,
-      roundSpots: rounds.slice(1).map((p) => spotFor("library", p))
+  return template.map((e, i) => {
+    if (e.rounds > 1) {
+      return { ...e, start: spotFor(e.room, rounds[0]), roundSpots: rounds.slice(1).map((p) => spotFor(e.room, p)) };
     }
-  ];
+    return { ...e, start: spotFor(e.room, starts[i % starts.length]) };
+  });
+}
+
+export function replayPlan(rng: Rng, world: World = WORLD, scope: Scope = "all"): Encounter[] {
+  const ch1 = scope !== "ch2" ? randomise(chapter1Plan(), rng, world) : [];
+  const ch2 = scope !== "ch1" ? randomise(chapter2Plan(), rng, world) : [];
+  return [...ch1, ...ch2];
+}
+
+/** The ghosts a scope covers, in order. */
+export function scopeGhosts(scope: Scope): GhostId[] {
+  return [...(scope !== "ch2" ? chapter1Plan() : []), ...(scope !== "ch1" ? chapter2Plan() : [])].map((e) => e.ghost);
 }

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useGame } from "../game/store";
 import { director } from "../game/director";
 import { rt } from "../game/runtime";
+import { WORLD } from "../game/world/world";
 
 const RADIUS = 52;
 
@@ -68,7 +69,7 @@ export function TouchControls() {
       {phase === "explore" && <Joystick />}
       {phase === "explore" && focus && (
         <button className="touch-action ui" onClick={() => director.interact()} aria-label="Search" data-testid="touch-search">
-          <span aria-hidden="true">🔍</span>
+          <span aria-hidden="true">{WORLD.objectById.get(focus)?.action === "fan" ? "🌀" : "🔍"}</span>
         </button>
       )}
     </>

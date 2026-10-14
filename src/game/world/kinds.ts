@@ -71,8 +71,13 @@ export interface KindSpec {
   solid: boolean;
   /** Hangs on a wall; x/z place it on the wall face with +z pointing into the room. */
   wallMounted?: boolean;
-  /** Lies on the floor (rugs); ignored when deciding which object is "nearest". */
+  /**
+   * Lies on the floor (rugs) or hangs high up (chandeliers, rafters, a mirror over the sink);
+   * ignored when deciding which object is "nearest" a floor-level ghost.
+   */
   flat?: boolean;
+  /** Seen from both floors (the staircase). */
+  bothFloors?: boolean;
   on?: OnSpec;
   under?: UnderSpec;
   in?: InSpec;
@@ -203,6 +208,85 @@ export const KINDS = {
     on: { y: 2.22, at: { x: -0.4, z: 0 }, area: { x0: -0.95, x1: 0.95, z0: -0.25, z1: 0.25 }, scale: 0.75 },
     by: BY_FLOOR
   },
+  // ---- upstairs searchable kinds ------------------------------------------
+  kidtable: {
+    w: 1.2,
+    h: 0.6,
+    d: 0.8,
+    solid: true,
+    on: { y: 0.6, at: { x: 0.26, z: 0 }, area: { x0: -0.04, x1: 0.6, z0: -0.4, z1: 0.4 }, scale: 0.8 },
+    under: { clearance: 0.52, area: { x0: -0.52, x1: 0.52, z0: -0.32, z1: 0.32 }, scale: [0.85, 0.58, 0.85] },
+    by: BY_FLOOR
+  },
+  /** Rocking horse: its body runs along local x; the saddle is the "on" spot. */
+  rockinghorse: {
+    w: 1.3,
+    h: 1.1,
+    d: 0.5,
+    solid: true,
+    on: { y: 0.66, at: { x: -0.05, z: 0 }, area: { x0: -0.32, x1: 0.24, z0: -0.25, z1: 0.25 }, scale: 0.72 },
+    by: BY_FLOOR
+  },
+  /** Ride-on toy engine: boiler at local +x, cab (with a flat roof: "on") at -x. */
+  toytrain: {
+    w: 1.4,
+    h: 0.82,
+    d: 0.6,
+    solid: true,
+    on: { y: 0.82, at: { x: -0.38, z: 0 }, area: { x0: -0.7, x1: -0.06, z0: -0.3, z1: 0.3 }, scale: 0.72 },
+    by: BY_FLOOR
+  },
+  /** Claw-foot bathtub on tall feet: in it, and under it. */
+  bathtub: {
+    w: 1.7,
+    h: 0.8,
+    d: 0.8,
+    solid: true,
+    in: {
+      box: { x0: -0.7, x1: 0.7, y0: 0.44, y1: 0.8, z0: -0.3, z1: 0.3 },
+      scale: 0.7,
+      reveal: "rise",
+      marker: { x: 0, y: 0.98, z: 0.18 }
+    },
+    under: { clearance: 0.38, area: { x0: -0.62, x1: 0.62, z0: -0.32, z1: 0.32 }, scale: [0.8, 0.42, 0.8] },
+    by: BY_FLOOR
+  },
+  /** Washstand with a basin on top and open legs below. */
+  sink: {
+    w: 0.9,
+    h: 0.88,
+    d: 0.62,
+    solid: true,
+    under: { clearance: 0.62, area: { x0: -0.38, x1: 0.38, z0: -0.26, z1: 0.26 }, scale: [0.75, 0.68, 0.75] },
+    by: BY_FLOOR
+  },
+  drum: {
+    w: 0.84,
+    h: 0.66,
+    d: 0.84,
+    solid: true,
+    on: { y: 0.66, at: { x: 0, z: 0 }, area: { x0: -0.3, x1: 0.3, z0: -0.3, z1: 0.3 }, scale: 0.8 },
+    by: BY_FLOOR
+  },
+  /** A sofa under a dust sheet (attic). */
+  coveredsofa: {
+    w: 1.9,
+    h: 0.95,
+    d: 0.9,
+    solid: true,
+    on: { y: 0.5, at: { x: 0.42, z: 0.12 }, area: { x0: -0.72, x1: 0.78, z0: -0.16, z1: 0.42 }, scale: 0.78 },
+    by: BY_FLOOR
+  },
+  /** The attic's mysterious glowing round window. */
+  roundwindow: {
+    w: 1.9,
+    h: 2.5,
+    d: 0.25,
+    solid: false,
+    wallMounted: true,
+    under: { clearance: 0.86, area: { x0: -0.55, x1: 0.55, z0: 0.12, z1: 0.74 }, scale: [0.9, 0.9, 0.9], y: 0.04 },
+    by: { y: 1.0, gap: 0.1, edge: 0.82, z: 0.42, scale: 0.9 }
+  },
   clock: {
     w: 0.62,
     h: 2.1,
@@ -228,7 +312,8 @@ export const KINDS = {
   coffeetable: { w: 1.1, h: 0.45, d: 0.6, solid: true },
   plant: { w: 0.6, h: 1.4, d: 0.6, solid: true },
   reception: { w: 2.6, h: 1.1, d: 0.8, solid: true },
-  stairs: { w: 2.4, h: 2.8, d: 2.8, solid: true },
+  /** Walkable: the banisters and the space under the top are explicit colliders (world.ts). */
+  stairs: { w: 2.4, h: 2.8, d: 2.8, solid: false, bothFloors: true },
   luggage: { w: 0.9, h: 0.9, d: 0.6, solid: true },
   umbrellastand: { w: 0.35, h: 0.8, d: 0.35, solid: true },
   chandelier: { w: 1.2, h: 0.8, d: 1.2, solid: false, flat: true },
@@ -243,7 +328,36 @@ export const KINDS = {
   bookpile: { w: 0.5, h: 0.5, d: 0.4, solid: false },
   broom: { w: 0.3, h: 1.4, d: 0.3, solid: false },
   ghostboard: { w: 2.4, h: 2.6, d: 0.12, solid: false, wallMounted: true },
-  painting: { w: 0.9, h: 2.2, d: 0.08, solid: false, wallMounted: true }
+  painting: { w: 0.9, h: 2.2, d: 0.08, solid: false, wallMounted: true },
+
+  // ---- upstairs decor ----------------------------------------------------
+  /** Balustrade round the stairwell (colliders are explicit, see world.ts). */
+  balustrade: { w: 2.6, h: 1.0, d: 3.0, solid: false },
+  bench: { w: 1.3, h: 0.9, d: 0.5, solid: true },
+  teddy: { w: 0.8, h: 1.05, d: 0.7, solid: true },
+  blocks: { w: 0.7, h: 0.4, d: 0.5, solid: false },
+  kidchair: { w: 0.42, h: 0.66, d: 0.42, solid: true },
+  toyshelf: { w: 1.6, h: 1.35, d: 0.42, solid: true },
+  playrug: { w: 3.2, h: 0.02, d: 2.4, solid: false, flat: true },
+  mirror: { w: 0.8, h: 1.9, d: 0.06, solid: false, wallMounted: true, flat: true },
+  towelrack: { w: 0.7, h: 1.1, d: 0.35, solid: true },
+  stool: { w: 0.4, h: 0.45, d: 0.4, solid: true },
+  bathcabinet: { w: 0.7, h: 1.7, d: 0.4, solid: true },
+  bathmat: { w: 1.2, h: 0.02, d: 0.7, solid: false, flat: true },
+  /** Extractor fan high on the wall (spins while switched on). */
+  ventfan: { w: 0.6, h: 2.4, d: 0.12, solid: false, wallMounted: true, flat: true },
+  /** The fan's wall switch - not a hiding place, it does something. */
+  fanswitch: { w: 0.3, h: 1.5, d: 0.06, solid: false, wallMounted: true },
+  gramophone: { w: 0.6, h: 1.2, d: 0.6, solid: true },
+  musicstand: { w: 0.5, h: 1.3, d: 0.4, solid: false },
+  cello: { w: 0.55, h: 1.5, d: 0.4, solid: true },
+  guitar: { w: 0.45, h: 1.1, d: 0.35, solid: false },
+  rockingchair: { w: 0.7, h: 1.15, d: 0.95, solid: true },
+  coveredchair: { w: 0.8, h: 1.4, d: 0.7, solid: true },
+  boxstack: { w: 0.9, h: 1.0, d: 0.7, solid: true },
+  oldpaintings: { w: 1.0, h: 1.0, d: 0.3, solid: true },
+  /** Roof rafters along an attic wall (fade with it). */
+  rafters: { w: 6.8, h: 2.8, d: 0.3, solid: false, wallMounted: true, flat: true }
 } satisfies Record<string, KindSpec>;
 
 export type KindId = keyof typeof KINDS;

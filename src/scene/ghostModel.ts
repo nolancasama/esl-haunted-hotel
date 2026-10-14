@@ -53,9 +53,23 @@ export function ghostArm(): THREE.BufferGeometry {
   return armGeo;
 }
 
-export type Accessory = "nightcap" | "bib" | "mask" | "tophat" | "bowtie";
+export type Accessory = "nightcap" | "bib" | "mask" | "tophat" | "bowtie" | "propeller" | "showercap" | "headphones" | "wings";
 
 const accCache = new Map<Accessory, THREE.BufferGeometry>();
+
+let propGeo: THREE.BufferGeometry | null = null;
+
+/** Bouncy's propeller blades (a separate mesh so they can spin); centred on the hub. */
+export function propellerGeometry(): THREE.BufferGeometry {
+  if (propGeo) return propGeo;
+  const b = new PartBuilder(0);
+  const flat = { flatAo: true };
+  b.add(new THREE.BoxGeometry(0.17, 0.012, 0.06), "#e8483f", [0.09, 0, 0], [0.25, 0, 0], [1, 1, 1], flat);
+  b.add(new THREE.BoxGeometry(0.17, 0.012, 0.06), "#3a6ad0", [-0.09, 0, 0], [-0.25, 0, 0], [1, 1, 1], flat);
+  b.add(new THREE.SphereGeometry(0.025, 8, 6), "#f2c94c", [0, 0.01, 0], [0, 0, 0], [1, 1, 1], flat);
+  propGeo = b.build();
+  return propGeo;
+}
 
 /** Vertex-coloured accessory geometry in ghost-local space. */
 export function accessoryGeometry(kind: Accessory): THREE.BufferGeometry {
@@ -107,6 +121,67 @@ export function accessoryGeometry(kind: Accessory): THREE.BufferGeometry {
       // drawn into the face texture
       b.add(new THREE.SphereGeometry(0.001, 3, 2), "#000000", [0, 0, 0]);
       break;
+    case "propeller": {
+      // a four-colour beanie with a little visor and a hub (the blades spin separately)
+      const flat = { flatAo: true };
+      const cols = ["#e8483f", "#f2c94c", "#3a6ad0", "#5cc46a"];
+      cols.forEach((c, i) =>
+        b.add(new THREE.SphereGeometry(0.315, 6, 6, (i * Math.PI) / 2, Math.PI / 2, 0, Math.PI * 0.3), c, [0, DOME_Y - 0.005, 0], [0, 0, 0], [1, 1, 1], flat)
+      );
+      b.add(new THREE.CylinderGeometry(0.17, 0.17, 0.02, 14, 1, false, -Math.PI / 2, Math.PI), "#e8483f", [0, 0.71, 0.16], [0.35, 0, 0], [1, 1, 0.9], flat);
+      b.add(new THREE.CylinderGeometry(0.018, 0.022, 0.15, 8), "#f2c94c", [0, 0.85, 0], [0, 0, 0], [1, 1, 1], flat);
+      break;
+    }
+    case "showercap": {
+      // a puffy pink shower cap with white dots and a frilly edge
+      const flat = { flatAo: true };
+      b.add(new THREE.SphereGeometry(0.335, 18, 8, 0, Math.PI * 2, 0, Math.PI * 0.36), "#ff9fc4", [0, DOME_Y - 0.01, -0.02], [-0.12, 0, 0], [1, 1.05, 1], flat);
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2;
+        b.add(new THREE.SphereGeometry(0.035, 6, 4), "#ffe0ee", [Math.cos(a) * 0.29, 0.62, Math.sin(a) * 0.29 - 0.02], [0, 0, 0], [1, 0.7, 1], flat);
+      }
+      for (const [x, y, z] of [
+        [0.1, 0.78, 0.1],
+        [-0.14, 0.74, 0.12],
+        [0.18, 0.71, -0.12],
+        [-0.06, 0.8, -0.1],
+        [-0.2, 0.7, -0.05]
+      ] as const) {
+        b.add(new THREE.SphereGeometry(0.03, 6, 4), "#ffffff", [x, y, z], [0, 0, 0], [1, 0.5, 1], flat);
+      }
+      break;
+    }
+    case "headphones": {
+      const flat = { flatAo: true };
+      b.add(new THREE.TorusGeometry(0.325, 0.028, 6, 22, Math.PI), "#7a3a6a", [0, DOME_Y, 0], [0, 0, 0], [1, 1, 1], flat);
+      for (const sx of [-1, 1]) {
+        b.add(new THREE.CylinderGeometry(0.095, 0.095, 0.08, 14), "#ffffff", [sx * 0.32, DOME_Y, 0], [0, 0, Math.PI / 2], [1, 1, 1], flat);
+        b.add(new THREE.CylinderGeometry(0.07, 0.07, 0.085, 14), "#ff6fb5", [sx * 0.325, DOME_Y, 0], [0, 0, Math.PI / 2], [1, 1, 1], flat);
+      }
+      // a little music note floating from one ear
+      b.add(new THREE.SphereGeometry(0.03, 8, 6), "#ffd84a", [0.46, 0.62, 0.02], [0, 0, 0], [1.3, 1, 0.6], flat);
+      b.add(new THREE.BoxGeometry(0.012, 0.11, 0.012), "#ffd84a", [0.48, 0.68, 0.02], [0, 0, 0], [1, 1, 1], flat);
+      break;
+    }
+    case "wings": {
+      // little bat wings on Shadow's back
+      const flat = { flatAo: true };
+      const wing = new THREE.Shape();
+      wing.moveTo(0, 0);
+      wing.lineTo(0.3, 0.16);
+      wing.quadraticCurveTo(0.27, 0.06, 0.32, 0.0);
+      wing.quadraticCurveTo(0.24, 0.0, 0.22, -0.07);
+      wing.quadraticCurveTo(0.15, -0.04, 0.12, -0.11);
+      wing.quadraticCurveTo(0.07, -0.05, 0, -0.06);
+      wing.closePath();
+      for (const sx of [-1, 1]) {
+        const g = new THREE.ExtrudeGeometry(wing, { depth: 0.012, bevelEnabled: false });
+        b.add(g, "#3a2466", [sx * 0.2, 0.52, -0.2], [0, sx > 0 ? -0.5 : Math.PI + 0.5, 0.25 * sx], [1, 1, 1], flat);
+      }
+      // tiny horns
+      for (const sx of [-1, 1]) b.add(new THREE.ConeGeometry(0.035, 0.1, 6), "#3a2466", [sx * 0.12, 0.79, 0.02], [0, 0, -sx * 0.4], [1, 1, 1], flat);
+      break;
+    }
   }
   const geo = b.build();
   accCache.set(kind, geo);

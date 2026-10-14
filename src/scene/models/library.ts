@@ -44,10 +44,12 @@ export const libraryModels: BuilderSet = {
     b.sphere(0.07, 0.15, h + 0.07, 0.05, "#c9d6e8", [1, 1, 1], 10);
   },
 
-  clock(_obj, b, _g, out) {
+  clock(obj, b, _g, out) {
     const { w, h, d } = KINDS.clock;
-    const wood = "#7a4128";
-    const dark = "#4f2818";
+    // The attic's clock is older and greyer.
+    const old = obj.variant === "old";
+    const wood = old ? "#5e4a3e" : "#7a4128";
+    const dark = old ? "#3e3028" : "#4f2818";
     // base, side walls, back (the cavity is x +-0.24, z -0.2..0.21, y 0.2..1.35)
     b.box(w + 0.06, 0.2, d + 0.04, 0, 0, 0, dark);
     b.box(0.07, 1.25, d, -w / 2 + 0.035, 0.2, 0, wood);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useGame, setGame } from "../game/store";
+import { useGame, setGame, visibleGhosts } from "../game/store";
+import { WORLD } from "../game/world/world";
 import { director } from "../game/director";
 import { currentEncounter, currentSpot } from "../game/logic/hunt";
 import { clueText } from "../game/logic/clues";
@@ -29,18 +30,31 @@ function GearIcon() {
   );
 }
 
-/** Ghosts captured (or, for a ghost that needs several answers, its remaining rounds). */
+/**
+ * Ghosts captured (or, for a ghost that needs several answers, its remaining rounds).
+ * In the full adventure the four upstairs ghosts only appear once Chapter 2 opens.
+ */
 function Counter() {
   const hunt = useGame((s) => s.hunt);
   const lantern = useGame((s) => s.lantern);
+  const scope = useGame((s) => s.scope);
+  const chapter = useGame((s) => s.chapter);
+  const mode = useGame((s) => s.mode);
   if (!hunt) return null;
   const enc = currentEncounter(hunt);
   const single = hunt.encounters.length === 1;
+  const ghosts = visibleGhosts({ hunt, scope, chapter, mode });
+  const caught = lantern.filter((g) => ghosts.includes(g)).length;
+  const rows = ghosts.length > 4 ? [ghosts.slice(0, 4), ghosts.slice(4)] : [ghosts];
   return (
     <div className="counter" data-testid="counter">
-      <div className="counter-ghosts">
-        {hunt.encounters.map((e, i) => (
-          <GhostPortrait key={i} ghost={e.ghost} size={38} dim={!lantern.includes(e.ghost)} face="smile" />
+      <div className={`counter-ghosts ${rows.length > 1 ? "two" : ""}`}>
+        {rows.map((row, r) => (
+          <div className="counter-row" key={r}>
+            {row.map((g) => (
+              <GhostPortrait key={g} ghost={g} size={rows.length > 1 ? 28 : 38} dim={!lantern.includes(g)} face="smile" />
+            ))}
+          </div>
         ))}
       </div>
       <div className="counter-text">
@@ -50,7 +64,7 @@ function Counter() {
           </span>
         ) : (
           <span>
-            {lantern.length}/{hunt.encounters.length}
+            {caught}/{ghosts.length}
           </span>
         )}
       </div>
@@ -134,6 +148,24 @@ function SkipButton() {
   );
 }
 
+/** "CHAPTER 2 — UPSTAIRS": a title across the middle of the screen for a moment. */
+function ChapterTitle() {
+  const card = useGame((s) => s.chapterCard);
+  const ja = useGame((s) => s.settings.japanese);
+  if (!card) return null;
+  return (
+    <div className="chapter-card" key={card.key} data-testid="chapter-card">
+      <div className="chapter-title">{card.title}</div>
+      <div className="chapter-sub">{card.sub}</div>
+      {ja && (
+        <div className="chapter-ja" lang="ja">
+          {card.ja}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Caption() {
   const caption = useGame((s) => s.caption);
   if (!caption) return null;
@@ -160,12 +192,16 @@ function HintBar() {
     return () => window.clearTimeout(t);
   }, [hint]);
 
+  const usable = focus ? WORLD.objectById.get(focus)?.action : undefined;
   let h: { en: string; ja: string } | null = null;
   if (toast === "micBlocked") h = HINT.micBlocked;
   else if (toast === "locked") h = HINT.locked;
+  else if (toast === "fan") h = HINT.fan;
   else if (phase === "explore" && hint === "exit") h = HINT.exit;
+  else if (phase === "explore" && focus && usable) h = touch ? HINT.fanTouch : HINT.fanKeys;
   else if (phase === "explore" && focus) h = touch ? HINT.searchTouch : HINT.searchKeys;
   else if (phase === "explore" && hint === "goDoor") h = HINT.goDoor;
+  else if (phase === "explore" && hint === "goStairs") h = HINT.goStairs;
   else if (phase === "explore" && hint === "move" && !moveHintGone) h = touch ? HINT.moveTouch : HINT.moveKeys;
   else if (phase === "search") h = touch ? HINT.chooseTouch : HINT.chooseKeys;
   if (!h) return null;
@@ -194,6 +230,7 @@ export function Hud() {
         </button>
       </div>
       <Caption />
+      <ChapterTitle />
       <SkipButton />
       <div className="bottom">
         <Subtitle />

@@ -1,64 +1,102 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { DOORS, DOOR_H, ROOMS, WALL_LINES, WALL_T, type DoorDef } from "../game/world/rooms";
+import { DOORS, DOOR_H, FLOOR_Y, ROOMS, STAIRS, WALL_LINES, WALL_T, type DoorDef } from "../game/world/rooms";
 import { rt } from "../game/runtime";
 import { PartBuilder } from "./partBuilder";
 import { iconTexture } from "./textures";
 import { lineFade } from "./wallFade";
 
-function panelGeometry(width: number, height: number, mirror: boolean, entrance: boolean): THREE.BufferGeometry {
+type Style = "plain" | "entrance" | "attic" | "gate";
+
+function panelGeometry(width: number, height: number, mirror: boolean, style: Style): THREE.BufferGeometry {
   const b = new PartBuilder(0.2);
   const x0 = mirror ? -width : 0;
   const cx = x0 + width / 2;
-  const wood = entrance ? "#4f2a1c" : "#6b3d2a";
-  const panel = entrance ? "#64372a" : "#7e4a33";
-  b.box(width, height, 0.07, cx, 0, 0, wood);
-  for (const y of [0.25, height * 0.55]) {
-    b.box(width - 0.3, height * 0.36, 0.02, cx, y, 0.04, panel);
-    b.box(width - 0.3, height * 0.36, 0.02, cx, y, -0.04, panel);
-  }
   const knobX = mirror ? -width + 0.12 : width - 0.12;
-  b.sphere(0.05, knobX, 1.0, 0.07, "#d4ad55");
-  b.sphere(0.05, knobX, 1.0, -0.07, "#d4ad55");
-  if (entrance) {
+  if (style === "gate") {
+    // wrought iron: frame, bars with spear tips, a curl in the middle
+    const iron = "#2a2433";
+    b.box(width, 0.05, 0.05, cx, 0.08, 0, iron);
+    b.box(width, 0.05, 0.05, cx, height - 0.12, 0, iron);
+    b.box(0.05, height, 0.05, x0 + 0.025, 0, 0, iron);
+    b.box(0.05, height, 0.05, x0 + width - 0.025, 0, 0, iron);
+    const n = Math.round(width / 0.14);
+    for (let i = 1; i < n; i++) {
+      const x = x0 + (i * width) / n;
+      b.box(0.025, height - 0.05, 0.025, x, 0.03, 0, iron);
+      b.add(new THREE.ConeGeometry(0.03, 0.09, 4), "#c9a24a", [x, height + 0.02, 0]);
+    }
+    b.torus(0.12, 0.018, [cx, height * 0.5, 0], [0, 0, 0], "#c9a24a");
+    return b.build();
+  }
+  const wood = style === "entrance" ? "#4f2a1c" : style === "attic" ? "#5a4636" : "#6b3d2a";
+  const panel = style === "entrance" ? "#64372a" : style === "attic" ? "#6e5844" : "#7e4a33";
+  b.box(width, height, 0.07, cx, 0, 0, wood);
+  if (style === "attic") {
+    // weathered vertical planks, iron straps, a little round window
+    for (let i = 1; i < 4; i++) b.box(0.015, height, 0.075, x0 + (i * width) / 4, 0, 0, "#3e3024");
+    for (const y of [0.3, height - 0.4]) b.box(width * 0.85, 0.06, 0.08, mirror ? x0 + width * 0.575 : x0 + width * 0.425, y, 0, "#2a2433");
+    b.cyl(0.13, 0.13, 0.08, cx, height * 0.74, 0, "#2a2433", 14);
+    b.cyl(0.1, 0.1, 0.085, cx, height * 0.74, 0, "#8a7ad8", 14);
+  } else {
+    for (const y of [0.25, height * 0.55]) {
+      b.box(width - 0.3, height * 0.36, 0.02, cx, y, 0.04, panel);
+      b.box(width - 0.3, height * 0.36, 0.02, cx, y, -0.04, panel);
+    }
+  }
+  b.sphere(0.05, knobX, 1.0, 0.07, style === "attic" ? "#8a8494" : "#d4ad55");
+  b.sphere(0.05, knobX, 1.0, -0.07, style === "attic" ? "#8a8494" : "#d4ad55");
+  if (style === "entrance") {
     // a little round window in each leaf
     b.cyl(0.16, 0.16, 0.08, cx, height * 0.72, 0, "#c9a24a", 14);
   }
   return b.build();
 }
 
-function frameGeometry(width: number, height: number): THREE.BufferGeometry {
+function frameGeometry(width: number, height: number, style: Style): THREE.BufferGeometry {
   const b = new PartBuilder(0);
+  if (style === "gate") {
+    // stone-capped gate posts
+    for (const x of [-0.08, width + 0.08]) {
+      b.box(0.16, height + 0.12, 0.16, x, 0, 0, "#3a3242");
+      b.sphere(0.09, x, height + 0.2, 0, "#c9a24a");
+    }
+    return b.build();
+  }
   const t = WALL_T + 0.08;
-  b.box(0.12, height + 0.1, t, -0.04, 0, 0, "#c9b28c");
-  b.box(0.12, height + 0.1, t, width + 0.04, 0, 0, "#c9b28c");
-  b.box(width + 0.2, 0.12, t, width / 2, height, 0, "#c9b28c");
+  const col = style === "attic" ? "#7a6450" : "#c9b28c";
+  b.box(0.12, height + 0.1, t, -0.04, 0, 0, col);
+  b.box(0.12, height + 0.1, t, width + 0.04, 0, 0, col);
+  b.box(width + 0.2, 0.12, t, width / 2, height, 0, col);
   return b.build();
 }
 
-/** Which side of the wall (along its normal axis) faces the lobby. */
-function lobbySide(door: DoorDef): number {
+/** Which side of the door (along its normal axis) is the hall (lobby / landing). */
+function hallSide(door: DoorDef): number {
   const room = ROOMS[door.room];
   const roomSide =
     door.axis === "x"
       ? Math.sign((room.bounds.z0 + room.bounds.z1) / 2 - door.at)
       : Math.sign((room.bounds.x0 + room.bounds.x1) / 2 - door.at);
+  if (door.style === "gate") return -1; // the gate is approached from the lobby (west)
   return door.room === "lobby" ? roomSide : -roomSide;
 }
+
+const styleOf = (door: DoorDef): Style => (door.id === "entrance" ? "entrance" : door.style ?? "plain");
 
 export function Door({ door }: { door: DoorDef }) {
   const width = door.to - door.from;
   const height = (door.height ?? DOOR_H) - 0.04;
-  const entrance = door.id === "entrance";
+  const style = styleOf(door);
   const leaves = useMemo(
     () =>
       door.double
-        ? [panelGeometry(width / 2, height, false, entrance), panelGeometry(width / 2, height, true, entrance)]
-        : [panelGeometry(width, height, false, entrance)],
-    [door.double, width, height, entrance]
+        ? [panelGeometry(width / 2, height, false, style), panelGeometry(width / 2, height, true, style)]
+        : [panelGeometry(width, height, false, style)],
+    [door.double, width, height, style]
   );
-  const frame = useMemo(() => frameGeometry(width, height + 0.04), [width, height]);
+  const frame = useMemo(() => frameGeometry(width, height + 0.04, style), [width, height, style]);
   const hinges = useRef<Array<THREE.Group | null>>([]);
   const root = useRef<THREE.Group>(null);
   const lock = useRef<THREE.Sprite>(null);
@@ -69,27 +107,29 @@ export function Door({ door }: { door: DoorDef }) {
   );
   const lineId = useMemo(() => WALL_LINES.find((l) => l.openings?.some((o) => o.door === door.id))?.id ?? "", [door.id]);
   const rotY = door.axis === "x" ? 0 : -Math.PI / 2;
-  const origin: [number, number, number] = door.axis === "x" ? [door.from, 0, door.at] : [door.at, 0, door.from];
+  const base = FLOOR_Y[door.floor];
+  const origin: [number, number, number] = door.axis === "x" ? [door.from, base, door.at] : [door.at, base, door.from];
   const room = ROOMS[door.room];
   const roomSide =
     door.axis === "x"
       ? Math.sign((room.bounds.z0 + room.bounds.z1) / 2 - door.at)
       : Math.sign((room.bounds.x0 + room.bounds.x1) / 2 - door.at);
-  // Local z of the frame equals world +z (axis x) or world -x (axis z).
-  const swing = door.axis === "x" ? roomSide : -roomSide;
-  const lockLocalZ = (door.axis === "x" ? lobbySide(door) : -lobbySide(door)) * 0.2;
+  // Local z of the frame equals world +z (axis x) or world -x (axis z). The gate swings back into the lobby.
+  const swing = style === "gate" ? 1 : door.axis === "x" ? roomSide : -roomSide;
+  const lockLocalZ = (door.axis === "x" ? hallSide(door) : -hallSide(door)) * 0.2;
   const angle = useRef(0);
 
   useFrame((_, dt) => {
     const open = rt.doorsOpen.has(door.id);
     const target = open ? 1 : 0;
-    const speed = open ? 1 / 1.1 : rt.doorSlam.has(door.id) ? 1 / 0.12 : 1 / 0.9;
+    const speed = open ? (style === "gate" ? 1 / 0.6 : 1 / 1.1) : rt.doorSlam.has(door.id) ? 1 / 0.12 : 1 / 0.9;
     const step = Math.min(1, dt * speed);
     angle.current += Math.sign(target - angle.current) * Math.min(Math.abs(target - angle.current), step);
     const a = open ? 1 - Math.pow(1 - angle.current, 2.2) : angle.current;
     if (hinges.current[0]) hinges.current[0].rotation.y = -swing * a * 1.75;
     if (hinges.current[1]) hinges.current[1].rotation.y = swing * a * 1.75;
-    const o = lineFade.get(lineId) ?? 1;
+    const onFloor = door.floor === rt.view.floor;
+    const o = onFloor ? (lineId ? lineFade.get(lineId) ?? 1 : 1) : 0;
     mat.opacity = o;
     mat.depthWrite = o > 0.98;
     if (root.current) root.current.visible = o > 0.02;
@@ -111,12 +151,29 @@ export function Door({ door }: { door: DoorDef }) {
           <mesh geometry={leaves[1]} material={mat} />
         </group>
       )}
-      <sprite ref={lock} material={lockMat} position={[width / 2, 1.35, lockLocalZ]} scale={[0.5, 0.5, 1]} />
+      <sprite
+        ref={lock}
+        material={lockMat}
+        position={[width / 2, style === "gate" ? height + 0.45 : 1.35, lockLocalZ]}
+        scale={[0.5, 0.5, 1]}
+      />
     </group>
   );
 }
 
-/** A bobbing golden arrow (and a floor glow) over the door the student should go to. */
+/** Where the beacon floats for a door: just outside it, on the hall side. */
+function beaconSpot(id: string): { x: number; z: number; y: number; floor: 0 | 1 } | null {
+  if (id === "stairs") return { ...STAIRS.beacon, y: 0, floor: 0 };
+  const door = DOORS.find((d) => d.id === id);
+  if (!door) return null;
+  const mid = (door.from + door.to) / 2;
+  const side = hallSide(door) * 0.7;
+  const x = door.axis === "x" ? mid : door.at + side;
+  const z = door.axis === "x" ? door.at + side : mid;
+  return { x, z, y: FLOOR_Y[door.floor], floor: door.floor };
+}
+
+/** A bobbing golden arrow (and a floor glow) over the door - or the stairs - the student should go to. */
 export function Beacon() {
   const arrow = useRef<THREE.Sprite>(null);
   const ring = useRef<THREE.Mesh>(null);
@@ -137,17 +194,13 @@ export function Beacon() {
     []
   );
   useFrame(() => {
-    const door = DOORS.find((d) => d.id === rt.beaconDoor);
-    const show = Boolean(door);
+    const spot = rt.beaconDoor ? beaconSpot(rt.beaconDoor) : null;
+    const show = Boolean(spot && spot.floor === rt.view.floor);
     if (arrow.current) arrow.current.visible = show;
     if (ring.current) ring.current.visible = show;
-    if (!door) return;
-    const mid = (door.from + door.to) / 2;
-    const side = lobbySide(door) * 0.7;
-    const x = door.axis === "x" ? mid : door.at + side;
-    const z = door.axis === "x" ? door.at + side : mid;
-    arrow.current?.position.set(x, 2.75 + Math.sin(rt.time * 4) * 0.12, z);
-    ring.current?.position.set(x, 0.02, z);
+    if (!spot || !show) return;
+    arrow.current?.position.set(spot.x, spot.y + 2.75 + Math.sin(rt.time * 4) * 0.12, spot.z);
+    ring.current?.position.set(spot.x, spot.y + 0.02, spot.z);
     if (ring.current) ring.current.scale.setScalar(1 + Math.sin(rt.time * 3) * 0.12);
   });
   return (

@@ -5,9 +5,9 @@ import { rt } from "../game/runtime";
 import { getGame } from "../game/store";
 import { GHOSTS } from "../game/ghosts";
 import { WORLD } from "../game/world/world";
-import { ROOMS } from "../game/world/rooms";
+import { ROOMS, floorYOf } from "../game/world/rooms";
 import type { GhostId } from "../game/types";
-import { accessoryGeometry, ghostArm, ghostBody, ghostFace, type Accessory } from "./ghostModel";
+import { accessoryGeometry, ghostArm, ghostBody, ghostFace, propellerGeometry, type Accessory } from "./ghostModel";
 import { faceTexture, type Expression } from "./textures";
 import { glowSpriteMaterial } from "./materials";
 
@@ -16,6 +16,8 @@ interface GhostLook {
   glow: string;
   accessory: Accessory;
   mask: boolean;
+  /** Shadow's glowing eyes. */
+  glowEyes?: boolean;
 }
 
 function useGhostMaterials(look: GhostLook) {
@@ -23,12 +25,12 @@ function useGhostMaterials(look: GhostLook) {
     const body = new THREE.MeshLambertMaterial({
       color: look.color,
       emissive: look.color,
-      emissiveIntensity: 0.5,
+      emissiveIntensity: look.glowEyes ? 0.38 : 0.5,
       transparent: true,
       side: THREE.DoubleSide
     });
     const face = new THREE.MeshBasicMaterial({
-      map: faceTexture("happy", look.mask),
+      map: faceTexture("happy", look.mask, look.glowEyes),
       transparent: true,
       depthWrite: false,
       polygonOffset: true,
@@ -38,7 +40,7 @@ function useGhostMaterials(look: GhostLook) {
     const acc = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true });
     const glow = glowSpriteMaterial(look.glow, 0.55);
     return { body, face, acc, glow };
-  }, [look.color, look.glow, look.mask]);
+  }, [look.color, look.glow, look.mask, look.glowEyes]);
 }
 
 type Mats = ReturnType<typeof useGhostMaterials>;
@@ -50,14 +52,18 @@ interface Rig {
   acc: THREE.Group | null;
   armL: THREE.Mesh | null;
   armR: THREE.Mesh | null;
+  /** Bouncy's propeller (spins). */
+  prop: THREE.Mesh | null;
   mats: Mats | null;
 }
 
 /** Height (ghost units) where hats sit; a flattened hat stays below HAT_FLAT_TOP (see spots.test.ts). */
 const HAT_BASE = 0.7;
 const HAT_FLAT = 0.35;
+/** Propeller hub height on Bouncy's cap (ghost units). */
+const PROP_Y = 0.93;
 
-const newRig = (): Rig => ({ root: null, squash: null, acc: null, armL: null, armR: null, mats: null });
+const newRig = (): Rig => ({ root: null, squash: null, acc: null, armL: null, armR: null, prop: null, mats: null });
 
 function GhostMesh({ look, rig }: { look: GhostLook; rig: Rig }) {
   const mats = useGhostMaterials(look);
@@ -65,6 +71,7 @@ function GhostMesh({ look, rig }: { look: GhostLook; rig: Rig }) {
   const face = useMemo(ghostFace, []);
   const arm = useMemo(ghostArm, []);
   const acc = useMemo(() => accessoryGeometry(look.accessory), [look.accessory]);
+  const prop = useMemo(() => (look.accessory === "propeller" ? propellerGeometry() : null), [look.accessory]);
   rig.mats = mats;
   return (
     <group ref={(g) => void (rig.root = g)} visible={false}>
@@ -74,6 +81,7 @@ function GhostMesh({ look, rig }: { look: GhostLook; rig: Rig }) {
         <mesh geometry={face} material={mats.face} renderOrder={2} />
         <group ref={(g) => void (rig.acc = g)} position={[0, HAT_BASE, 0]}>
           <mesh geometry={acc} material={mats.acc} position={[0, -HAT_BASE, 0]} renderOrder={1} />
+          {prop && <mesh ref={(m) => void (rig.prop = m)} geometry={prop} material={mats.acc} position={[0, PROP_Y - HAT_BASE, 0]} renderOrder={1} />}
         </group>
         <mesh ref={(m) => void (rig.armL = m)} geometry={arm} material={mats.body} position={[-0.31, 0.36, 0.04]} renderOrder={1} />
         <mesh ref={(m) => void (rig.armR = m)} geometry={arm} material={mats.body} position={[0.31, 0.36, 0.04]} renderOrder={1} />
@@ -82,13 +90,15 @@ function GhostMesh({ look, rig }: { look: GhostLook; rig: Rig }) {
   );
 }
 
-function setExpression(mats: Mats, expr: Expression, mask: boolean) {
-  const tex = faceTexture(expr, mask);
+function setExpression(mats: Mats, expr: Expression, look: { mask: boolean; glowEyes?: boolean }) {
+  const tex = faceTexture(expr, look.mask, look.glowEyes);
   if (mats.face.map !== tex) {
     mats.face.map = tex;
     mats.face.needsUpdate = true;
   }
 }
+
+const BOO_FACE = { mask: false };
 
 function setOpacity(mats: Mats, o: number) {
   mats.body.opacity = o;
@@ -120,10 +130,11 @@ function faceCamera(root: THREE.Group, k = 1) {
 export function GhostActor() {
   const looks = useMemo(() => {
     const out = {} as Record<GhostId, GhostLook>;
-    for (const g of Object.values(GHOSTS)) out[g.id] = { color: g.color, glow: g.glow, accessory: g.accessory, mask: g.accessory === "mask" };
+    for (const g of Object.values(GHOSTS))
+      out[g.id] = { color: g.color, glow: g.glow, accessory: g.accessory, mask: g.accessory === "mask", glowEyes: g.glowEyes };
     return out;
   }, []);
-  const rigs = useRef<Record<GhostId, Rig>>({ sleepy: newRig(), hungry: newRig(), sneaky: newRig(), mischief: newRig() });
+  const rigs = useRef(Object.fromEntries(Object.keys(GHOSTS).map((id) => [id, newRig()])) as Record<GhostId, Rig>);
 
   useFrame((_, dt) => {
     for (const id of Object.keys(rigs.current) as GhostId[]) {
@@ -167,6 +178,7 @@ function animateGhost(r: Rig, look: GhostLook, dt: number) {
   const wave = Math.sin(rt.time * 6 * def.bob);
   if (r.armL) r.armL.position.y = 0.36 + wave * 0.03;
   if (r.armR) r.armR.position.y = 0.36 - wave * 0.03;
+  if (r.prop) r.prop.rotation.y += dt * (anim.mode === "escape" || anim.mode === "capture" ? 30 : 9);
   const squashed = spot.prep === "under";
   // Under low furniture the hat is pressed flat too, so it never pokes through.
   let hatFlat = squashed ? 1 : 0;
@@ -192,7 +204,7 @@ function animateGhost(r: Rig, look: GhostLook, dt: number) {
       if (anim.mode === "found") expr = t < 1.1 ? "surprised" : Math.floor(rt.time * 0.6) % 3 === 0 ? "giggle" : "happy";
       else expr = t < 1.2 ? "giggle" : "happy";
       if (rt.ghost.id === "sleepy" && anim.mode === "found" && t > 1.1 && Math.floor(rt.time * 0.4) % 2 === 0) expr = "sleepy";
-      setExpression(mats, expr, look.mask);
+      setExpression(mats, expr, look);
       setOpacity(mats, 1);
       break;
     }
@@ -203,43 +215,46 @@ function animateGhost(r: Rig, look: GhostLook, dt: number) {
         const shake = Math.sin(rt.time * 50) * 0.04;
         root.position.set(start.x + shake, start.y + (squashed ? 0 : 0.05), start.z);
         squash.scale.set(sx * (1 + Math.sin(t * 25) * 0.08), sy * (1.08 - Math.sin(t * 25) * 0.08), sz);
-        setExpression(mats, t < 0.3 ? "surprised" : "dizzy", look.mask);
+        setExpression(mats, t < 0.3 ? "surprised" : "dizzy", look);
         setOpacity(mats, 1);
       } else {
-        const k = Math.min(1, (t - 0.55) / 0.85);
+        // The last ghost of the game takes a grander, slower, spiralling flight.
+        const big = Boolean(anim.big);
+        const k = Math.min(1, (t - 0.55) / (big ? 1.5 : 0.85));
         const e = k * k * (3 - 2 * k);
         const lx = rt.lantern.x;
         const ly = rt.lantern.y;
         const lz = rt.lantern.z;
         // arc above the straight line, spiralling in
-        const mid = { x: (start.x + lx) / 2, y: Math.max(start.y, ly) + 1.2, z: (start.z + lz) / 2 };
+        const mid = { x: (start.x + lx) / 2, y: Math.max(start.y, ly) + (big ? 2.0 : 1.2), z: (start.z + lz) / 2 };
         const a = 1 - e;
         const x = a * a * start.x + 2 * a * e * mid.x + e * e * lx;
         const y = a * a * start.y + 2 * a * e * mid.y + e * e * ly;
         const z = a * a * start.z + 2 * a * e * mid.z + e * e * lz;
-        const spin = (1 - e) * 0.35;
-        root.position.set(x + Math.cos(t * 14) * spin, y, z + Math.sin(t * 14) * spin);
+        const spin = (1 - e) * (big ? 0.8 : 0.35);
+        root.position.set(x + Math.cos(t * (big ? 9 : 14)) * spin, y, z + Math.sin(t * (big ? 9 : 14)) * spin);
         root.rotation.y += dt * 12;
         const s = Math.max(0.001, 1 - e * 0.97);
         const un = Math.min(1, k * 3);
         if (squashed) hatFlat = 1 - un;
         squash.scale.set(THREE.MathUtils.lerp(sx, 1, un) * s, THREE.MathUtils.lerp(sy, 1, un) * s, THREE.MathUtils.lerp(sz, 1, un) * s);
-        setExpression(mats, "dizzy", look.mask);
+        setExpression(mats, "dizzy", look);
         setOpacity(mats, k > 0.92 ? Math.max(0, (1 - k) / 0.08) : 1);
         if (k >= 1) rt.ghost.anim = { mode: "hidden" };
       }
       break;
     }
     case "escape": {
-      const room = ROOMS[spot.room]!.bounds;
+      const room = ROOMS[spot.room].bounds;
       const cx = (room.x0 + room.x1) / 2;
       const cz = (room.z0 + room.z1) / 2;
+      const loopY = floorYOf(spot.room) + 1.9;
       if (t < 0.45) {
         const e = easeOutBack(Math.min(1, t / 0.45));
         root.position.set(spot.pos.x, spot.pos.y + e * 0.25, spot.pos.z);
         squash.scale.set(Math.max(0.01, e), Math.max(0.01, e), Math.max(0.01, e));
         faceCamera(root, 1);
-        setExpression(mats, "giggle", look.mask);
+        setExpression(mats, "giggle", look);
         setOpacity(mats, 1);
       } else if (t < 2.2) {
         const k = (t - 0.45) / 1.75;
@@ -248,11 +263,11 @@ function animateGhost(r: Rig, look: GhostLook, dt: number) {
         const rad = THREE.MathUtils.lerp(0.2, 2.3, Math.min(1, k * 3));
         const bx = THREE.MathUtils.lerp(spot.pos.x, cx, Math.min(1, k * 3));
         const bz = THREE.MathUtils.lerp(spot.pos.z, cz, Math.min(1, k * 3));
-        root.position.set(bx + Math.cos(ang) * rad, THREE.MathUtils.lerp(spot.pos.y + 0.25, 1.9, Math.min(1, k * 2.5)) + Math.sin(k * 20) * 0.1, bz + Math.sin(ang) * rad);
+        root.position.set(bx + Math.cos(ang) * rad, THREE.MathUtils.lerp(spot.pos.y + 0.25, loopY, Math.min(1, k * 2.5)) + Math.sin(k * 20) * 0.1, bz + Math.sin(ang) * rad);
         root.rotation.y = -ang;
         squash.scale.setScalar(1);
         squash.rotation.z = Math.sin(t * 12) * 0.25;
-        setExpression(mats, Math.floor(t * 4) % 2 ? "giggle" : "happy", look.mask);
+        setExpression(mats, Math.floor(t * 4) % 2 ? "giggle" : "happy", look);
         setOpacity(mats, 1);
       } else {
         const k = Math.min(1, (t - 2.2) / 0.3);
@@ -288,7 +303,7 @@ export function Boo() {
     const yaw = rt.camera.yaw;
     const want = b.target
       ? new THREE.Vector3(b.target.x, b.target.y, b.target.z)
-      : new THREE.Vector3(rt.player.x + Math.cos(yaw) * 0.85 + Math.sin(yaw) * 0.25, 1.35, rt.player.z - Math.sin(yaw) * 0.85 + Math.cos(yaw) * 0.25);
+      : new THREE.Vector3(rt.player.x + Math.cos(yaw) * 0.85 + Math.sin(yaw) * 0.25, rt.player.y + 1.35, rt.player.z - Math.sin(yaw) * 0.85 + Math.cos(yaw) * 0.25);
     const appear = Math.min(1, (rt.time - b.appearT0) / 0.6);
     if (appear < 0.05) pos.current.copy(want);
     pos.current.lerp(want, Math.min(1, dt * 3));
@@ -296,10 +311,15 @@ export function Boo() {
     faceCamera(r.root, Math.min(1, dt * 5));
     const s = 0.72 * easeOutBack(appear) * presence.current;
     const talkBounce = b.talking ? Math.abs(Math.sin(rt.time * 9)) * 0.04 : 0;
+    // Surprised (the bang upstairs): a jump and wide eyes.
+    const st = rt.time - b.surprisedT0;
+    const jump = st >= 0 && st < 0.5 ? Math.sin((st / 0.5) * Math.PI) * 0.2 : 0;
+    r.root.position.y += jump;
     r.squash.scale.set(s * (1 + talkBounce), s * (1 - talkBounce), s);
     r.squash.rotation.z = Math.sin(rt.time * 1.3) * 0.06;
-    const expr: Expression = b.talking ? (Math.floor(rt.time * 7) % 2 ? "talk" : "smile") : "smile";
-    setExpression(mats, expr, false);
+    let expr: Expression = b.talking ? (Math.floor(rt.time * 7) % 2 ? "talk" : "smile") : "smile";
+    if (st >= 0 && st < 1.8) expr = "surprised";
+    setExpression(mats, expr, BOO_FACE);
     const wave = Math.sin(rt.time * 5);
     if (r.armL) r.armL.position.y = 0.36 + wave * 0.04;
     if (r.armR) r.armR.position.y = 0.36 - wave * 0.04;

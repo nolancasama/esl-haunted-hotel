@@ -7,10 +7,11 @@ import { diningModels } from "./dining";
 import { storageModels } from "./storage";
 import { libraryModels } from "./library";
 import { lobbyModels } from "./lobby";
+import { upstairsModels } from "./upstairs";
 
 export type { AnimatedPart, BuiltObject, TexKey } from "./common";
 
-const BUILDERS: BuilderSet = { ...bedroomModels, ...diningModels, ...storageModels, ...libraryModels, ...lobbyModels };
+const BUILDERS: BuilderSet = { ...bedroomModels, ...diningModels, ...storageModels, ...libraryModels, ...lobbyModels, ...upstairsModels };
 
 export function buildObject(obj: WorldObject): BuiltObject {
   const b = new PartBuilder();

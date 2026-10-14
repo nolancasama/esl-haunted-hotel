@@ -1,8 +1,21 @@
 export type Prep = "in" | "on" | "under" | "by";
 export const PREPS: readonly Prep[] = ["in", "on", "under", "by"];
 
-export type RoomId = "lobby" | "bedroom" | "dining" | "storage" | "library";
-export type GhostId = "sleepy" | "hungry" | "sneaky" | "mischief";
+/** 0 = ground floor (Chapter 1), 1 = upstairs (Chapter 2). */
+export type Floor = 0 | 1;
+
+export type RoomId =
+  | "lobby"
+  | "bedroom"
+  | "dining"
+  | "storage"
+  | "library"
+  | "landing"
+  | "playroom"
+  | "bathroom"
+  | "music"
+  | "attic";
+export type GhostId = "sleepy" | "hungry" | "sneaky" | "mischief" | "bouncy" | "bubbles" | "melody" | "shadow";
 
 export interface Vec3 {
   x: number;

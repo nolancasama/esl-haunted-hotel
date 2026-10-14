@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { PREPS, type Rot, type Vec3 } from "../types";
+import { PREPS, type Floor, type RoomId, type Rot, type Vec3 } from "../types";
 import { circleHitsRect, rectContains, rectDistance, rotateXZ } from "./geometry";
 import { GHOST_H, GHOST_R, HAT_FLAT_TOP } from "./kinds";
-import { ROOMS, WALL_T, roomAt } from "./rooms";
+import { FLOOR_Y, ROOMS, STAIRS, WALL_T, roomAt } from "./rooms";
 import { WORLD, type HidingSpot, type WorldObject } from "./world";
-import { INTERACT_RANGE, PLAYER_R, PRACTICE_START, STORY_START } from "./constants";
+import { INTERACT_RANGE, PLAYER_R, PRACTICE_START, STORY_START, UPSTAIRS_START } from "./constants";
+import { collidersFor, floorState, moveBody } from "./collision";
 
 const EPS = 1e-6;
+const GHOST_ROOMS: RoomId[] = ["bedroom", "dining", "storage", "library", "playroom", "bathroom", "music", "attic"];
 
 function toLocal(obj: WorldObject, p: Vec3): Vec3 {
   const back = ((360 - obj.rot) % 360) as Rot;
   const r = rotateXZ(p.x - obj.x, p.z - obj.z, back);
-  return { x: r.x, y: p.y, z: r.z };
+  return { x: r.x, y: p.y - obj.y, z: r.z };
 }
 
 /** Worst-case floor radius of a (possibly squashed) ghost that turns to face the camera. */
@@ -159,10 +161,19 @@ describe("clues are unambiguous", () => {
     }
   });
 
-  it("every ghost room offers all four prepositions (random replays and Mischief's four rounds)", () => {
-    for (const room of ["bedroom", "dining", "storage", "library"] as const) {
+  it("every ghost room offers all four prepositions (random replays, Mischief's and Shadow's four rounds)", () => {
+    for (const room of GHOST_ROOMS) {
       const preps = new Set(WORLD.spots.filter((s) => s.room === room).map((s) => s.prep));
       for (const p of PREPS) expect(preps.has(p), `${room} ${p}`).toBe(true);
+    }
+  });
+
+  it("every spot stands on its room's floor", () => {
+    for (const s of WORLD.spots) {
+      const base = FLOOR_Y[ROOMS[s.room].floor];
+      expect(s.pos.y, s.id).toBeGreaterThanOrEqual(base - EPS);
+      expect(s.pos.y, s.id).toBeLessThan(base + 2.6);
+      expect(s.hidePos.y, s.id).toBeGreaterThanOrEqual(base - EPS);
     }
   });
 
@@ -173,26 +184,48 @@ describe("clues are unambiguous", () => {
     }
   });
 
-  it("the lobby has nothing to search (ghosts hide only in the four rooms)", () => {
-    expect(WORLD.spots.some((s) => s.room === "lobby")).toBe(false);
+  it("the lobby and the landing have nothing to search (ghosts hide only in the eight rooms)", () => {
+    expect(WORLD.spots.some((s) => s.room === "lobby" || s.room === "landing")).toBe(false);
+  });
+
+  it("the fan switch is something to use, not a hiding place", () => {
+    const sw = WORLD.objectById.get("bathroom.switch")!;
+    expect(sw.interactive).toBe(true);
+    expect(sw.searchable).toBe(false);
   });
 });
 
-/** Flood-fill the walkable floor from a start point; returns reachable cell centres. */
-function reachable(start: { x: number; z: number }, openDoors: (id: string) => boolean) {
+interface Cell {
+  x: number;
+  z: number;
+  floor: Floor;
+}
+
+/**
+ * Flood-fill the walkable floors from a start point, the way the player
+ * moves: on the steps only the banisters block, and the floor changes at
+ * the top and bottom of the stairs. Returns reachable cell centres.
+ */
+function reachable(start: { x: number; z: number }, openDoors: (id: string) => boolean, startFloor: Floor = 0): Cell[] {
   const b = { x0: -8, x1: 8, z0: -11, z1: 11 };
   const step = 0.1;
   const nx = Math.round((b.x1 - b.x0) / step);
   const nz = Math.round((b.z1 - b.z0) / step);
-  const solid = WORLD.colliders.filter((c) => !(c.door && openDoors(c.door)));
-  const free = (i: number, k: number) => !solid.some((c) => circleHitsRect(c.rect, b.x0 + i * step, b.z0 + k * step, PLAYER_R));
+  const blocks = (i: number, k: number, from: Floor): Cell | null => {
+    const x = b.x0 + i * step;
+    const z = b.z0 + k * step;
+    const st = floorState(x, z, from);
+    const hit = collidersFor(st.floor, st.stairs).some((c) => !(c.door && openDoors(c.door)) && circleHitsRect(c.rect, x, z, PLAYER_R));
+    return hit ? null : { x, z, floor: st.floor };
+  };
   const si = Math.round((start.x - b.x0) / step);
   const sk = Math.round((start.z - b.z0) / step);
-  expect(free(si, sk), "start is free").toBe(true);
-  const seen = new Set<number>([si * 10000 + sk]);
-  const queue: Array<[number, number]> = [[si, sk]];
+  expect(blocks(si, sk, startFloor), "start is free").not.toBeNull();
+  const key = (i: number, k: number, f: Floor) => (i * 10000 + k) * 2 + f;
+  const seen = new Map<number, Cell>([[key(si, sk, startFloor), { x: start.x, z: start.z, floor: startFloor }]]);
+  const queue: Array<[number, number, Floor]> = [[si, sk, startFloor]];
   while (queue.length) {
-    const [i, k] = queue.pop()!;
+    const [i, k, f] = queue.pop()!;
     for (const [di, dk] of [
       [1, 0],
       [-1, 0],
@@ -202,35 +235,103 @@ function reachable(start: { x: number; z: number }, openDoors: (id: string) => b
       const a = i + di;
       const c = k + dk;
       if (a < 0 || c < 0 || a > nx || c > nz) continue;
-      const key = a * 10000 + c;
-      if (seen.has(key) || !free(a, c)) continue;
-      seen.add(key);
-      queue.push([a, c]);
+      const cell = blocks(a, c, f);
+      if (!cell) continue;
+      const id = key(a, c, cell.floor);
+      if (seen.has(id)) continue;
+      seen.set(id, cell);
+      queue.push([a, c, cell.floor]);
     }
   }
-  return [...seen].map((key) => ({ x: b.x0 + Math.floor(key / 10000) * step, z: b.z0 + (key % 10000) * step }));
+  return [...seen.values()];
+}
+
+function expectAllReachable(cells: Cell[], objects: WorldObject[]) {
+  for (const o of objects) {
+    const inRoom = cells.filter((c) => c.floor === o.floor && roomAt(c.x, c.z, c.floor) === o.room);
+    const best = Math.min(...inRoom.map((c) => rectDistance(o.rect, c.x, c.z)));
+    expect(best, o.id).toBeLessThanOrEqual(INTERACT_RANGE - 0.2);
+  }
 }
 
 describe("every searchable object can be reached", () => {
   it("in practice mode, from the bedroom start with the door shut", () => {
     const cells = reachable(PRACTICE_START, () => false);
-    for (const o of WORLD.objects.filter((x) => x.searchable && x.room === "bedroom")) {
-      const best = Math.min(...cells.map((c) => rectDistance(o.rect, c.x, c.z)));
-      expect(best, o.id).toBeLessThanOrEqual(INTERACT_RANGE - 0.2);
-    }
+    expectAllReachable(
+      cells,
+      WORLD.objects.filter((x) => x.searchable && x.room === "bedroom")
+    );
   });
 
-  it("in the story, from the lobby once each room's door is open", () => {
+  it("in the full adventure, from the lobby (and up the stairs) once every door is open", () => {
     const cells = reachable(STORY_START, (id) => id !== "entrance");
-    for (const o of WORLD.objects.filter((x) => x.searchable)) {
-      const inRoom = cells.filter((c) => roomAt(c.x, c.z) === o.room);
-      const best = Math.min(...inRoom.map((c) => rectDistance(o.rect, c.x, c.z)));
-      expect(best, o.id).toBeLessThanOrEqual(INTERACT_RANGE - 0.2);
+    expectAllReachable(cells, WORLD.objects.filter((x) => x.interactive));
+  });
+
+  it("in Chapter 2 on its own, from the top of the stairs (and back down to the lobby)", () => {
+    const cells = reachable(UPSTAIRS_START, (id) => id !== "entrance", 1);
+    expectAllReachable(cells, WORLD.objects.filter((x) => x.interactive && x.floor === 1));
+    expect(cells.some((c) => c.floor === 0 && roomAt(c.x, c.z, 0) === "lobby")).toBe(true);
+  });
+
+  it("closed doors really close the rooms off, and the stairs gate keeps you downstairs", () => {
+    const cells = reachable(STORY_START, () => false);
+    for (const c of cells) {
+      expect(c.floor).toBe(0);
+      expect(roomAt(c.x, c.z, 0), `${c.x},${c.z}`).toBe("lobby");
     }
   });
 
-  it("closed doors really close the rooms off", () => {
-    const cells = reachable(STORY_START, () => false);
-    for (const c of cells) expect(roomAt(c.x, c.z), `${c.x},${c.z}`).toBe("lobby");
+  it("with only the gate open you can climb to the landing, but no further", () => {
+    const cells = reachable(STORY_START, (id) => id === "stairs");
+    expect(cells.some((c) => c.floor === 1)).toBe(true);
+    for (const c of cells) expect(roomAt(c.x, c.z, c.floor), `${c.x},${c.z},${c.floor}`).toMatch(/^(lobby|landing)$/);
+  });
+
+});
+
+describe("walking the stairs", () => {
+  const open = () => true;
+  function walk(from: { x: number; z: number }, floor: Floor, dx: number, steps: number) {
+    let s = { x: from.x, z: from.z, floor, y: FLOOR_Y[floor], stairs: false };
+    const ys: number[] = [];
+    for (let i = 0; i < steps; i++) {
+      s = moveBody(s.x + dx, s.z, s.floor, open);
+      ys.push(s.y);
+    }
+    return { end: s, ys };
+  }
+
+  it("walking east from the lobby climbs to the landing, rising steadily", () => {
+    const { end, ys } = walk({ x: 2.8, z: 0 }, 0, 0.05, 120);
+    expect(end.floor).toBe(1);
+    expect(end.y).toBeCloseTo(FLOOR_Y[1]);
+    expect(roomAt(end.x, end.z, end.floor)).toBe("landing");
+    for (let i = 1; i < ys.length; i++) expect(ys[i]).toBeGreaterThanOrEqual(ys[i - 1] - 1e-9);
+  });
+
+  it("walking west from the landing goes back down to the lobby", () => {
+    const { end } = walk(UPSTAIRS_START, 1, -0.05, 120);
+    expect(end.floor).toBe(0);
+    expect(end.y).toBe(0);
+    expect(roomAt(end.x, end.z, end.floor)).toBe("lobby");
+  });
+
+  it("upstairs, the railing round the stairwell stops you walking into the hole", () => {
+    // From the west end of the landing, and from the corridors beside the well.
+    expect(walk({ x: 2.6, z: 0 }, 1, 0.05, 60).end.x).toBeLessThan(STAIRS.rect.x0 - 0.2);
+    for (const z of [-2.2, 2.2]) {
+      let s = { x: 5.0, z, floor: 1 as Floor };
+      for (let i = 0; i < 60; i++) s = moveBody(s.x, s.z - Math.sign(z) * 0.05, s.floor, open);
+      expect(s.floor).toBe(1);
+      expect(Math.abs(s.z)).toBeGreaterThan(STAIRS.rect.z1 + 0.2);
+    }
+  });
+
+  it("the closed gate blocks the foot of the stairs", () => {
+    let s = { x: 2.8, z: 0, floor: 0 as Floor };
+    for (let i = 0; i < 60; i++) s = moveBody(s.x + 0.05, s.z, s.floor, (id) => id !== "stairs");
+    expect(s.floor).toBe(0);
+    expect(s.x).toBeLessThan(STAIRS.gateX);
   });
 });

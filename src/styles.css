@@ -142,7 +142,18 @@ small[lang="ja"] {
 
 .counter-ghosts {
   display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.counter-row {
+  display: flex;
   gap: 2px;
+}
+
+/* Two rows of four once Chapter 2 opens: the chapter 1 row above, upstairs below. */
+.counter-ghosts.two .counter-row + .counter-row {
+  margin-top: -2px;
 }
 
 .counter-text {
@@ -718,6 +729,121 @@ small[lang="ja"] {
   color: var(--ink-soft);
 }
 
+.title-ghosts.many {
+  gap: 2px;
+}
+
+/* What to play: the whole hotel, one chapter, or practice. */
+.mode-choice {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 96px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  border: 2px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.chip small {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.chip.on {
+  border-color: var(--gold);
+  background: rgba(255, 211, 107, 0.18);
+  box-shadow: 0 0 0 3px rgba(255, 211, 107, 0.18);
+}
+
+.chip.locked {
+  opacity: 0.45;
+}
+
+.random-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.random-toggle input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--gold);
+}
+
+.random-toggle small {
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+/* "CHAPTER 2 — UPSTAIRS" */
+.chapter-card {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  padding: 18px 46px;
+  border-top: 2px solid rgba(255, 211, 107, 0.7);
+  border-bottom: 2px solid rgba(255, 211, 107, 0.7);
+  background: linear-gradient(90deg, rgba(14, 6, 30, 0), rgba(14, 6, 30, 0.82) 18%, rgba(14, 6, 30, 0.82) 82%, rgba(14, 6, 30, 0));
+  animation: chapter-in 2.8s ease-in-out both;
+  z-index: 5;
+}
+
+.chapter-title {
+  font-size: clamp(18px, 2.6vw, 26px);
+  font-weight: 900;
+  letter-spacing: 0.35em;
+  color: var(--gold);
+}
+
+.chapter-sub {
+  font-size: clamp(34px, 6vw, 64px);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #fff;
+  text-shadow: 0 0 22px rgba(170, 140, 255, 0.85), 0 4px 0 #3b2370;
+}
+
+.chapter-ja {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+@keyframes chapter-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -40%) scale(0.96);
+  }
+  15%,
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -54%) scale(1.02);
+  }
+}
+
 button.primary,
 button.secondary {
   border-radius: 18px;
@@ -796,6 +922,31 @@ button.secondary {
   padding: 0;
   font-size: 18px;
   font-weight: 700;
+}
+
+/* Eight ghosts: a tighter grid, four to a row. */
+.results-card.many {
+  max-width: min(940px, 100%);
+}
+
+.results-card.many .results-ghosts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin: 12px 0;
+}
+
+.results-card.many .results-ghost {
+  min-width: 0;
+}
+
+.results-card.many .results-name {
+  font-size: 17px;
+}
+
+.results-card.many .results-ghost ul {
+  font-size: 14px;
+  margin-top: 2px;
 }
 
 .stats {
@@ -912,10 +1063,26 @@ button.secondary {
     top: 8px;
     left: 8px;
     padding: 4px 8px;
+    /* Round pips sit under the count so the counter stays clear of the clue card. */
+    display: grid;
+    grid-template-columns: auto auto;
+    column-gap: 8px;
+    row-gap: 2px;
+    align-items: center;
+  }
+  .counter-ghosts {
+    grid-row: span 2;
   }
   .counter-ghosts svg {
     width: 28px;
     height: 28px;
+  }
+  .pips {
+    gap: 4px;
+  }
+  .pips i {
+    width: 11px;
+    height: 11px;
   }
   .clue-card {
     top: 8px;
@@ -1043,6 +1210,51 @@ button.secondary {
   }
   .results-card .modal-buttons {
     bottom: -14px;
+  }
+  .results-card.many .results-ghost svg {
+    width: 34px;
+    height: 34px;
+  }
+  .results-card.many .results-ghost ul {
+    font-size: 11px;
+  }
+  .results-card.many .results-name {
+    font-size: 13px;
+  }
+  .chip {
+    min-width: 76px;
+    padding: 3px 8px;
+    font-size: 13px;
+  }
+  .chip small {
+    font-size: 10px;
+  }
+  .random-toggle {
+    font-size: 13px;
+  }
+  .title-ghosts.many svg {
+    width: 30px;
+    height: 30px;
+  }
+  .title-ghosts.many svg:nth-child(5) {
+    width: 50px;
+    height: 50px;
+  }
+  .counter-ghosts.two svg {
+    width: 22px;
+    height: 22px;
+  }
+  .chapter-card {
+    padding: 8px 30px;
+  }
+  .chapter-ja {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 700px) {
+  .results-card.many .results-ghosts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

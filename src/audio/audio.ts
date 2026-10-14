@@ -25,7 +25,9 @@ class AudioEngine {
   private listening = false;
   private rain: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
   private musicTimer = 0;
-  private music: { name: "night" | "victory"; next: number; step: number } | null = null;
+  private music: { name: MusicName; next: number; step: number } | null = null;
+  /** Where one-shots go while `play` runs (a stereo panner for sounds placed in the room). */
+  private target: AudioNode | null = null;
 
   /** Must be called from a user gesture (Start button). */
   unlock() {
@@ -130,7 +132,7 @@ class AudioEngine {
     const decay = opts.decay ?? 0.3;
     if (opts.to) osc.frequency.exponentialRampToValueAtTime(opts.to, t + attack + decay);
     this.env(g, t, opts.peak ?? 0.2, attack, decay);
-    osc.connect(g).connect(opts.bus ?? this.sfxBus);
+    osc.connect(g).connect(opts.bus ?? this.target ?? this.sfxBus);
     osc.start(t);
     osc.stop(t + attack + decay + 0.05);
   }
@@ -162,7 +164,7 @@ class AudioEngine {
     if (opts.to) f.frequency.exponentialRampToValueAtTime(opts.to, t + attack + decay);
     const g = ctx.createGain();
     this.env(g, t, opts.peak ?? 0.2, attack, decay);
-    src.connect(f).connect(g).connect(opts.bus ?? this.sfxBus);
+    src.connect(f).connect(g).connect(opts.bus ?? this.target ?? this.sfxBus);
     const offset = Math.random() * 1.5;
     src.start(t, offset, attack + decay + 0.1);
   }
@@ -177,8 +179,25 @@ class AudioEngine {
 
   // --------------------------------------------------------------- one-shots
 
-  play(name: SfxName, opts: { pitch?: number } = {}) {
+  /** One-shot sound. `pan` (-1 left .. 1 right) places it in the room; `gain` scales it (distance). */
+  play(name: SfxName, opts: { pitch?: number; pan?: number; gain?: number } = {}) {
     if (!this.ready()) return;
+    if ((opts.pan !== undefined || opts.gain !== undefined) && !this.target) {
+      const ctx = this.ctx!;
+      const panner = ctx.createStereoPanner();
+      panner.pan.value = Math.max(-1, Math.min(1, opts.pan ?? 0));
+      const g = ctx.createGain();
+      g.gain.value = opts.gain ?? 1;
+      panner.connect(g).connect(this.sfxBus);
+      this.target = panner;
+      try {
+        this.play(name, { pitch: opts.pitch });
+      } finally {
+        this.target = null;
+      }
+      window.setTimeout(() => g.disconnect(), 4000);
+      return;
+    }
     const t = this.now;
     const p = opts.pitch ?? 1;
     switch (name) {
@@ -209,7 +228,7 @@ class AudioEngine {
         g.gain.exponentialRampToValueAtTime(0.09, t + 0.06);
         g.gain.setValueAtTime(0.09, t + 0.5);
         g.gain.exponentialRampToValueAtTime(0.0001, t + 0.85);
-        osc.connect(f).connect(g).connect(this.sfxBus);
+        osc.connect(f).connect(g).connect(this.target ?? this.sfxBus);
         osc.start(t);
         lfo.start(t);
         osc.stop(t + 0.9);
@@ -333,6 +352,117 @@ class AudioEngine {
           this.tone(2600 + Math.random() * 600, tt, { to: 3600, peak: 0.03, decay: 0.08 });
         }
         break;
+      // ------------------------------------------------------------ upstairs
+      case "thud":
+        // something heavy falls over upstairs
+        this.tone(62, t, { to: 34, peak: 0.55, decay: 0.7 });
+        this.noiseBurst(t, { filter: "lowpass", freq: 420, to: 80, peak: 0.5, decay: 0.6 });
+        this.noiseBurst(t + 0.22, { filter: "lowpass", freq: 300, to: 70, peak: 0.25, decay: 0.4 });
+        for (let i = 0; i < 5; i++) this.noiseBurst(t + 0.3 + i * 0.09, { filter: "bandpass", freq: 900 + i * 120, q: 3, peak: 0.05, decay: 0.05 });
+        break;
+      case "laugh": {
+        // a slow, echoing "ha ha ha" far away
+        for (let r = 0; r < 3; r++) {
+          const echo = 1 - r * 0.38;
+          for (let i = 0; i < 4; i++) {
+            const tt = t + r * 0.32 + i * 0.22;
+            const f0 = 330 * p * (1 - i * 0.05);
+            this.tone(f0 * 1.2, tt, { to: f0, peak: 0.09 * echo, attack: 0.03, decay: 0.16, type: "triangle" });
+            this.tone(f0 * 2.4, tt, { to: f0 * 2, peak: 0.02 * echo, attack: 0.03, decay: 0.12 });
+          }
+        }
+        break;
+      }
+      case "boing":
+        this.tone(180 * p, t, { to: 620 * p, peak: 0.16, decay: 0.12, type: "triangle" });
+        this.tone(620 * p, t + 0.12, { to: 260 * p, peak: 0.1, decay: 0.3, type: "sine" });
+        break;
+      case "toot":
+        // toy train whistle
+        for (const [m, d] of [
+          [81, 0],
+          [84, 0.32]
+        ] as const) {
+          this.tone(midi(m), t + d, { peak: 0.07, attack: 0.03, decay: 0.26, type: "square" });
+          this.tone(midi(m) * 1.5, t + d, { peak: 0.03, attack: 0.03, decay: 0.24 });
+        }
+        this.noiseBurst(t, { filter: "highpass", freq: 3000, peak: 0.03, attack: 0.05, decay: 0.5 });
+        break;
+      case "bubbles":
+        for (let i = 0; i < 9; i++) {
+          const f = 500 + Math.random() * 900;
+          this.tone(f, t + i * 0.06 + Math.random() * 0.03, { to: f * 2.2, peak: 0.07, decay: 0.07 });
+        }
+        break;
+      case "steam":
+        this.noiseBurst(t, { filter: "highpass", freq: 2500, peak: 0.06, attack: 0.4, decay: 1.4 });
+        break;
+      case "click":
+        this.tone(2200, t, { peak: 0.1, decay: 0.025, type: "square" });
+        this.noiseBurst(t, { filter: "highpass", freq: 4000, peak: 0.06, decay: 0.03 });
+        break;
+      case "fan": {
+        const ctx = this.ctx!;
+        const osc = ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(30, t);
+        osc.frequency.exponentialRampToValueAtTime(95, t + 1.2);
+        const f = ctx.createBiquadFilter();
+        f.type = "lowpass";
+        f.frequency.value = 500;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.06, t + 0.6);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 2.4);
+        osc.connect(f).connect(g).connect(this.target ?? this.sfxBus);
+        osc.start(t);
+        osc.stop(t + 2.5);
+        this.noiseBurst(t + 0.2, { filter: "bandpass", freq: 700, q: 0.7, peak: 0.05, attack: 0.6, decay: 1.6 });
+        break;
+      }
+      case "drum":
+        [0, 0.24, 0.48].forEach((d, i) => {
+          this.tone(i === 2 ? 70 : 110, t + d, { to: 55, peak: 0.3, decay: 0.3 });
+          this.noiseBurst(t + d, { filter: "lowpass", freq: 600, peak: 0.12, decay: 0.08 });
+        });
+        break;
+      case "strum":
+        // a guitar chord, strummed
+        [52, 57, 62, 66, 69, 74].forEach((m, i) => this.tone(midi(m), t + i * 0.025, { peak: 0.045, decay: 1.1, type: "triangle" }));
+        break;
+      case "gramophone":
+        for (let i = 0; i < 12; i++) this.noiseBurst(t + Math.random() * 1.6, { filter: "highpass", freq: 3000, peak: 0.025, decay: 0.01 });
+        [69, 72, 76, 74, 72].forEach((m, i) => this.tone(midi(m), t + 0.15 + i * 0.28, { peak: 0.05, attack: 0.02, decay: 0.32, type: "square", detune: -12 }));
+        break;
+      case "cello":
+        this.tone(midi(43), t, { peak: 0.1, attack: 0.25, decay: 1.2, type: "sawtooth" });
+        this.tone(midi(55), t + 0.05, { peak: 0.03, attack: 0.25, decay: 1.0 });
+        break;
+      case "musicbox":
+        [84, 88, 91, 88, 86].forEach((m, i) => this.tone(midi(m), t + i * 0.16, { peak: 0.05, decay: 0.7 }));
+        break;
+      case "flourish":
+        // Melody's little fanfare when she is found
+        [72, 76, 79, 84, 88, 91].forEach((m, i) => {
+          this.tone(midi(m), t + i * 0.07, { peak: 0.08, decay: 0.6 });
+          this.tone(midi(m) * 2, t + i * 0.07, { peak: 0.015, decay: 0.4 });
+        });
+        break;
+      case "blackout":
+        this.tone(1600, t, { peak: 0.08, decay: 0.03, type: "square" });
+        this.tone(220, t + 0.05, { to: 70, peak: 0.12, decay: 0.7, type: "triangle" });
+        this.noiseBurst(t + 0.05, { filter: "lowpass", freq: 900, to: 150, peak: 0.08, attack: 0.05, decay: 0.8 });
+        break;
+      case "bigcapture":
+        this.play("capture");
+        [60, 64, 67, 72].forEach((m) => this.tone(midi(m), t + 0.5, { peak: 0.07, attack: 0.05, decay: 1.6, type: "triangle" }));
+        [84, 88, 91, 96, 100].forEach((m, i) => this.tone(midi(m), t + 0.7 + i * 0.08, { peak: 0.04, decay: 0.8 }));
+        break;
+      case "chapter":
+        // the chapter title sting
+        [50, 57, 62, 66].forEach((m, i) => this.tone(midi(m), t + i * 0.09, { peak: 0.08, attack: 0.02, decay: 1.8, type: "triangle" }));
+        this.noiseBurst(t, { filter: "bandpass", freq: 600, to: 2400, q: 0.8, peak: 0.04, attack: 0.4, decay: 0.9 });
+        break;
     }
   }
 
@@ -377,7 +507,7 @@ class AudioEngine {
   // ------------------------------------------------------------------ music
 
   /** Quiet 3/4 music-box lullaby (D minor), or the same tune in major for the ending. */
-  startMusic(name: "night" | "victory") {
+  startMusic(name: MusicName) {
     if (!this.ctx) return;
     if (this.music?.name === name) return;
     this.stopMusic();
@@ -394,7 +524,7 @@ class AudioEngine {
     const ctx = this.ctx;
     const m = this.music;
     if (!ctx || !m) return;
-    const beat = m.name === "night" ? 60 / 92 : 60 / 112;
+    const beat = m.name === "night" ? 60 / 92 : m.name === "upstairs" ? 60 / 100 : 60 / 112;
     while (m.next < ctx.currentTime + 0.3) {
       const bar = Math.floor(m.step / 3) % 8;
       const beatInBar = m.step % 3;
@@ -404,7 +534,7 @@ class AudioEngine {
     }
   }
 
-  private playMusicBeat(name: "night" | "victory", bar: number, beatInBar: number, t: number, beat: number) {
+  private playMusicBeat(name: MusicName, bar: number, beatInBar: number, t: number, beat: number) {
     // Melody per bar: [midi, beats] pairs starting on beat 0.
     const MELODY: Array<Array<[number, number]>> = [
       [[62, 1], [65, 1], [69, 1]],
@@ -428,6 +558,8 @@ class AudioEngine {
       [53, 57]
     ];
     const major = name === "victory";
+    // Upstairs: the same lullaby a little higher and quicker.
+    const shift = name === "upstairs" ? 3 : 0;
     // Minor -> major: F -> F#, Bb -> B (D major lullaby for the happy ending).
     const fix = (n: number) => (major && (n % 12 === 5 || n % 12 === 10) ? n + 1 : n);
     const bus = this.musicBus;
@@ -435,7 +567,7 @@ class AudioEngine {
     let pos = 0;
     for (const [note, len] of MELODY[bar]) {
       if (pos === beatInBar) {
-        const f = midi(fix(note) + (major ? 0 : 0));
+        const f = midi(fix(note) + shift);
         const dur = Math.min(1.6, len * beat + 0.6);
         this.tone(f, t, { peak: 0.16, attack: 0.006, decay: dur, bus, detune: Math.random() * 6 - 3 });
         this.tone(f * 2, t, { peak: 0.035, attack: 0.006, decay: dur * 0.6, bus });
@@ -444,12 +576,12 @@ class AudioEngine {
       pos += len;
     }
     if (beatInBar === 0) {
-      this.tone(midi(fix(ROOTS[bar])), t, { type: "triangle", peak: 0.16, attack: 0.02, decay: beat * 2.6, bus });
+      this.tone(midi(fix(ROOTS[bar]) + shift), t, { type: "triangle", peak: 0.16, attack: 0.02, decay: beat * 2.6, bus });
     } else {
-      for (const n of CHORDS[bar]) this.tone(midi(fix(n)), t, { peak: 0.035, attack: 0.01, decay: beat * 0.7, bus });
+      for (const n of CHORDS[bar]) this.tone(midi(fix(n) + shift), t, { peak: 0.035, attack: 0.01, decay: beat * 0.7, bus });
     }
     if ((bar === 3 || bar === 7) && beatInBar === 2) {
-      [86, 90, 93].forEach((n, i) => this.tone(midi(fix(n)), t + i * beat * 0.2, { peak: 0.025, decay: 0.5, bus }));
+      [86, 90, 93].forEach((n, i) => this.tone(midi(fix(n) + shift), t + i * beat * 0.2, { peak: 0.025, decay: 0.5, bus }));
     }
   }
 }
@@ -483,6 +615,25 @@ export type SfxName =
   | "micOff"
   | "thunder"
   | "fanfare"
-  | "birds";
+  | "birds"
+  | "thud"
+  | "laugh"
+  | "boing"
+  | "toot"
+  | "bubbles"
+  | "steam"
+  | "click"
+  | "fan"
+  | "drum"
+  | "strum"
+  | "gramophone"
+  | "cello"
+  | "musicbox"
+  | "flourish"
+  | "blackout"
+  | "bigcapture"
+  | "chapter";
+
+export type MusicName = "night" | "upstairs" | "victory";
 
 export const audio = new AudioEngine();

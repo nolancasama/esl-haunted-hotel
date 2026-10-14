@@ -1,21 +1,32 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { WALL_H, WALL_LINES, WALL_T } from "../game/world/rooms";
+import { FLOOR_Y, WALL_H, WALL_LINES, WALL_T } from "../game/world/rooms";
+import { rt } from "../game/runtime";
+import type { Floor } from "../game/types";
 import { lineFade } from "./wallFade";
 
-/** Upper room corners that get a web: [x, z, direction along x, direction along z]. */
-const CORNERS: Array<[number, number, number, number]> = [
-  [-8, -11, 1, 1], // bedroom NW
-  [0, -11, -1, 1], // bedroom NE
-  [8, -11, -1, 1], // dining NE
-  [0, -4, 1, -1], // dining SW
-  [-8, 11, 1, -1], // library SW
-  [0, 4, -1, 1], // library NE
-  [8, 11, -1, -1], // storage SE
-  [0, 11, 1, -1], // storage SW
-  [-8, -4, 1, 1], // lobby NW
-  [8, 4, -1, -1] // lobby SE
+/** Upper room corners that get a web: [x, z, direction along x, direction along z, floor]. */
+const CORNERS: Array<[number, number, number, number, Floor]> = [
+  [-8, -11, 1, 1, 0], // bedroom NW
+  [0, -11, -1, 1, 0], // bedroom NE
+  [8, -11, -1, 1, 0], // dining NE
+  [0, -4, 1, -1, 0], // dining SW
+  [-8, 11, 1, -1, 0], // library SW
+  [0, 4, -1, 1, 0], // library NE
+  [8, 11, -1, -1, 0], // storage SE
+  [0, 11, 1, -1, 0], // storage SW
+  [-8, -4, 1, 1, 0], // lobby NW
+  [8, 4, -1, -1, 0], // lobby SE
+  [-8, -11, 1, 1, 1], // playroom NW
+  [8, -4, -1, -1, 1], // bathroom SE
+  [-8, 11, 1, -1, 1], // music SW
+  [0, 4, 1, 1, 1], // attic NW
+  [8, 4, -1, 1, 1], // attic NE
+  [8, 11, -1, -1, 1], // attic SE
+  [0, 11, 1, -1, 1], // attic SW
+  [-8, 4, 1, -1, 1], // landing SW
+  [8, -4, -1, 1, 1] // landing NE
 ];
 
 /** One web hanging in a corner: radial threads plus a few sagging rings. */
@@ -55,8 +66,9 @@ function webGeometry(size: number, seed: number): THREE.BufferGeometry {
 }
 
 /** Walls a corner touches (the web vanishes if either fades). */
-function linesAt(x: number, z: number): string[] {
+function linesAt(x: number, z: number, floor: Floor): string[] {
   return WALL_LINES.filter((l) => {
+    if (l.floor !== floor) return false;
     if (l.axis === "x") return Math.abs(l.at - z) < 0.01 && x >= l.from - 0.01 && x <= l.to + 0.01;
     return Math.abs(l.at - x) < 0.01 && z >= l.from - 0.01 && z <= l.to + 0.01;
   }).map((l) => l.id);
@@ -69,11 +81,12 @@ export function Cobwebs() {
   );
   const webs = useMemo(
     () =>
-      CORNERS.map(([x, z, dx, dz], i) => ({
+      CORNERS.map(([x, z, dx, dz, floor], i) => ({
         geo: webGeometry(0.75 + (i % 3) * 0.12, i * 97 + 13),
-        pos: [x + dx * (WALL_T / 2 + 0.01), WALL_H - 0.02, z + dz * (WALL_T / 2 + 0.01)] as [number, number, number],
+        pos: [x + dx * (WALL_T / 2 + 0.01), FLOOR_Y[floor] + WALL_H - 0.02, z + dz * (WALL_T / 2 + 0.01)] as [number, number, number],
         scale: [dx, 1, dz] as [number, number, number],
-        lines: linesAt(x, z)
+        floor,
+        lines: linesAt(x, z, floor)
       })),
     []
   );
@@ -81,7 +94,7 @@ export function Cobwebs() {
   useFrame(() => {
     webs.forEach((w, i) => {
       const r = refs.current[i];
-      if (r) r.visible = Math.min(...w.lines.map((id) => lineFade.get(id) ?? 1)) > 0.5;
+      if (r) r.visible = w.floor === rt.view.floor && Math.min(...w.lines.map((id) => lineFade.get(id) ?? 1)) > 0.5;
     });
   });
   return (

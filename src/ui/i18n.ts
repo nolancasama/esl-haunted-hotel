@@ -24,7 +24,17 @@ export const LINE_JA: Record<string, string> = {
   "Next room!": "つぎの へやへ いこう！",
   "Look!": "みて！",
   "Go home!": "おうちへ かえろう！",
-  "Yum yum!": "もぐもぐ！"
+  "Yum yum!": "もぐもぐ！",
+  // Chapter 2
+  "Wait! What's that?": "まって！ いまの おとは なに？",
+  "Four more ghosts!": "おばけが あと 4ひき いる！",
+  "Let's go upstairs!": "2かいへ いこう！",
+  "You found eight ghosts!": "おばけを 8ぴき みつけたね！",
+  "You found all the ghosts!": "おばけを ぜんぶ みつけたね！",
+  "Play with me!": "いっしょに あそぼう！",
+  "Splish splash!": "ちゃぷちゃぷ！",
+  "La la la!": "ラララ〜♪",
+  "Find me!": "みつけてごらん！"
 };
 
 export const HINT = {
@@ -43,6 +53,10 @@ export const HINT = {
   micBlocked: { en: "The microphone is off. Use the buttons.", ja: "マイクが つかえないので、ボタンで こたえよう" },
   rescue: { en: "You can tap the words, too.", ja: "ことばを タップしても いいよ" },
   goDoor: { en: "Go to the open door!", ja: "あいている ドアへ いこう！" },
+  goStairs: { en: "Go up the stairs!", ja: "かいだんを のぼろう！" },
+  fan: { en: "Steamy! The switch on the wall turns on the fan.", ja: "ゆげで いっぱい！ かべの スイッチで かんきせんを つけよう" },
+  fanKeys: { en: "E: turn on the fan", ja: "E キーで かんきせんを つける" },
+  fanTouch: { en: "Tap 🔍 to turn on the fan", ja: "🔍 を タップして かんきせんを つける" },
   locked: { en: "Locked!", ja: "まだ あかないよ" },
   exit: { en: "Walk out of the door!", ja: "ドアから そとへ でよう！" },
   replay: { en: "Listen again", ja: "もういちど きく" }

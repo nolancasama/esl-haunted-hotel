@@ -33,7 +33,7 @@ export function searchShot(obj: WorldObject, from: { x: number; z: number }): Ca
   const dir = viewDir(obj, from);
   const size = Math.max(obj.spec.w, obj.spec.d, obj.spec.wallMounted ? 1.6 : obj.spec.h * 0.9);
   const dist = Math.min(4.8, Math.max(2.7, size * 1.6 + 1.2));
-  const ty = obj.spec.wallMounted ? 1.05 : Math.min(1.15, Math.max(0.35, obj.spec.h * 0.42));
+  const ty = obj.y + (obj.spec.wallMounted ? 1.05 : Math.min(1.15, Math.max(0.35, obj.spec.h * 0.42)));
   const pitch = obj.spec.h > 1.6 ? 0.36 : 0.34;
   const target: Vec3 = { x: c.x, y: ty, z: c.z };
   const pos: Vec3 = {
@@ -72,7 +72,7 @@ export function standPoint(
 }
 
 /** Wider view for the capture, so the flight into the lantern is visible. */
-export function captureShot(player: { x: number; z: number }, ghost: Vec3): CameraShot {
+export function captureShot(player: { x: number; z: number; y: number }, ghost: Vec3): CameraShot {
   const mx = (player.x + ghost.x) / 2;
   const mz = (player.z + ghost.z) / 2;
   let bx = player.x - ghost.x;
@@ -84,8 +84,8 @@ export function captureShot(player: { x: number; z: number }, ghost: Vec3): Came
   const sx = -bz * 0.45;
   const sz = bx * 0.45;
   return {
-    pos: { x: player.x + bx * 2.4 + sx, y: 2.3, z: player.z + bz * 2.4 + sz },
-    target: { x: mx, y: 0.75, z: mz }
+    pos: { x: player.x + bx * 2.4 + sx, y: player.y + 2.3, z: player.z + bz * 2.4 + sz },
+    target: { x: mx, y: player.y + 0.75, z: mz }
   };
 }
 
@@ -108,13 +108,13 @@ export function revealShot(spot: HidingSpot, obj: WorldObject, from: { x: number
       if (obj.spec.wallMounted) {
         // Under a window: keep the window in the frame above the ghost.
         dist = 3.1;
-        camY = 1.05;
-        ty = 0.95;
+        camY = obj.y + 1.05;
+        ty = obj.y + 0.95;
       } else {
         // Low, nearly floor level, so the sight line passes under the rail.
         dist = 2.2;
-        camY = 0.4;
-        ty = 0.24;
+        camY = obj.y + 0.4;
+        ty = obj.y + 0.24;
       }
       break;
     case "on":

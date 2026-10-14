@@ -30,8 +30,34 @@ export const storageModels: BuilderSet = {
     out.parts.push({ name: "lid", pivot: [0, h - 0.01, -d / 2 - 0.025], geometry: lid.build() });
   },
 
-  shelf(_obj, b) {
+  shelf(obj, b) {
     const { w, h, d } = KINDS.shelf;
+    if (obj.variant === "bath") {
+      // white bathroom shelves: folded towels, bottles, a plant; the top's right half is the "on" spot
+      const paint = "#ece6dc";
+      b.box(w, h, 0.03, 0, 0, -d / 2 + 0.015, "#d8d0c2");
+      for (const sx of [-1, 1]) b.box(0.05, h, d, sx * (w / 2 - 0.025), 0, 0, paint);
+      for (const y of [0.05, 0.6, 1.2, h - 0.04]) b.box(w, 0.04, d, 0, y, 0, paint);
+      const towels = ["#ff9fb6", "#6fc3cf", "#ffffff", "#f2d36b"];
+      towels.forEach((c, i) => {
+        b.box(0.34, 0.09, 0.36, -0.55 + i * 0.36, 0.09, 0, c);
+        b.box(0.34, 0.09, 0.36, -0.55 + i * 0.36, 0.18, 0, towels[(i + 2) % 4]);
+      });
+      const bottles = ["#62c4e0", "#ff9fc4", "#9ae08a", "#e0b0ff", "#f2c94c"];
+      bottles.forEach((c, i) => {
+        b.cyl(0.05, 0.055, 0.18 + (i % 2) * 0.06, -0.7 + i * 0.32, 0.64, 0, c, 8);
+        b.cyl(0.02, 0.02, 0.05, -0.7 + i * 0.32, 0.82 + (i % 2) * 0.06, 0, "#ffffff", 6);
+      });
+      b.box(0.5, 0.12, 0.3, 0.45, 1.24, 0, "#ffffff");
+      b.box(0.5, 0.12, 0.3, -0.35, 1.24, 0, "#6fc3cf");
+      // plant on the left of the top board
+      b.cyl(0.09, 0.07, 0.14, -0.6, h, 0, "#c06a4a", 10);
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        b.add(new THREE.ConeGeometry(0.04, 0.3, 4), "#5aa864", [-0.6 + Math.cos(a) * 0.05, h + 0.27, Math.sin(a) * 0.05], [Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4], [1, 1, 0.4]);
+      }
+      return;
+    }
     const metal = "#6b6577";
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(0.05, h, 0.05, (sx * (w - 0.05)) / 2, 0, (sz * (d - 0.05)) / 2, metal);
     for (const y of [0.36, 0.86, 1.36, h - 0.04]) b.box(w, 0.04, d, 0, y, 0, "#8d6a4a");
@@ -47,9 +73,10 @@ export const storageModels: BuilderSet = {
     b.box(0.22, 0.14, 0.2, -0.62, h, 0, "#b08a5a", 0.3);
   },
 
-  worktable(_obj, b) {
+  worktable(obj, b) {
     const { w, h, d } = KINDS.worktable;
-    b.box(w, 0.06, d, 0, h - 0.06, 0, "#9b7550");
+    const music = obj.variant === "music";
+    b.box(w, 0.06, d, 0, h - 0.06, 0, music ? "#5a2c22" : "#9b7550");
     // apron: bottom at 0.72 (clearance)
     b.box(w - 0.1, 0.04, 0.03, 0, h - 0.1, d / 2 - 0.04, C.woodDark);
     b.box(w - 0.1, 0.04, 0.03, 0, h - 0.1, -d / 2 + 0.04, C.woodDark);
@@ -59,7 +86,18 @@ export const storageModels: BuilderSet = {
       [-0.63, 0.31],
       [0.63, 0.31]
     ] as const) {
-      b.box(0.07, h - 0.06, 0.07, x, 0, z, C.woodDark);
+      if (music) b.cyl(0.035, 0.025, h - 0.06, x, 0, z, C.woodDark, 8);
+      else b.box(0.07, h - 0.06, 0.07, x, 0, z, C.woodDark);
+    }
+    if (music) {
+      // sheet music and a metronome on the left half
+      b.box(1.1, 0.004, 0.6, 0, 0.002, 0, "#140c1f");
+      b.box(0.3, 0.01, 0.22, -0.38, h, -0.05, "#f4efe2", 0.2);
+      b.box(0.28, 0.01, 0.21, -0.3, h + 0.01, 0.05, "#efe8d6", -0.15);
+      for (let i = 0; i < 4; i++) b.box(0.22, 0.003, 0.006, -0.3, h + 0.016, -0.02 + i * 0.04, "#3a3048", -0.15);
+      b.add(new THREE.ConeGeometry(0.08, 0.24, 4), "#7a3a2a", [-0.1, h + 0.12, -0.18], [0, Math.PI / 4, 0]);
+      b.boxAt(0.012, 0.18, 0.012, [-0.1, h + 0.14, -0.13], [0, 0, 0.3], C.brass);
+      return;
     }
     // tools on the left half
     b.box(0.34, 0.12, 0.18, -0.4, h, -0.12, "#c43c3c");

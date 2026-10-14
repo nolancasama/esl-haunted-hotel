@@ -1,26 +1,36 @@
-import type { Prep, Rect, RoomId, Vec3 } from "../types";
+import type { Floor, Prep, Rect, RoomId, Vec3 } from "../types";
 import { footprint, localToWorld } from "./geometry";
 import { GHOST_H, GHOST_R, KINDS, type KindSpec } from "./kinds";
 import { PLACEMENTS, type Placement, type SpotRule } from "./furniture";
-import { DOORS, ROOMS, WALL_LINES, WALL_T, wallPieces, type DoorId, type WallPiece } from "./rooms";
+import { DOORS, FLOOR_Y, ROOMS, STAIRS, WALL_LINES, WALL_T, wallPieces, type DoorId, type WallPiece } from "./rooms";
 
 export interface WorldObject extends Placement {
   spec: KindSpec;
+  floor: Floor;
+  /** World height of the floor it stands on. */
+  y: number;
   /** Floor footprint in world space. */
   rect: Rect;
   searchable: boolean;
+  /** Can be walked up to and used with E / a tap: hiding places and switches. */
+  interactive: boolean;
   /** Wall lines a wall-mounted object hangs on (it fades with them in the cutaway view). */
   wallLines: string[];
 }
 
 /** The wall line(s) a wall-mounted object hangs on. */
-function wallLinesFor(p: Placement, spec: KindSpec): string[] {
+function wallLinesFor(p: Placement, spec: KindSpec, floor: Floor): string[] {
   if (!spec.wallMounted) return [];
   const alongX = p.rot === 0 || p.rot === 180;
   const coord = alongX ? p.z : p.x;
   const pos = alongX ? p.x : p.z;
   return WALL_LINES.filter(
-    (l) => l.axis === (alongX ? "x" : "z") && Math.abs(l.at - coord) <= 0.15 && pos + spec.w / 2 > l.from && pos - spec.w / 2 < l.to
+    (l) =>
+      l.floor === floor &&
+      l.axis === (alongX ? "x" : "z") &&
+      Math.abs(l.at - coord) <= 0.15 &&
+      pos + spec.w / 2 > l.from &&
+      pos - spec.w / 2 < l.to
   ).map((l) => l.id);
 }
 
@@ -42,13 +52,24 @@ export interface HidingSpot {
 
 function objectFrom(p: Placement): WorldObject {
   const spec: KindSpec = KINDS[p.kind];
+  const floor = ROOMS[p.room].floor;
   let rect = footprint(p, p.rot, spec.w, spec.d);
   if (spec.wallMounted) {
     // x/z sit on the wall face; the object sticks out into the room along its local +z.
     const centre = localToWorld(p, p.rot, { x: 0, y: 0, z: spec.d / 2 });
     rect = footprint(centre, p.rot, spec.w, spec.d);
   }
-  return { ...p, spec, rect, searchable: Boolean(p.noun && p.spots?.length), wallLines: wallLinesFor(p, spec) };
+  const searchable = Boolean(p.noun && p.spots?.length);
+  return {
+    ...p,
+    spec,
+    floor,
+    y: FLOOR_Y[floor],
+    rect,
+    searchable,
+    interactive: searchable || Boolean(p.action),
+    wallLines: wallLinesFor(p, spec, floor)
+  };
 }
 
 function spotFor(obj: WorldObject, rule: SpotRule): HidingSpot {
@@ -127,7 +148,22 @@ export interface Collider {
   rect: Rect;
   /** Door blockers only apply while their door is closed. */
   door?: DoorId;
+  /** The floor it blocks on; "all" = both floors and the stairs (the banisters). */
+  floor: Floor | "all";
 }
+
+/**
+ * The staircase's own blockers. The banisters keep you on the steps and
+ * double as the stairwell railing upstairs; the space under the top landing
+ * is closed downstairs, and the stairwell's far end has a railing upstairs.
+ */
+const S = STAIRS.rect;
+export const STAIR_COLLIDERS: Collider[] = [
+  { id: "stairs-banister-n", floor: "all", rect: { x0: S.x0, x1: S.x1, z0: S.z0 - 0.1, z1: S.z0 + 0.1 } },
+  { id: "stairs-banister-s", floor: "all", rect: { x0: S.x0, x1: S.x1, z0: S.z1 - 0.1, z1: S.z1 + 0.1 } },
+  { id: "stairs-under", floor: 0, rect: { x0: S.x1, x1: 7.9, z0: S.z0 - 0.1, z1: S.z1 + 0.1 } },
+  { id: "stairwell-rail", floor: 1, rect: { x0: S.x0 - 0.18, x1: S.x0, z0: S.z0 - 0.1, z1: S.z1 + 0.1 } }
+];
 
 export interface World {
   objects: WorldObject[];
@@ -143,16 +179,18 @@ export function buildWorld(placements: Placement[] = PLACEMENTS): World {
   const spots = objects.flatMap((o) => (o.searchable ? o.spots!.map((rule) => spotFor(o, rule)) : []));
   const walls = wallPieces();
   const colliders: Collider[] = [
-    ...walls.filter((w) => w.y0 === 0).map((w) => ({ id: w.id, rect: w.rect })),
+    ...walls.filter((w) => w.y0 === FLOOR_Y[w.line.floor]).map((w) => ({ id: w.id, rect: w.rect, floor: w.line.floor })),
     ...DOORS.map((d) => ({
       id: `door-${d.id}`,
       door: d.id,
+      floor: d.floor,
       rect:
         d.axis === "x"
           ? { x0: d.from, x1: d.to, z0: d.at - WALL_T / 2, z1: d.at + WALL_T / 2 }
           : { x0: d.at - WALL_T / 2, x1: d.at + WALL_T / 2, z0: d.from, z1: d.to }
     })),
-    ...objects.filter((o) => o.spec.solid).map((o) => ({ id: o.id, rect: o.rect }))
+    ...objects.filter((o) => o.spec.solid).map((o) => ({ id: o.id, rect: o.rect, floor: o.floor })),
+    ...STAIR_COLLIDERS
   ];
   return {
     objects,

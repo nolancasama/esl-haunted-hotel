@@ -36,6 +36,26 @@ export const ROOM_STYLE: Record<RoomId, { wall: WallStyle; floor: FloorStyle }> 
   library: {
     wall: { paper: "#6a2a3c", pattern: "#7e364a", kind: "damask", wainscot: "#3a2522", trim: "#221413" },
     floor: { base: "#573927", seam: "#2a1a12", seed: 12 }
+  },
+  landing: {
+    wall: { paper: "#2f3a72", pattern: "#3f4d90", kind: "damask", wainscot: "#3a2a44", trim: "#1f1628" },
+    floor: { base: "#5c3c2c", seam: "#2c1b14", seed: 21 }
+  },
+  playroom: {
+    wall: { paper: "#35588a", pattern: "#e8cf6a", kind: "stars", wainscot: "#5a3f6e", trim: "#2f2140" },
+    floor: { base: "#8a6242", seam: "#3e2818", seed: 14 }
+  },
+  bathroom: {
+    wall: { paper: "#3f8290", pattern: "#2b6470", kind: "tiles", wainscot: "#d6e4e8", trim: "#2a4a52" },
+    floor: { base: "#e4dfd2", seam: "#4b7480", seed: 2, tiles: true }
+  },
+  music: {
+    wall: { paper: "#5a2b5a", pattern: "#743b74", kind: "stripes", wainscot: "#3a2232", trim: "#21121d" },
+    floor: { base: "#6a4430", seam: "#331f16", seed: 17 }
+  },
+  attic: {
+    wall: { paper: "#5e4532", pattern: "#3a2a1e", kind: "planks", wainscot: "#5e4532", trim: "#2e2118" },
+    floor: { base: "#6b5138", seam: "#2f2216", seed: 23 }
   }
 };
 
@@ -68,6 +88,18 @@ export function texturedMaterial(key: TexKey): THREE.Material {
       break;
     case "rugLibrary":
       m = new THREE.MeshLambertMaterial({ map: rugTexture("#24406e", "#c9a24a") });
+      break;
+    case "rugPlay":
+      m = new THREE.MeshLambertMaterial({ map: rugTexture("#3f8f7a", "#f2c14e") });
+      break;
+    case "rugMusic":
+      m = new THREE.MeshLambertMaterial({ map: rugTexture("#8a2f62", "#e0b45a") });
+      break;
+    case "rugAttic":
+      m = new THREE.MeshLambertMaterial({ map: rugTexture("#5a4a6a", "#9a8a6a") });
+      break;
+    case "bathmat":
+      m = new THREE.MeshLambertMaterial({ map: rugTexture("#f2f2ee", "#6fc3cf") });
       break;
     case "runner":
       m = new THREE.MeshLambertMaterial({ map: runnerTexture() });
