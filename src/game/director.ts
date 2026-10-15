@@ -21,6 +21,7 @@ import { replayPlan } from "./logic/replay";
 import { clueSpoken, emptyCaption, QUESTION, sentenceWith } from "./logic/clues";
 import { judgeSpeech, type Judgement } from "./logic/speechMatch";
 import { mulberry32, pick, type Rng } from "./logic/rng";
+import { turnDelta } from "./logic/startle";
 import { WORLD, type HidingSpot, type WorldObject } from "./world/world";
 import { INTERACT_RANGE, OUTSIDE, PRACTICE_START, STAIRS_FOOT, STORY_START, UPSTAIRS_START } from "./world/constants";
 import { rectCenter, rectDistance } from "./world/geometry";
@@ -113,7 +114,18 @@ function placePlayer(x: number, z: number, floor: Floor, yaw: number) {
   rt.player.yaw = yaw;
   rt.player.stepTo = null;
   rt.player.walkTo = null;
+  rt.player.startle = null;
   rt.view.floor = floor;
+}
+
+/** Resolve once `done()` is true (checked every 50 ms), or false after `maxMs` of real time. */
+async function waitUntil(done: () => boolean, maxMs: number): Promise<boolean> {
+  const t0 = performance.now();
+  while (!done()) {
+    if (performance.now() - t0 > maxMs) return false;
+    await sleep(50);
+  }
+  return true;
 }
 
 let toastKey = 0;
@@ -869,6 +881,28 @@ const SHOT_GATE = { pos: { x: 0.6, y: 1.7, z: 2.3 }, target: { x: 3.7, y: 0.9, z
 const SHOT_BOO_STAIRS = { pos: { x: -0.5, y: 1.95, z: 3.0 }, target: { x: 2.4, y: 1.35, z: 0.2 } };
 const BOO_BY_STAIRS = { x: 2.3, y: 1.5, z: -0.5 };
 
+/** Past this, the player is clear of the front door. */
+const INTRO_INSIDE_X = -7.6;
+const INTRO_DOOR = { x: -10, z: 0 };
+
+/**
+ * Hop and turn round to face `look` (logic/startle.ts, played by Player). A
+ * near half-turn goes round the side that faces the camera, so the face shows.
+ */
+function startleTowards(look: { x: number; z: number }) {
+  const p = rt.player;
+  p.stepTo = null;
+  p.walkTo = null;
+  p.vx = 0;
+  p.vz = 0;
+  const to = Math.atan2(look.x - p.x, look.z - p.z);
+  const cx = rt.camera.pos.x - p.x;
+  const cz = rt.camera.pos.z - p.z;
+  const towardsCamera = (s: number) => Math.sin(p.yaw + (s * Math.PI) / 2) * cx + Math.cos(p.yaw + (s * Math.PI) / 2) * cz;
+  const prefer = towardsCamera(1) >= towardsCamera(-1) ? 1 : -1;
+  p.startle = { t0: rt.time + 0.04, from: p.yaw, delta: turnDelta(p.yaw, to, prefer) };
+}
+
 async function intro() {
   const enc0 = currentEncounter(hunt());
   cutscene = "intro";
@@ -883,20 +917,32 @@ async function intro() {
   rt.flashT0 = rt.time + 0.3;
   window.setTimeout(() => audio.thunder(0.75), 900 * pace);
   await sleep(1000);
-  // Walk in out of the rain...
+  // Walk in out of the rain (however long that takes on this device)...
   rt.player.stepTo = { x: STORY_START.x, z: STORY_START.z, face: { x: 0, z: 0 } };
-  await sleep(2300);
-  // ...and the door slams shut behind you (on a slow device, make sure you are inside first).
-  if (rt.player.x < -7.6) {
-    rt.player.x = STORY_START.x;
-    rt.player.z = STORY_START.z;
+  const arrived = await waitUntil(() => !rt.player.stepTo, 15000);
+  if (!arrived) {
+    rt.player.stepTo = null;
+    if (rt.player.x < INTRO_INSIDE_X) {
+      // Still in the doorway after all that time: move them in behind a quick fade, never a visible jump.
+      setGame({ fade: 1 });
+      await sleep(400);
+      placePlayer(STORY_START.x, STORY_START.z, 0, Math.PI / 2);
+      setGame({ fade: 0 });
+      await sleep(300);
+    }
   }
-  rt.player.stepTo = { x: rt.player.x, z: rt.player.z, face: { x: -10, z: 0 } };
+  // ...the door slams shut behind you: a startled hop, and a turn to look at it.
   rt.doorSlam.add("entrance");
   rt.doorsOpen.delete("entrance");
   audio.play("slam");
   rt.flickerT0 = rt.time;
-  await sleep(1700);
+  startleTowards(INTRO_DOOR);
+  if (!(await waitUntil(() => !rt.player.startle, 15000)) && rt.player.startle) {
+    // frames have all but stopped (a hidden tab): just end up facing the door
+    rt.player.yaw = rt.player.startle.from + rt.player.startle.delta;
+    rt.player.startle = null;
+  }
+  await sleep(900);
   // Boo appears.
   rt.boo.visible = true;
   rt.boo.appearT0 = rt.time;

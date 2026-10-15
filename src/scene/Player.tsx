@@ -11,6 +11,7 @@ import { WORLD } from "../game/world/world";
 import { GHOSTS } from "../game/ghosts";
 import { audio } from "../audio/audio";
 import { director } from "../game/director";
+import { startlePose } from "../game/logic/startle";
 import { PartBuilder } from "./partBuilder";
 import { glowSpriteMaterial } from "./materials";
 import { glowTexture } from "./textures";
@@ -202,15 +203,37 @@ export function Player() {
       p.yaw += d * Math.min(1, dt * 12);
     }
 
+    // The intro's startled hop: up, arms out, leaning back, then a smooth turn (driven by rt.time).
+    let lift = 0;
+    let lean = 0;
+    let arms = 0;
+    if (p.startle) {
+      const pose = startlePose(rt.time - p.startle.t0);
+      p.yaw = p.startle.from + p.startle.delta * pose.turn;
+      lift = pose.lift;
+      lean = pose.lean;
+      arms = pose.arms;
+      if (pose.done) p.startle = null;
+    }
+
     // Walk cycle.
     const moving = Math.min(1, speed / SPEED);
     p.step += dt * speed * 3.1;
     const swing = Math.sin(p.step) * 0.6 * moving;
     if (legL.current) legL.current.rotation.x = swing;
     if (legR.current) legR.current.rotation.x = -swing;
-    if (armL.current) armL.current.rotation.x = -swing * 0.8;
-    if (armR.current) armR.current.rotation.x = 0.35 + swing * 0.25;
-    if (bob.current) bob.current.position.y = Math.abs(Math.cos(p.step)) * 0.045 * moving + Math.sin(rt.time * 2) * 0.004;
+    if (armL.current) {
+      armL.current.rotation.x = -swing * 0.8 - arms * 0.5;
+      armL.current.rotation.z = -0.15 - arms * 0.85;
+    }
+    if (armR.current) {
+      armR.current.rotation.x = 0.35 + swing * 0.25 - arms * 0.5;
+      armR.current.rotation.z = 0.15 + arms * 0.85;
+    }
+    if (bob.current) {
+      bob.current.position.y = Math.abs(Math.cos(p.step)) * 0.045 * moving + Math.sin(rt.time * 2) * 0.004 + lift;
+      bob.current.rotation.x = lean;
+    }
     const stepIndex = Math.floor(p.step / Math.PI);
     if (stepIndex !== lastStep.current) {
       lastStep.current = stepIndex;

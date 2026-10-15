@@ -57,7 +57,7 @@ export function installE2eHook() {
         searchId: g.searchId,
         selectedSpot: g.selectedSpot,
         helpLevel: g.helpLevel,
-        player: { x: rt.player.x, z: rt.player.z, y: rt.player.y, floor: rt.player.floor, stairs: rt.player.stairs },
+        player: { x: rt.player.x, z: rt.player.z, y: rt.player.y, yaw: rt.player.yaw, floor: rt.player.floor, stairs: rt.player.stairs, startle: Boolean(rt.player.startle) },
         viewFloor: rt.view.floor,
         scope: g.scope,
         chapter: g.chapter,
@@ -193,6 +193,16 @@ export function installE2eHook() {
     },
     camera() {
       return { ...rt.camera.pos, mode: rt.camera.mode };
+    },
+    /** Visual checks: hold the camera on a fixed shot (null = back to following the player). */
+    look(pos: { x: number; y: number; z: number } | null, target?: { x: number; y: number; z: number }) {
+      rt.camera.mode = pos && target ? "shot" : "follow";
+      rt.camera.shot = pos && target ? { pos, target } : null;
+      rt.camera.snap = true;
+    },
+    /** Visual checks: slow down (or speed up) game time, to film a quick animation. */
+    timeScale(s: number) {
+      rt.timeScale = s;
     }
   };
   (window as unknown as { __hh: typeof api }).__hh = api;

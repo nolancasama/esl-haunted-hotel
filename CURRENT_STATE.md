@@ -6,6 +6,9 @@ Unit tests, typecheck, build and all e2e specs (including `tests/e2e/chapter2.sp
 pass. The visuals were checked in screenshots at 1366x768 and 844x390 touch
 (`.tmp/upstairs`, `.tmp/ending`). The repository is still private, so GitHub Pages is not
 live yet (see README for the publish commands).
+**2026-10-15:** In the intro, the player now walks all the way in before the door slams,
+then hops and turns smoothly to face it (`logic/startle.ts`). There is no more teleport
+or snap. Z-fighting is fixed on the plant soil and the sink water.
 
 ## What Exists
 - **Chapter 1 (ground floor):** lobby hub, bedroom (Sleepy), dining (Hungry), storage
@@ -31,13 +34,15 @@ live yet (see README for the publish commands).
 - **Short screens:** the round pips sit under the ghost count (grid in the
   `max-height: 520px` block), so they stay clear of the clue card.
 - **Test hooks** (`src/game/e2e.ts`): `teleport(x,z,floor)`, `goTo`, `jump(index, round)`,
-  `setYaw`, `steam`, `wobble`, `fanSwitchTest`. State includes floor, chapter, scope, steam,
-  fanOn, blackout.
+  `setYaw`, `steam`, `wobble`, `fanSwitchTest`, `look(pos, target)` (fixed camera shot),
+  `timeScale(s)` (slow motion for filming). State includes floor, chapter, scope, steam,
+  fanOn, blackout, player yaw/startle.
 - **Scripts:** `scripts/upstairs.mjs --part=rooms|stairs|tricks|cutscene`,
   `scripts/ending.mjs [url] [WxH] [--touch]` (both need a dev server on 5199).
 - **E2E:** `story.spec.ts`, `practice.spec.ts`, `chapter2.spec.ts`. In chapter2, tests B–E
   were shown to fail on injected bugs (Chapter 2 starting downstairs, floor never flipping,
-  no blackout on escape, fan doing nothing).
+  no blackout on escape, fan doing nothing). The intro movement test in `story.spec.ts`
+  was shown to fail on the old teleport and on the old instant half-turn.
 
 ## Known Issues
 - Software-rendered (SwiftShader) runs are only 2–7 fps, so the full-adventure e2e test

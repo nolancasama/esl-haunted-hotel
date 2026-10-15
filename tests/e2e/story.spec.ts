@@ -44,6 +44,53 @@ async function catchOnce(page: Page) {
   return s.clue!;
 }
 
+test("the intro: walk in, the door slams once you are inside, a hop and a smooth turn to face it", async ({ page }) => {
+  const errors = await boot(page, "&mode=story");
+  // Record every rendered frame from the start of the intro until Boo speaks.
+  await page.evaluate(() => {
+    type P = { x: number; z: number; yaw: number; startle: boolean };
+    const api = (window as unknown as { __hh: { state(): { phase: string; player: P; doorsOpen: string[]; line: unknown } } }).__hh;
+    const w = window as unknown as { introFrames: { x: number; z: number; yaw: number; startle: boolean; door: boolean }[]; introDone: boolean };
+    w.introFrames = [];
+    w.introDone = false;
+    const tick = () => {
+      const s = api.state();
+      if (s.phase === "intro") w.introFrames.push({ ...s.player, door: s.doorsOpen.includes("entrance") });
+      if (s.phase === "intro" && s.line) w.introDone = true;
+      else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  await page.getByTestId("start").click();
+  await page.waitForFunction(() => (window as unknown as { introDone: boolean }).introDone, null, { timeout: 60_000 });
+  const frames = await page.evaluate(() => (window as unknown as { introFrames: { x: number; z: number; yaw: number; startle: boolean; door: boolean }[] }).introFrames);
+  const walk = frames.slice(frames.findIndex((f) => f.x < -9)); // after the cut to the doorstep
+  expect(walk.length).toBeGreaterThan(5);
+  let maxStep = 0;
+  let maxTurn = 0;
+  for (let i = 1; i < walk.length; i++) {
+    maxStep = Math.max(maxStep, Math.hypot(walk[i].x - walk[i - 1].x, walk[i].z - walk[i - 1].z));
+    let d = Math.abs(walk[i].yaw - walk[i - 1].yaw) % (Math.PI * 2);
+    if (d > Math.PI) d = Math.PI * 2 - d;
+    maxTurn = Math.max(maxTurn, d);
+  }
+  expect(maxStep).toBeLessThan(0.4); // no teleport (a frame moves at most ~0.22 m, even at 10 fps or less)
+  expect(maxTurn).toBeLessThan(2.4); // no instant half-turn
+  const slam = walk.findIndex((f) => !f.door);
+  expect(slam).toBeGreaterThan(0);
+  expect(walk[slam].x).toBeGreaterThan(-7.6); // inside before the door shuts
+  const reaction = walk.slice(slam);
+  expect(reaction.some((f) => f.startle)).toBe(true);
+  // the hop and turn happen on the spot
+  for (const f of reaction) expect(Math.hypot(f.x - walk[slam].x, f.z - walk[slam].z)).toBeLessThan(0.05);
+  // ...through some in-between headings, ending up looking at the door (west)
+  const turning = reaction.filter((f) => f.startle && Math.abs(Math.cos(f.yaw)) > 0.3).length;
+  expect(turning).toBeGreaterThan(0);
+  const last = walk[walk.length - 1];
+  expect(Math.sin(last.yaw)).toBeLessThan(-0.95);
+  expect(errors).toEqual([]);
+});
+
 test("the intro plays, can be skipped, and opens only the bedroom", async ({ page }) => {
   const errors = await boot(page, "&mode=story");
   await page.getByTestId("start").click();

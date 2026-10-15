@@ -107,6 +107,31 @@ network that blocks or slows them. Fixed light set (hemisphere, moon, one warm
 "room light" that moves to the player's room, the lantern) because changing light
 counts recompiles shaders on Chromebooks.
 
+## 2026-10-15 — Intro slam reaction; no coplanar tops
+
+- **The front door slams only once the player has arrived inside.** The intro
+  waits for the scripted walk to finish (not a fixed 2.3 s). Previously, on a
+  slow device the walk was cut short and the player was teleported in, then
+  snapped 180° (a `stepTo` on the spot sets the yaw instantly). If the walk
+  still has not finished after 15 s and the player is in the doorway, they are
+  moved in behind a short fade, never in view.
+- **A startled hop and turn** (`logic/startle.ts`, played by `Player`): a 15 cm
+  arc of 0.34 s, arms flung out and a lean back, a soft landing squash, and a
+  0.55 s eased turn that starts mid-hop. A near half-turn goes round the side
+  that faces the camera, so the face shows. The animation is driven by game
+  time (`rt.time`), so it plays the same at any frame rate, with fewer frames on
+  slow machines. Then about 0.9 s looking at the door before Boo appears. Any
+  scene cut (`placePlayer`, so Skip too) clears it. Rejected: a bigger cartoon
+  jump (too much for the tone), and turning after landing (two reactions, not
+  one).
+- **No two surfaces share a plane where both can be seen.** Lobby/landing plant:
+  the soil disc's top was flush with the rim's closed top. Now the rim is 4 mm
+  lower, so the soil sits 6 mm proud. Sink: the water disc's top was flush with
+  the basin's closed top. Now the water dips into the basin and stands 4 mm
+  proud, and the side aprons stop at the front one. The fix is the geometry,
+  not `polygonOffset` or depth tricks. Offsets of 4–6 mm hold even on a 16-bit
+  depth buffer at room distance.
+
 ## 2026-10-14 — Chapter 2: upstairs, eight ghosts
 
 - **Two stacked floors with walkable ramp stairs** (lobby → landing, the floor

@@ -114,7 +114,8 @@ export const lobbyModels: BuilderSet = {
 
   plant(_obj, b) {
     b.cyl(0.24, 0.18, 0.42, 0, 0, 0, "#b4654a", 12);
-    b.cyl(0.26, 0.26, 0.05, 0, 0.4, 0, "#9a5038", 12);
+    // rim, and the soil sitting 6 mm proud of it (a soil top flush with the rim's top flickered)
+    b.cyl(0.26, 0.26, 0.044, 0, 0.4, 0, "#9a5038", 12);
     b.cyl(0.22, 0.22, 0.02, 0, 0.43, 0, "#3a2a1a", 12);
     for (let i = 0; i < 9; i++) {
       const a = (i / 9) * Math.PI * 2;

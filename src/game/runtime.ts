@@ -68,7 +68,9 @@ export const rt = {
     /** Tap-to-walk: head for this point, then search `objectId` on arrival. */
     walkTo: null as null | { x: number; z: number; objectId: string | null; t0: number },
     /** Scripted step (any phase): move here, then face `face`. Used to step aside in close-ups. */
-    stepTo: null as null | { x: number; z: number; face: { x: number; z: number } }
+    stepTo: null as null | { x: number; z: number; face: { x: number; z: number } },
+    /** The intro's startled hop and turn (logic/startle.ts), from `t0` (rt.time). */
+    startle: null as null | { t0: number; from: number; delta: number }
   },
   /** Which floor is drawn (switches halfway up the stairs). */
   view: { floor: 0 as Floor },
@@ -153,6 +155,7 @@ export function resetRuntime() {
   rt.player.frozen = true;
   rt.player.walkTo = null;
   rt.player.stepTo = null;
+  rt.player.startle = null;
   rt.player.floor = 0;
   rt.player.y = 0;
   rt.player.stairs = false;

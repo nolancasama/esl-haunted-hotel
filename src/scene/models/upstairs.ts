@@ -326,13 +326,15 @@ export const upstairsModels: BuilderSet = {
     }
     // apron: bottom at the clearance (0.62)
     b.box(0.86, slab - k.under.clearance, 0.03, 0, k.under.clearance, 0.28, paint);
-    b.box(0.03, slab - k.under.clearance, 0.56, 0.42, k.under.clearance, 0, paint);
-    b.box(0.03, slab - k.under.clearance, 0.56, -0.42, k.under.clearance, 0, paint);
+    // the side aprons stop at the front one (overlapping, their undersides shared a plane)
+    b.box(0.03, slab - k.under.clearance, 0.545, 0.42, k.under.clearance, -0.0075, paint);
+    b.box(0.03, slab - k.under.clearance, 0.545, -0.42, k.under.clearance, -0.0075, paint);
     b.box(k.w, 0.06, k.d, 0, slab, 0, "#cfd8dc");
     b.box(0.82, 0.004, 0.5, 0, 0.002, 0, "#13202a");
     // basin, water and tap
     b.cyl(0.25, 0.18, 0.1, 0, slab + 0.06, 0.02, "#ffffff", 16);
-    b.cyl(0.21, 0.21, 0.005, 0, slab + 0.155, 0.02, "#8fd8e8", 16);
+    // water: sunk into the basin's top, 4 mm proud (flush with it, the two tops flickered)
+    b.cyl(0.21, 0.21, 0.008, 0, slab + 0.156, 0.02, "#8fd8e8", 16);
     b.cyl(0.02, 0.02, 0.22, 0, slab + 0.06, -0.24, C.brass, 6);
     b.cylAt(0.016, 0.14, [0, slab + 0.27, -0.18], [Math.PI / 2, 0, 0], C.brass, 6);
     // soap and a toothbrush cup
