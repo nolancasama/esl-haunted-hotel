@@ -1,7 +1,8 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { DOORS, DOOR_H, FLOOR_Y, ROOMS, STAIRS, WALL_LINES, WALL_T, type DoorDef } from "../game/world/rooms";
+import { DOOR_H, FLOOR_Y, ROOMS, WALL_LINES, WALL_T, type DoorDef } from "../game/world/rooms";
+import { BEACON_RADIUS, beaconSpot, hallSide } from "../game/beacon";
 import { rt } from "../game/runtime";
 import { PartBuilder } from "./partBuilder";
 import { iconTexture } from "./textures";
@@ -75,17 +76,6 @@ function frameGeometry(width: number, height: number, style: Style): THREE.Buffe
   return b.build();
 }
 
-/** Which side of the door (along its normal axis) is the hall (lobby / landing). */
-function hallSide(door: DoorDef): number {
-  const room = ROOMS[door.room];
-  const roomSide =
-    door.axis === "x"
-      ? Math.sign((room.bounds.z0 + room.bounds.z1) / 2 - door.at)
-      : Math.sign((room.bounds.x0 + room.bounds.x1) / 2 - door.at);
-  if (door.style === "gate") return -1; // the gate is approached from the lobby (west)
-  return door.room === "lobby" ? roomSide : -roomSide;
-}
-
 const styleOf = (door: DoorDef): Style => (door.id === "entrance" ? "entrance" : door.style ?? "plain");
 
 export function Door({ door }: { door: DoorDef }) {
@@ -119,7 +109,7 @@ export function Door({ door }: { door: DoorDef }) {
       : Math.sign((room.bounds.x0 + room.bounds.x1) / 2 - door.at);
   // Local z of the frame equals world +z (axis x) or world -x (axis z). The gate swings back into the lobby.
   const swing = style === "gate" ? 1 : door.axis === "x" ? roomSide : -roomSide;
-  const lockLocalZ = (door.axis === "x" ? hallSide(door) : -hallSide(door)) * 0.2;
+  const lockLocalZ = (door.axis === "x" ? hallSide(door) : -hallSide(door)) * 0.38;
   const angle = useRef(0);
 
   useFrame((_, dt) => {
@@ -137,6 +127,10 @@ export function Door({ door }: { door: DoorDef }) {
     mat.depthWrite = o > 0.98;
     if (root.current) root.current.visible = o > 0.02;
     if (lock.current) {
+      // Sprites face the camera: keep the whole billboard proud of the visible
+      // door face, including when the entrance is viewed from outside.
+      const cameraSide = door.axis === "x" ? rt.camera.pos.z - door.at : door.at - rt.camera.pos.x;
+      lock.current.position.z = (Math.sign(cameraSide) || Math.sign(lockLocalZ)) * 0.38;
       const locked = !open && angle.current < 0.02;
       lock.current.visible = locked;
       lockMat.opacity = o * (0.75 + Math.sin(rt.time * 3) * 0.2);
@@ -166,18 +160,6 @@ export function Door({ door }: { door: DoorDef }) {
       />
     </group>
   );
-}
-
-/** Where the beacon floats for a door: just outside it, on the hall side. */
-function beaconSpot(id: string): { x: number; z: number; y: number; floor: 0 | 1 } | null {
-  if (id === "stairs") return { ...STAIRS.beacon, y: 0, floor: 0 };
-  const door = DOORS.find((d) => d.id === id);
-  if (!door) return null;
-  const mid = (door.from + door.to) / 2;
-  const side = hallSide(door) * 0.7;
-  const x = door.axis === "x" ? mid : door.at + side;
-  const z = door.axis === "x" ? door.at + side : mid;
-  return { x, z, y: FLOOR_Y[door.floor], floor: door.floor };
 }
 
 /** A bobbing golden arrow (and a floor glow) over the door - or the stairs - the student should go to. */
@@ -214,7 +196,7 @@ export function Beacon() {
     <group>
       <sprite ref={arrow} material={mat} scale={[0.7, 0.7, 1]} renderOrder={30} visible={false} />
       <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} material={ringMat} visible={false}>
-        <ringGeometry args={[0.45, 0.62, 32]} />
+        <ringGeometry args={[0.45, BEACON_RADIUS, 32]} />
       </mesh>
     </group>
   );

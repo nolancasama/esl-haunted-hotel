@@ -2,6 +2,7 @@ import type { Floor, GhostId, Vec3 } from "./types";
 import type { NavPoint } from "./world/nav";
 
 export interface WalkPath extends NavPoint {
+  auto?: { dirX: number; dirZ: number; ramp?: boolean };
   objectId: string | null;
   t0: number;
   path: NavPoint[];
@@ -138,6 +139,7 @@ export const rt = {
   doorSlam: new Set<string>(),
   /** The door to walk to next (a beacon floats over it); "stairs" floats at the foot of the stairs. */
   beaconDoor: null as string | null,
+  beaconEntry: { door: null as string | null, spent: false, starts: 0, introductions: 0 },
   /** Lights flicker from this time (intro, the bang upstairs). */
   flickerT0: -100,
   /** Shadow switches the lights off for a moment. */
@@ -181,6 +183,7 @@ export function resetRuntime() {
   rt.doorsOpen.clear();
   rt.doorSlam.clear();
   rt.beaconDoor = null;
+  Object.assign(rt.beaconEntry, { door: null, spent: false, starts: 0, introductions: 0 });
   rt.flickerT0 = -100;
   rt.blackoutT0 = -100;
   rt.sunriseT0 = -1;
