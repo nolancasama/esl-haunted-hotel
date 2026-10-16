@@ -4,11 +4,16 @@
 **Chapter 2 (upstairs) is done and tested.** The full game has 8 ghosts on two floors.
 Unit tests, typecheck, build and all e2e specs (including `tests/e2e/chapter2.spec.ts`)
 pass. The visuals were checked in screenshots at 1366x768 and 844x390 touch
-(`.tmp/upstairs`, `.tmp/ending`). The repository is still private, so GitHub Pages is not
-live yet (see README for the publish commands).
-**2026-10-15:** In the intro, the player now walks all the way in before the door slams,
-then hops and turns smoothly to face it (`logic/startle.ts`). There is no more teleport
-or snap. Z-fighting is fixed on the plant soil and the sink water.
+(`.tmp/upstairs`, `.tmp/ending`). The repository is public and every push to `main`
+deploys to GitHub Pages (https://nolancasama.github.io/esl-haunted-hotel/).
+**2026-10-16:** The intro's startled hop and turn are now actually visible. Before, the
+player was faded out by the "standing in the camera's way" rule during the whole reaction.
+Camera shots can now set `keepPlayer`. The reaction is bigger (crouch, 0.3 m hop,
+squash/stretch, arms up, 0.75 s turn). **Outdoor rain** (`scene/Rain.tsx`): 2,600 instanced
+shader streaks plus 160 splash rings in 2 draw calls, lamp-lit, slanted by gusting wind,
+hidden above the drawn walls when indoors, fading out over the sunrise. Checked in
+screenshots on GPU and SwiftShader: `node scripts/intro.mjs` (`.tmp/intro`) and
+`node scripts/rain.mjs` (`.tmp/rain`), both against a dev server on 5199.
 
 ## What Exists
 - **Chapter 1 (ground floor):** lobby hub, bedroom (Sleepy), dining (Hungry), storage
@@ -33,16 +38,18 @@ or snap. Z-fighting is fixed on the plant soil and the sink water.
   `?chapter=1|2`, `?mode=practice|replay`. Results: up to 8 ghost cards, Time, Main Menu.
 - **Short screens:** the round pips sit under the ghost count (grid in the
   `max-height: 520px` block), so they stay clear of the clue card.
-- **Test hooks** (`src/game/e2e.ts`): `teleport(x,z,floor)`, `goTo`, `jump(index, round)`,
-  `setYaw`, `steam`, `wobble`, `fanSwitchTest`, `look(pos, target)` (fixed camera shot),
+- **Test hooks** (`src/game/e2e.ts`): `teleport(x,z,floor,yaw?)`, `goTo`, `jump(index, round)`,
+  `setYaw`, `steam`, `wobble`, `fanSwitchTest`, `look(pos, target, keepPlayer?)` (fixed camera shot),
   `timeScale(s)` (slow motion for filming). State includes floor, chapter, scope, steam,
-  fanOn, blackout, player yaw/startle.
+  fanOn, blackout, player yaw/startle/opacity.
 - **Scripts:** `scripts/upstairs.mjs --part=rooms|stairs|tricks|cutscene`,
-  `scripts/ending.mjs [url] [WxH] [--touch]` (both need a dev server on 5199).
+  `scripts/ending.mjs [url] [WxH] [--touch]`, `scripts/intro.mjs [url] [--speed=] [--gpu]`,
+  `scripts/rain.mjs [url] [--gpu]` (all need a dev server on 5199).
 - **E2E:** `story.spec.ts`, `practice.spec.ts`, `chapter2.spec.ts`. In chapter2, tests B–E
   were shown to fail on injected bugs (Chapter 2 starting downstairs, floor never flipping,
   no blackout on escape, fan doing nothing). The intro movement test in `story.spec.ts`
-  was shown to fail on the old teleport and on the old instant half-turn.
+  was shown to fail on the old teleport, on the old instant half-turn, and (2026-10-16) on
+  the old entrance shot that faded the player out during the reaction.
 
 ## Known Issues
 - Software-rendered (SwiftShader) runs are only 2–7 fps, so the full-adventure e2e test

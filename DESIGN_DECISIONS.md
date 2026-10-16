@@ -230,3 +230,46 @@ Phase 1 is one ghost in the bedroom that must be answered four times (it escapes
 after each correct answer to a preposition not yet used), so one round practises
 in / on / under / by, then it is captured. It also slips away after two empty
 searches on a clue (once per round). Kept as `?mode=practice`.
+
+## 2026-10-16 — Outdoor rainfall
+
+- **Outdoor rain uses two batched shader systems:** 2,100 instanced streaks in
+  one draw call and 160 porch/path splash rings in one more. Static seeds and
+  `rt.time` drive wrapped falling motion and slow wind gusts without per-drop
+  CPU updates, keeping the effect cheap on school Chromebooks. Sparse brighter
+  near streaks layer over dimmer distant rain; lamp proximity adds warm light.
+  The west volume is clipped outside the hotel footprint, remains visible on
+  both floors, and fades with sunrise before becoming invisible at full daylight.
+  Rejected: per-drop React components (CPU and draw-call overhead), and a
+  full-screen post effect (rain would overlay indoor rooms and lack world depth).
+- **Rain must never read as indoors.** The cutaway hotel draws only the floor
+  you are on, so from inside (or with the follow camera swung out over the
+  wall while the player is inside) rain above the drawn walls' top is
+  discarded. Rain still shows through the open door and over the porch.
+- **Each drop's start height is independent of its speed.** Both came from one
+  seed, which made the rain fall in horizontal sheets early in a session (the
+  intro). The wind drift is centred on the fall, and the near layer falls from
+  4.5 m, so the dense rain stays over the porch and path where cameras look.
+- **Far streaks stay about a pixel wide and dim to match.** Without
+  antialiasing (SwiftShader, some Chromebooks) sub-pixel streaks flickered at
+  full strength and piled into a bright band at the horizon.
+
+## 2026-10-16 — The intro reaction is now visible (and bigger)
+
+- **Why the startle "did nothing": the player was invisible during it.** The
+  player fades out when standing between a scripted camera and its target, and
+  the old entrance shot looked through the player at the door, so the hop and
+  turn played at opacity ~0. A shot can now set `keepPlayer`. The entrance shot
+  is a held three-quarter view (door on the left, player clear of it on the
+  right) with `keepPlayer`, and so is Boo's reveal shot. On slow devices the
+  camera ease into Boo's shot used to fade the player out as well. The intro
+  e2e test now checks the player's opacity through the reaction, and fails on
+  the old shot.
+- **A readable cartoon reaction**, reversing the 2026-10-15 "small hop" choice,
+  which proved too subtle at cutscene distance: a flinch crouch, a 0.3 m hop
+  (about a quarter of the player's height) of 0.5 s with squash and stretch,
+  arms thrown up, a recoil lean, a 0.75 s turn mostly done in the air, then
+  1.2 s staring at the shut door before Boo. The lantern now hangs upright from
+  the hand however the arm moves; with the arm up, its dark base showed as a
+  black disc. Rejected: a camera cut at the slam (the reaction would play during
+  a camera move).

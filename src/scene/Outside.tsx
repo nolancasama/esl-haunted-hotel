@@ -5,6 +5,7 @@ import { rt } from "../game/runtime";
 import { PartBuilder } from "./partBuilder";
 import { glowPartMaterial, glowSpriteMaterial } from "./materials";
 import { beamTexture, glowTexture } from "./textures";
+import { Rain } from "./Rain";
 
 const NIGHT_GRASS = new THREE.Color("#141c1a");
 const DAY_GRASS = new THREE.Color("#6aa84f");
@@ -124,6 +125,7 @@ export function Outside() {
 
   return (
     <group>
+      <Rain />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.03, 0]} material={grassMat}>
         <planeGeometry args={[90, 90]} />
       </mesh>
