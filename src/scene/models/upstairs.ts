@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { KINDS } from "../../game/world/kinds";
 import { PartBuilder } from "../partBuilder";
-import { C, books, plane, type BuilderSet } from "./common";
+import { C, books, plane, underShadow, type BuilderSet } from "./common";
 
 /**
  * Upstairs furniture (Chapter 2): the landing, the playroom, the bathroom,
@@ -85,7 +85,7 @@ export const upstairsModels: BuilderSet = {
       [0.54, 0.34]
     ].forEach(([x, z], i) => b.cyl(0.04, 0.045, top - 0.05, x, 0, z, legColors[i], 8));
     // dark patch so "under the table" reads as a space
-    b.box(1.0, 0.004, 0.62, 0, 0.002, 0, "#1a1028");
+    underShadow(b, 1.0, 0.62, "#1a1028");
     // tea party on the left half (the right half is the "on" spot)
     b.cyl(0.07, 0.08, 0.11, -0.36, top, -0.12, "#f4f0ff", 12);
     b.sphere(0.035, -0.36, top + 0.13, -0.12, "#e86a8a");
@@ -210,8 +210,9 @@ export const upstairsModels: BuilderSet = {
       b.sphere(0.03, sx * 0.08, 0.84, 0.19, C.ink);
       b.sphere(0.08, sx * 0.17, 0.97, -0.02, fur, [1, 1, 0.6], 10);
       b.sphere(0.045, sx * 0.17, 0.97, 0.01, light, [1, 1, 0.5], 8);
-      // arms and legs
-      b.add(new THREE.CapsuleGeometry(0.08, 0.18, 4, 8), fur, [sx * 0.28, 0.38, 0.1], [0.9, 0, sx * 0.3]);
+      // Upper ends tuck into the shoulders; the paws fall forward and outward.
+      // The same capsules retain the original width and the feet set the depth.
+      b.add(new THREE.CapsuleGeometry(0.08, 0.18, 4, 8), fur, [sx * 0.28, 0.49, 0.08], [-0.35, 0, sx * 0.3]);
       b.add(new THREE.CapsuleGeometry(0.1, 0.18, 4, 8), fur, [sx * 0.16, 0.1, 0.24], [Math.PI / 2, 0, 0]);
       b.sphere(0.07, sx * 0.16, 0.1, 0.38, light, [1, 1, 0.4], 10);
     }
@@ -269,7 +270,7 @@ export const upstairsModels: BuilderSet = {
     const enamel = "#f4f2ee";
     const clear = k.under.clearance; // 0.38: underside of the tub
     const top = k.h; // 0.8 rim
-    b.box(1.4, 0.004, 0.66, 0, 0.002, 0, "#13202a");
+    underShadow(b, 1.4, 0.66, "#13202a");
     // claw feet
     for (const [x, z] of [
       [-0.6, -0.26],
@@ -330,7 +331,7 @@ export const upstairsModels: BuilderSet = {
     b.box(0.03, slab - k.under.clearance, 0.545, 0.42, k.under.clearance, -0.0075, paint);
     b.box(0.03, slab - k.under.clearance, 0.545, -0.42, k.under.clearance, -0.0075, paint);
     b.box(k.w, 0.06, k.d, 0, slab, 0, "#cfd8dc");
-    b.box(0.82, 0.004, 0.5, 0, 0.002, 0, "#13202a");
+    underShadow(b, 0.82, 0.5, "#13202a");
     // basin, water and tap
     b.cyl(0.25, 0.18, 0.1, 0, slab + 0.06, 0.02, "#ffffff", 16);
     // water: sunk into the basin's top, 4 mm proud (flush with it, the two tops flickered)
@@ -456,15 +457,35 @@ export const upstairsModels: BuilderSet = {
   gramophone(_obj, b) {
     b.box(0.5, 0.62, 0.5, 0, 0, 0, C.woodRed);
     b.box(0.54, 0.04, 0.54, 0, 0.62, 0, C.woodDark);
-    b.box(0.4, 0.1, 0.4, 0, 0.66, 0, C.woodDark);
-    b.cyl(0.17, 0.17, 0.015, 0, 0.76, 0, "#1d1a24", 18);
-    b.cyl(0.04, 0.04, 0.018, 0, 0.761, 0, "#d0403a", 10);
-    // arm and the big horn
-    b.cyl(0.02, 0.025, 0.2, 0.15, 0.76, -0.15, C.brass, 6);
-    b.cylAt(0.018, 0.24, [0.06, 0.95, -0.12], [0, 0, 1.0], C.brass, 6);
-    const horn = new THREE.ConeGeometry(0.3, 0.55, 18, 1, true);
-    b.add(horn, C.brass, [-0.05, 1.05, 0.1], [-0.6, 0, -0.5]);
-    b.add(new THREE.ConeGeometry(0.29, 0.54, 18, 1, true), "#5a3a1a", [-0.05, 1.05, 0.1], [-0.6 + Math.PI, 0, -0.5 + Math.PI], [-1, 1, -1]);
+    // The platter rests on the cabinet; the record and label stand 4 mm proud.
+    b.cyl(0.172, 0.172, 0.08, 0, 0.66, 0, C.woodDark, 18);
+    b.cyl(0.162, 0.162, 0.008, 0, 0.744, 0, "#1d1a24", 18);
+    b.cyl(0.04, 0.04, 0.004, 0, 0.756, 0, "#d0403a", 10);
+    const tube = (from: THREE.Vector3, to: THREE.Vector3, radius: number) => {
+      const direction = to.clone().sub(from);
+      const mid = from.clone().add(to).multiplyScalar(0.5);
+      const turn = new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize()));
+      b.cylAt(radius, direction.length(), [mid.x, mid.y, mid.z], [turn.x, turn.y, turn.z], C.brass, 6);
+    };
+    // The back-right pivot carries the arm above the disc, ending in a stylus.
+    b.cyl(0.025, 0.03, 0.18, 0.2, 0.66, -0.2, C.brass, 6);
+    tube(new THREE.Vector3(0.2, 0.84, -0.2), new THREE.Vector3(0.1, 0.8, 0.07), 0.014);
+    b.cyl(0.024, 0.024, 0.036, 0.1, 0.756, 0.07, C.brass, 8);
+    b.cyl(0.006, 0.006, 0.004, 0.1, 0.752, 0.07, C.iron, 4);
+    // A separate rear neck supports one hollow shell, opening forward/upward.
+    // Its joined outer wall, lip and inner wall replace the intersecting cones.
+    b.cyl(0.03, 0.035, 0.25, -0.17, 0.66, -0.22, C.brass, 8);
+    const throat = new THREE.Vector3(-0.16, 0.94, -0.22);
+    tube(new THREE.Vector3(-0.17, 0.91, -0.22), throat, 0.03);
+    const axis = new THREE.Vector3(-0.05, 1.015, 0.13).sub(throat);
+    const turn = new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis.clone().normalize()));
+    const horn = new THREE.LatheGeometry([
+      new THREE.Vector2(0.03, 0),
+      new THREE.Vector2(0.27, axis.length()),
+      new THREE.Vector2(0.258, axis.length()),
+      new THREE.Vector2(0.024, 0)
+    ], 18);
+    b.add(horn, C.brass, [throat.x, throat.y, throat.z], [turn.x, turn.y, turn.z]);
     b.cylAt(0.015, 0.14, [0.27, 0.45, 0.2], [0, 0, Math.PI / 2], C.brass, 6);
   },
 
@@ -565,11 +586,28 @@ export const upstairsModels: BuilderSet = {
   boxstack(_obj, b) {
     const card = "#c49a62";
     const tape = "#e0c48a";
-    b.box(0.85, 0.42, 0.65, 0, 0, 0, card, 0.05);
-    b.box(0.86, 0.43, 0.08, 0, 0, 0, tape, 0.05);
-    b.box(0.6, 0.34, 0.5, 0.06, 0.42, 0.02, "#b48a52", -0.2);
-    b.box(0.61, 0.35, 0.07, 0.06, 0.42, 0.02, tape, -0.2);
-    b.box(0.36, 0.22, 0.3, -0.05, 0.76, 0.0, card, 0.4);
+    const box = (w: number, h: number, d: number, x: number, y: number, z: number, rot: number, color: string, top = false) => {
+      const part = (pw: number, ph: number, pd: number, px: number, py: number, pz: number, col: string) => {
+        b.box(pw, ph, pd, x + px * Math.cos(rot) + pz * Math.sin(rot), y + py, z - px * Math.sin(rot) + pz * Math.cos(rot), col, rot);
+      };
+      // Flush lids retain each box's footprint and the original stack heights.
+      part(w, h - 0.035, d, 0, 0, 0, color);
+      part(w, 0.035, d, 0, h - 0.035, 0, color);
+      for (const sx of [-1, 1]) {
+        // Tape runs outside the end faces; it no longer cuts through the box.
+        const handleY = h * 0.48;
+        const endX = sx * (w / 2 + 0.006);
+        part(0.004, handleY - 0.034, 0.08, endX, 0.03, 0, tape);
+        part(0.004, h - handleY - 0.079, 0.08, endX, handleY + 0.049, 0, tape);
+        part(0.004, 0.045, 0.14, endX, handleY, 0, C.woodDark);
+      }
+      part(0.05, 0.075, 0.012, 0, h - 0.065, d / 2 + 0.01, tape);
+      // Only the uncovered box gets top tape, keeping the next box seated flush.
+      if (top) part(w - 0.012, 0.004, 0.08, 0, h + 0.004, 0, tape);
+    };
+    box(0.85, 0.42, 0.65, 0, 0, 0, 0.05, card);
+    box(0.6, 0.34, 0.5, 0.06, 0.42, 0.02, -0.2, "#b48a52");
+    box(0.36, 0.22, 0.3, -0.05, 0.76, 0, 0.4, card, true);
   },
 
   oldpaintings(_obj, b, _g, out) {

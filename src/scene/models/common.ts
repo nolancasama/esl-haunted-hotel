@@ -69,6 +69,13 @@ export function plane(w: number, h: number): THREE.BufferGeometry {
   return new THREE.PlaneGeometry(w, h);
 }
 
+// Rugs/mats are at 6 mm. A single face 6 mm above them avoids a box's
+// coincident underside/top and keeps UNDER spaces readable on either floor.
+export const UNDER_SHADOW_Y = 0.012;
+export function underShadow(b: PartBuilder, w: number, d: number, color = "#140c1f") {
+  b.add(plane(w, d), color, [0, UNDER_SHADOW_Y, 0], [-Math.PI / 2, 0, 0], [1, 1, 1], { flatAo: true });
+}
+
 /** A candle: wax column plus a glowing flame. */
 export function candle(b: PartBuilder, g: PartBuilder, x: number, y: number, z: number, h = 0.14) {
   b.cyl(0.022, 0.024, h, x, y, z, "#f7efe0", 8);
@@ -88,8 +95,10 @@ export function books(b: PartBuilder, x0: number, x1: number, y: number, z: numb
     const w = 0.035 + rnd() * 0.04;
     if (x + w > x1) break;
     const h = maxH * (0.65 + rnd() * 0.35);
-    const lean = rnd() < 0.08 ? 0.18 : 0;
-    b.add(new THREE.BoxGeometry(w, h, depth), colors[Math.floor(rnd() * colors.length)], [x + w / 2, y + h / 2, z], [0, 0, lean]);
+    // Upright books keep the whole base clear of the board. The old lean
+    // pivoted around the centre, cutting into both the board and neighbours.
+    const setback = rnd() * 0.025;
+    b.add(new THREE.BoxGeometry(w, h, depth - setback), colors[Math.floor(rnd() * colors.length)], [x + w / 2, y + 0.004 + h / 2, z - setback / 2]);
     x += w + 0.004;
     if (rnd() < 0.07) x += 0.06;
   }

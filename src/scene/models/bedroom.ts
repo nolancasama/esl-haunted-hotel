@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { KINDS } from "../../game/world/kinds";
 import { PartBuilder } from "../partBuilder";
-import { C, plane, type BuilderSet, type TexKey } from "./common";
+import { C, plane, underShadow, type BuilderSet, type TexKey } from "./common";
 
 /** Shared pieces (desk, box, window, chair, rug) and the bedroom. */
 export const bedroomModels: BuilderSet = {
@@ -9,7 +9,7 @@ export const bedroomModels: BuilderSet = {
     const k = KINDS.bed;
     const clear = k.under.clearance; // 0.38: rail bottom
     // Dark floor patch so "under the bed" reads as a space.
-    b.box(1.5, 0.004, 2.0, 0, 0.002, 0, "#140c1f");
+    underShadow(b, 1.5, 2.0);
     b.box(1.6, 0.12, 2.1, 0, clear, 0, C.wood);
     b.box(1.52, 0.16, 2.04, 0, clear + 0.12, 0, C.linen); // mattress, top 0.66
     for (const [x, z, h] of [
@@ -61,7 +61,7 @@ export const bedroomModels: BuilderSet = {
     b.box(0.03, 0.06, 0.6, -0.6, 0.65, 0, apron);
     if (attic) {
       // an old table: dusty books, a candle and a crystal ball on the left half
-      b.box(0.9, 0.004, 0.5, 0, 0.002, 0, "#140c1f");
+      underShadow(b, 0.9, 0.5);
       b.box(0.3, 0.06, 0.22, -0.42, top, -0.1, "#5a3a4a", 0.2);
       b.box(0.28, 0.05, 0.2, -0.42, top + 0.06, -0.1, "#3a4a5a", -0.15);
       b.cyl(0.06, 0.07, 0.03, -0.12, top, 0.18, C.brass, 10);
@@ -117,12 +117,15 @@ export const bedroomModels: BuilderSet = {
     b.box(w, h - 0.05, 0.05, 0, 0.05, -d / 2 + 0.025, body);
     b.box(0.05, h - 0.05, d - 0.1, w / 2 - 0.025, 0.05, 0, body);
     b.box(0.05, h - 0.05, d - 0.1, -w / 2 + 0.025, 0.05, 0, body);
-    b.box(w + 0.02, 0.05, d + 0.02, 0, 0.0, 0, trim);
-    b.box(w + 0.02, 0.04, d + 0.02, 0, h - 0.06, 0, trim);
+    // Trim follows the outside walls, leaving the chest cavity unobstructed.
+    for (const [y, bandH] of [[0, 0.05], [h - 0.06, 0.04]]) {
+      for (const sz of [-1, 1]) b.box(w, bandH, 0.012, 0, y, sz * (d / 2 + 0.006), trim);
+      for (const sx of [-1, 1]) b.box(0.012, bandH, d, sx * (w / 2 + 0.006), y, 0, trim);
+    }
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(0.06, h, 0.06, (sx * w) / 2, 0, (sz * d) / 2, trim);
-    b.box(w - 0.1, 0.01, d - 0.1, 0, 0.05, 0, "#1d1426");
-    const front = (shape: THREE.BufferGeometry, color: string, x: number, y: number, rot = 0, scale: [number, number, number] = [1, 1, 1]) =>
-      b.add(shape, color, [x, y, d / 2 + 0.002], [0, 0, rot], scale, { flatAo: true });
+    b.box(w - 0.1, 0.006, d - 0.1, 0, 0.054, 0, "#1d1426");
+    const front = (shape: THREE.BufferGeometry, color: string, x: number, y: number, rot = 0, scale: [number, number, number] = [1, 1, 1], relief = 0.004) =>
+      b.add(shape, color, [x, y, d / 2 + relief], [0, 0, rot], scale, { flatAo: true });
     if (toy) {
       for (const [x, y, c] of [
         [-0.22, 0.32, "#ffe27a"],
@@ -137,7 +140,7 @@ export const bedroomModels: BuilderSet = {
       letters.forEach((c, i) => {
         const x = -0.26 + i * 0.26;
         front(new THREE.PlaneGeometry(0.17, 0.17), c, x, 0.3, 0.12 * (i - 1));
-        front(new THREE.PlaneGeometry(0.09, 0.09), "#fff6e0", x, 0.3, 0.12 * (i - 1), [1, 1, 1]);
+        front(new THREE.PlaneGeometry(0.09, 0.09), "#fff6e0", x, 0.3, 0.12 * (i - 1), [1, 1, 1], 0.008);
       });
     } else if (v === "music") {
       // gold notes on a dark red music box
@@ -146,24 +149,31 @@ export const bedroomModels: BuilderSet = {
         [0.12, 0.34]
       ] as const) {
         front(new THREE.CircleGeometry(0.045, 10), C.brass, x, y, 0, [1.3, 1, 1]);
-        front(new THREE.PlaneGeometry(0.018, 0.16), C.brass, x + 0.05, y + 0.08);
+        front(new THREE.PlaneGeometry(0.018, 0.16), C.brass, x + 0.05, y + 0.08, 0, [1, 1, 1], 0.008);
       }
-      front(new THREE.PlaneGeometry(0.34, 0.02), C.brass, -0.04, 0.42);
+      front(new THREE.PlaneGeometry(0.34, 0.02), C.brass, -0.04, 0.42, 0, [1, 1, 1], 0.012);
     } else if (v === "attic") {
       // a cardboard box: tape and a red label
       front(new THREE.PlaneGeometry(0.06, h - 0.1), "#e0c48a", 0, 0.3);
       front(new THREE.PlaneGeometry(0.22, 0.12), "#c0403a", 0.24, 0.22);
     } else {
       // plank lines and rope handles: a box of books
-      for (const y of [0.22, 0.4]) b.box(w + 0.005, 0.015, d + 0.005, 0, y, 0, C.woodDark);
-      for (const sx of [-1, 1]) b.torus(0.07, 0.014, [(sx * w) / 2 + sx * 0.02, 0.42, 0], [0, Math.PI / 2, 0], "#c8a873");
+      for (const y of [0.22, 0.4]) {
+        for (const sz of [-1, 1]) b.box(w - 0.04, 0.015, 0.012, 0, y, sz * (d / 2 + 0.006), C.woodDark);
+        for (const sx of [-1, 1]) b.box(0.012, 0.015, d - 0.04, sx * (w / 2 + 0.006), y, 0, C.woodDark);
+      }
       // books stacked beside it
       b.box(0.24, 0.05, 0.18, w / 2 + 0.2, 0, 0.1, "#3e6ea8", 0.2);
       b.box(0.22, 0.05, 0.17, w / 2 + 0.2, 0.05, 0.1, "#a83e3e", -0.1);
     }
+    for (const sx of [-1, 1]) {
+      for (const z of [-0.08, 0.08]) b.box(0.035, 0.02, 0.025, sx * (w / 2 + 0.018), 0.37, z, trim);
+      b.box(0.035, 0.025, 0.185, sx * (w / 2 + 0.018), 0.39, 0, trim);
+    }
+    b.box(0.09, 0.085, 0.018, 0, h - 0.085, d / 2 + 0.012, C.brass);
     const lid = new PartBuilder();
-    lid.box(w + 0.04, 0.06, d + 0.04, 0, 0, (d + 0.04) / 2, lidColor);
-    lid.box(0.16, 0.03, 0.05, 0, -0.01, d + 0.04, C.brass);
+    lid.box(w, 0.06, d, 0, 0, d / 2 + 0.02, lidColor);
+    lid.box(0.09, 0.05, 0.018, 0, 0, d + 0.032, C.brass);
     out.parts.push({ name: "lid", pivot: [0, h, -d / 2 - 0.02], geometry: lid.build() });
   },
 

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { KINDS } from "../../game/world/kinds";
 import { PartBuilder } from "../partBuilder";
-import { C, candle, plane, type BuilderSet } from "./common";
+import { C, candle, plane, UNDER_SHADOW_Y, type BuilderSet } from "./common";
 
 export const diningModels: BuilderSet = {
   table(_obj, b, g) {
@@ -88,7 +88,7 @@ export const diningModels: BuilderSet = {
       b.sphere(0.06, x, 0.03, z, C.brass, [1, 0.5, 1], 8);
     }
     // dark floor patch under the piano
-    b.add(new THREE.CircleGeometry(0.8, 20), "#140c1f", [0, 0.003, -0.05], [-Math.PI / 2, 0, 0], [1, 1.1, 1], { flatAo: true });
+    b.add(new THREE.CircleGeometry(0.8, 20), "#140c1f", [0, UNDER_SHADOW_Y, -0.05], [-Math.PI / 2, 0, 0], [1, 1.1, 1], { flatAo: true });
     // a small candle on the corner (not on the "on" spot)
     candle(b, g, 0.58, legH + 0.38, 0.55, 0.1);
   },

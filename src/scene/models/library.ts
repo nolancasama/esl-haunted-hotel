@@ -60,10 +60,12 @@ export const libraryModels: BuilderSet = {
     b.box(0.015, 0.7, 0.015, 0, 0.62, -d / 2 + 0.06, C.brass);
     b.cyl(0.08, 0.08, 0.02, 0, 0.55, -d / 2 + 0.06, C.brass, 16);
     // hood with the face
-    b.box(w + 0.04, 0.65, d + 0.02, 0, 1.45, 0, wood);
+    b.box(w + 0.04, h - 0.06 - 1.49, d + 0.02, 0, 1.49, 0, wood);
     b.box(w + 0.1, 0.06, d + 0.06, 0, 1.43, 0, dark);
     b.box(w + 0.1, 0.06, d + 0.06, 0, h - 0.06, 0, dark);
-    b.add(new THREE.CylinderGeometry(0.16, 0.16, w + 0.06, 14, 1, false, -Math.PI / 2, Math.PI), dark, [0, h, 0], [0, 0, Math.PI / 2], [1, 0.5, 1]);
+    // Upper half only: the crown springs from the cornice rather than cutting
+    // through it. Keep the existing crown width, height and segment count.
+    b.add(new THREE.CylinderGeometry(0.16, 0.16, w + 0.06, 14, 1, false, 0, Math.PI), dark, [0, h, 0], [0, 0, Math.PI / 2], [1, 0.5, 1]);
     out.textured.push({ key: "clockface", geometry: new THREE.CircleGeometry(0.21, 24), position: [0, 1.76, d / 2 + 0.012] });
     // the door (a frame: you can see the pendulum through it); hinged on the left
     const door = new PartBuilder();

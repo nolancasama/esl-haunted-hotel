@@ -136,10 +136,24 @@ export const lobbyModels: BuilderSet = {
   },
 
   luggage(_obj, b) {
-    b.box(0.8, 0.28, 0.52, 0, 0, 0, "#7a4a2a");
-    b.box(0.82, 0.04, 0.54, 0, 0.12, 0, "#5a341c");
-    b.box(0.62, 0.24, 0.42, 0.04, 0.28, 0, "#2f5a6a", 0.12);
-    b.box(0.64, 0.03, 0.44, 0.04, 0.38, 0, "#1f3a46", 0.12);
+    const suitcase = (w: number, h: number, d: number, x: number, y: number, yaw: number, color: string, trim: string) => {
+      const box = (bw: number, bh: number, bd: number, bx: number, by: number, bz: number, paint: string) =>
+        b.box(bw, bh, bd, x + bx * Math.cos(yaw) + bz * Math.sin(yaw), y + by, -bx * Math.sin(yaw) + bz * Math.cos(yaw), paint, yaw);
+      const seam = h - 0.04;
+      box(w, seam, d, 0, 0, 0, color);
+      box(w, 0.04, d, 0, seam, 0, trim);
+      // Straps sit outside the case; no solid trim slab cuts through its middle.
+      for (const strapX of [-w * 0.3, w * 0.3]) {
+        for (const sz of [-1, 1]) box(0.035, h - 0.012, 0.008, strapX, 0.006, sz * (d / 2 + 0.004), trim);
+      }
+      for (const sx of [-1, 1]) {
+        for (const z of [-0.055, 0.055]) box(0.02, 0.02, 0.02, sx * (w / 2 + 0.01), h / 2, z, C.brass);
+        box(0.02, 0.018, 0.13, sx * (w / 2 + 0.01), h / 2 + 0.02, 0, C.brass);
+      }
+      box(0.065, 0.075, 0.012, 0, seam - 0.04, d / 2 + 0.006, C.brass);
+    };
+    suitcase(0.8, 0.28, 0.52, 0, 0, 0, "#7a4a2a", "#5a341c");
+    suitcase(0.62, 0.24, 0.42, 0.04, 0.28, 0.12, "#2f5a6a", "#1f3a46");
     b.cyl(0.18, 0.18, 0.2, -0.05, 0.52, 0.02, "#c98a8a", 14);
     b.torus(0.06, 0.012, [0.04, 0.58, 0], [0, 0, 0], C.brass);
   },

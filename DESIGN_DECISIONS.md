@@ -1,5 +1,19 @@
 # Design Decisions
 
+## 2026-10-16 — Furniture construction polish
+
+- Furniture contact shadows use a single horizontal face at 12 mm, above the
+  rugs' 6 mm surface. This keeps UNDER spaces readable on either floor without
+  coincident box tops, depth flags or render-order exceptions.
+- Books stand 4 mm above boards with individual depth setbacks and small lateral
+  gaps; leaning boxes were intersecting both their neighbours and the boards.
+  Clock hood mouldings meet in successive layers and the crown arches upward.
+- Chest lids meet the body at the rim with matching footprints; bands and handles
+  sit outside the panels. Existing animated hinges and hiding spots stay fixed.
+  The gramophone uses a connected hollow horn above its cabinet and a separate
+  platter, record and pivoted tone arm. Geometry stays merged with similar segment
+  counts, following the Chromebook rendering budget.
+
 ## 2026-10-16 — Global tap-to-move navigation
 
 - **Taps supply waypoints to the existing player controller.** A cached 0.25 m

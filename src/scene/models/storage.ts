@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { KINDS } from "../../game/world/kinds";
 import { PartBuilder } from "../partBuilder";
-import { C, type BuilderSet } from "./common";
+import { C, underShadow, type BuilderSet } from "./common";
 
 const CRATE_COLORS: Record<string, [string, string]> = {
   red: ["#cf4a3e", "#8f2a22"],
@@ -19,14 +19,24 @@ export const storageModels: BuilderSet = {
     b.box(w, h - t, t, 0, t, -d / 2 + t / 2, paint);
     b.box(t, h - t, d - 2 * t, w / 2 - t / 2, t, 0, paint);
     b.box(t, h - t, d - 2 * t, -w / 2 + t / 2, t, 0, paint);
-    // planks, corner posts and a cross brace on the front
-    for (const y of [0.25, 0.5]) b.box(w + 0.01, 0.018, d + 0.01, 0, y, 0, edge);
+    // Exterior plank rails leave the cavity open instead of filling it with slabs.
+    for (const y of [0.25, 0.5]) {
+      for (const sz of [-1, 1]) b.box(w, 0.018, 0.012, 0, y, sz * (d / 2 + 0.006), edge);
+      for (const sx of [-1, 1]) b.box(0.012, 0.018, d, sx * (w / 2 + 0.006), y, 0, edge);
+    }
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(0.08, h, 0.08, (sx * w) / 2, 0, (sz * d) / 2, edge);
     b.boxAt(0.06, Math.hypot(w, h) * 0.86, 0.02, [0, h / 2, d / 2 + 0.012], [0, 0, Math.atan2(w, h)], edge);
-    b.box(w - 2 * t, 0.01, d - 2 * t, 0, t, 0, "#1d1426");
+    b.box(w - 2 * t, 0.006, d - 2 * t, 0, t + 0.004, 0, "#1d1426");
+    for (const sx of [-1, 1]) {
+      for (const z of [-0.09, 0.09]) b.box(0.035, 0.02, 0.025, sx * (w / 2 + 0.018), 0.4, z, C.iron);
+      b.box(0.035, 0.025, 0.205, sx * (w / 2 + 0.018), 0.42, 0, C.iron);
+    }
+    b.box(0.09, 0.09, 0.018, 0, h - 0.09, d / 2 + 0.028, C.brass);
     const lid = new PartBuilder();
-    lid.box(w + 0.05, 0.06, d + 0.05, 0, 0, (d + 0.05) / 2, paint);
-    for (const z of [0.12, 0.42, 0.72]) lid.box(w + 0.06, 0.065, 0.03, 0, 0, z, edge);
+    // Retain the hinge pivot; its local offset seats the lid exactly at h, top 0.8.
+    lid.box(w, 0.044, d, 0, 0.01, d / 2 + 0.025, paint);
+    for (const z of [0.12, 0.42, 0.72]) lid.box(w, 0.006, 0.03, 0, 0.054, z, edge);
+    lid.box(0.09, 0.04, 0.018, 0, 0.01, d + 0.053, C.brass);
     out.parts.push({ name: "lid", pivot: [0, h - 0.01, -d / 2 - 0.025], geometry: lid.build() });
   },
 
@@ -91,7 +101,7 @@ export const storageModels: BuilderSet = {
     }
     if (music) {
       // sheet music and a metronome on the left half
-      b.box(1.1, 0.004, 0.6, 0, 0.002, 0, "#140c1f");
+      underShadow(b, 1.1, 0.6);
       b.box(0.3, 0.01, 0.22, -0.38, h, -0.05, "#f4efe2", 0.2);
       b.box(0.28, 0.01, 0.21, -0.3, h + 0.01, 0.05, "#efe8d6", -0.15);
       for (let i = 0; i < 4; i++) b.box(0.22, 0.003, 0.006, -0.3, h + 0.016, -0.02 + i * 0.04, "#3a3048", -0.15);
@@ -123,12 +133,17 @@ export const storageModels: BuilderSet = {
   trunk(_obj, b) {
     const { w, d } = KINDS.trunk;
     b.box(w, 0.42, d, 0, 0, 0, "#3f5a7a");
-    b.add(new THREE.CylinderGeometry(d / 2, d / 2, w, 14, 1, false, -Math.PI / 2, Math.PI), "#4a6a8f", [0, 0.42, 0], [0, 0, Math.PI / 2]);
+    // theta 0..PI becomes the upper half after rotating the cylinder axis to x.
+    b.add(new THREE.CylinderGeometry(d / 2, d / 2, w, 14, 1, false, 0, Math.PI), "#4a6a8f", [0, 0.42, 0], [0, 0, Math.PI / 2]);
     for (const x of [-0.3, 0.3]) {
-      b.box(0.06, 0.43, d + 0.01, x, 0, 0, "#7a5a3a");
-      b.add(new THREE.CylinderGeometry(d / 2 + 0.005, d / 2 + 0.005, 0.06, 14, 1, false, -Math.PI / 2, Math.PI), "#7a5a3a", [x, 0.42, 0], [0, 0, Math.PI / 2]);
+      for (const sz of [-1, 1]) b.box(0.06, 0.42, 0.01, x, 0, sz * (d / 2 + 0.005), "#7a5a3a");
+      b.add(new THREE.CylinderGeometry(d / 2 + 0.006, d / 2 + 0.006, 0.06, 14, 1, true, 0, Math.PI), "#7a5a3a", [x, 0.42, 0], [0, 0, Math.PI / 2]);
     }
-    b.box(0.1, 0.1, 0.02, 0, 0.32, d / 2 + 0.01, C.brass);
+    for (const sx of [-1, 1]) {
+      for (const z of [-0.08, 0.08]) b.box(0.035, 0.02, 0.025, sx * (w / 2 + 0.018), 0.23, z, C.iron);
+      b.box(0.035, 0.025, 0.185, sx * (w / 2 + 0.018), 0.25, 0, C.iron);
+    }
+    b.box(0.1, 0.14, 0.02, 0, 0.35, d / 2 + 0.014, C.brass);
   },
 
   cupboard(_obj, b) {
