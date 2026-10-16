@@ -95,6 +95,8 @@ test("the intro: walk in, the door slams once you are inside, a hop and a smooth
 
 test("the intro plays, can be skipped, and opens only the bedroom", async ({ page }) => {
   const errors = await boot(page, "&mode=story");
+  // The default 120 ms voice + fast pause is shorter than expect's polling interval.
+  await page.evaluate(() => { (window as unknown as { __ttsMs: number }).__ttsMs = 2000; });
   await page.getByTestId("start").click();
   await waitPhase(page, "intro");
   await expect(page.getByTestId("subtitle")).toContainText("Oh no! Four ghosts are hiding!", { timeout: 30_000 });

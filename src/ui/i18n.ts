@@ -58,6 +58,7 @@ export const HINT = {
   fanKeys: { en: "E: turn on the fan", ja: "E キーで かんきせんを つける" },
   fanTouch: { en: "Tap 🔍 to turn on the fan", ja: "🔍 を タップして かんきせんを つける" },
   locked: { en: "Locked!", ja: "まだ あかないよ" },
+  cantGo: { en: "Can't go there.", ja: "そこには いけないよ" },
   exit: { en: "Walk out of the door!", ja: "ドアから そとへ でよう！" },
   replay: { en: "Listen again", ja: "もういちど きく" }
 } as const;

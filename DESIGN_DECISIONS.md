@@ -1,5 +1,30 @@
 # Design Decisions
 
+## 2026-10-16 — Global tap-to-move navigation
+
+- **Taps supply waypoints to the existing player controller.** A cached 0.25 m
+  grid is built from WORLD's floor-specific wall, furniture and door colliders,
+  inflated by the player radius plus a small steering allowance. Door masks track
+  the same `rt.doorsOpen.has(id)` predicate as collision. A* runs on a new tap,
+  with one retry if stuck; collision-checked line-of-sight smoothing removes grid
+  steps. Movement still uses the keyboard/joystick speed, acceleration, turning,
+  `moveBody` and `floorState`; the ramp is the only link between floors.
+  Rejected: a navmesh dependency (unnecessary size and setup for fixed rectangular
+  rooms), and straight-line walking (gets stuck on furniture and walls).
+- **Floor taps travel; furniture taps travel then search.** Object approaches
+  must satisfy interaction distance and `nearestSearchable`. Open thresholds
+  lead just through the door; locked doors use the existing locked toast/sound.
+  Invalid floor points snap to reachable space in the destination room, never
+  across a locked wall. The stairs tap traverses the ramp; its gate still follows
+  Chapter 2 progression. A subtle cyan ring marks floor destinations in one draw
+  call and fades on arrival; furniture uses its existing interaction highlight.
+- **Manual input and camera gestures remain in charge.** Keys/joystick cancel
+  a path. Pointer travel over 8 px, including a gesture returning to its start,
+  suppresses all movement clicks. Only canvas geometry receives movement taps;
+  menus, cutscenes, reveals, close-ups and frozen states cannot start a path.
+  Search markers retain their existing close-up behavior. No new camera rotation,
+  idle raycasts, per-frame pathfinding, assets or npm dependencies.
+
 This file records meaningful product, UX, visual, architectural, or behavioral decisions for this project.
 
 For each significant decision, record:

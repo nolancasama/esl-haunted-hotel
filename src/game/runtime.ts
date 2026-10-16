@@ -1,4 +1,16 @@
 import type { Floor, GhostId, Vec3 } from "./types";
+import type { NavPoint } from "./world/nav";
+
+export interface WalkPath extends NavPoint {
+  objectId: string | null;
+  t0: number;
+  path: NavPoint[];
+  index: number;
+  replans: number;
+  checkT: number;
+  checkX: number;
+  checkZ: number;
+}
 
 /**
  * Mutable per-frame state shared by the scene, input and director.
@@ -67,8 +79,8 @@ export const rt = {
     speed: 0,
     step: 0,
     frozen: true,
-    /** Tap-to-walk: head for this point, then search `objectId` on arrival. */
-    walkTo: null as null | { x: number; z: number; objectId: string | null; t0: number },
+    /** Follow collision-safe waypoints, then search `objectId` on arrival. */
+    walkTo: null as WalkPath | null,
     /** Scripted step (any phase): move here, then face `face`. Used to step aside in close-ups. */
     stepTo: null as null | { x: number; z: number; face: { x: number; z: number } },
     /** The intro's startled hop and turn (logic/startle.ts), from `t0` (rt.time). */
@@ -78,6 +90,7 @@ export const rt = {
   },
   /** Which floor is drawn (switches halfway up the stairs). */
   view: { floor: 0 as Floor },
+  destination: { x: 0, z: 0, floor: 0 as Floor, t0: -100, arrived: -1, visible: false },
   /** Movement intent in camera space: x = right, y = forward (-1..1). */
   move: { x: 0, y: 0 },
   joy: { x: 0, y: 0, active: false },
@@ -158,6 +171,7 @@ export function resetRuntime() {
   rt.camera.shake = { t0: -10, amp: 0 };
   rt.player.frozen = true;
   rt.player.walkTo = null;
+  rt.destination.visible = false;
   rt.player.stepTo = null;
   rt.player.startle = null;
   rt.player.floor = 0;

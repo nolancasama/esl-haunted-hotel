@@ -5,8 +5,7 @@ import { rt } from "../game/runtime";
 import { getGame, setGame } from "../game/store";
 import { keyboardMove } from "../input/keyboard";
 import { floorState, moveBody, nearestSearchable } from "../game/world/collision";
-import { rectDistance } from "../game/world/geometry";
-import { INTERACT_RANGE } from "../game/world/constants";
+import { findPath } from "../game/world/nav";
 import { WORLD } from "../game/world/world";
 import { GHOSTS } from "../game/ghosts";
 import { audio } from "../audio/audio";
@@ -94,7 +93,6 @@ export function Player() {
   const tmp = useMemo(() => new THREE.Vector3(), []);
   const tmpColor = useMemo(() => new THREE.Color(), []);
   const lastStep = useRef(0);
-  const stuck = useRef({ t: 0, x: 0, z: 0 });
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1); // real time down to 10 fps (slow Chromebooks)
@@ -108,9 +106,13 @@ export function Player() {
       const k = keyboardMove();
       mx = k.x + rt.joy.x;
       my = k.y + rt.joy.y;
-      if (mx !== 0 || my !== 0) p.walkTo = null;
-    } else if (game.phase !== "explore") {
+      if (mx !== 0 || my !== 0) {
+        p.walkTo = null;
+        rt.destination.visible = false;
+      }
+    } else {
       p.walkTo = null;
+      rt.destination.visible = false;
     }
 
     if (mx === 0 && my === 0) rt.camera.inputLock = null;
@@ -122,30 +124,46 @@ export function Player() {
     let dx = rx * mx + fx * my;
     let dz = rz * mx + fz * my;
 
-    // Tap-to-walk towards an object (on this floor).
+    // Paths only supply intent: acceleration, turning and moveBody stay shared with keys/joystick.
     if (canMove && p.walkTo) {
       const w = p.walkTo;
-      const found = w.objectId ? WORLD.objectById.get(w.objectId) : null;
-      const obj = found && found.floor === p.floor ? found : null;
-      if (found && !obj) p.walkTo = null;
-      const reached = obj ? rectDistance(obj.rect, p.x, p.z) < INTERACT_RANGE - 0.25 : Math.hypot(w.x - p.x, w.z - p.z) < 0.2;
-      if (reached) {
+      let point = w.path[w.index];
+      while (point && p.floor === point.floor && Math.hypot(point.x - p.x, point.z - p.z) < 0.045) {
+        point = w.path[++w.index];
+      }
+      if (!point) {
         p.walkTo = null;
+        rt.destination.arrived = rt.time;
+        const obj = w.objectId ? WORLD.objectById.get(w.objectId) : null;
         if (obj) {
-          p.yaw = Math.atan2(w.x - p.x, w.z - p.z);
+          p.yaw = Math.atan2((obj.rect.x0 + obj.rect.x1) / 2 - p.x, (obj.rect.z0 + obj.rect.z1) / 2 - p.z);
           director.tapObject(obj.id);
         }
       } else {
-        const ax = w.x - p.x;
-        const az = w.z - p.z;
+        const ax = point.x - p.x;
+        const az = point.z - p.z;
         const l = Math.hypot(ax, az) || 1;
-        dx = ax / l;
-        dz = az / l;
-        // Give up if we are not getting anywhere (blocked).
-        if (rt.time - stuck.current.t > 0.6) {
-          const moved = Math.hypot(p.x - stuck.current.x, p.z - stuck.current.z);
-          if (rt.time - w.t0 > 0.6 && moved < 0.12) p.walkTo = null;
-          stuck.current = { t: rt.time, x: p.x, z: p.z };
+        const throttle = Math.min(1, l * 4, l / (SPEED * dt));
+        dx = ax / l * throttle;
+        dz = az / l * throttle;
+        // Retry once from the actual body position, then retain the old stuck give-up behavior.
+        if (rt.time - w.checkT > 0.8) {
+          const moved = Math.hypot(p.x - w.checkX, p.z - w.checkZ);
+          if (moved < 0.12) {
+            const path = w.replans === 0 ? findPath(p, w, (id) => rt.doorsOpen.has(id), w.objectId) : null;
+            if (path?.length) {
+              w.path = path;
+              w.index = 0;
+              w.replans++;
+            } else {
+              p.walkTo = null;
+              rt.destination.visible = false;
+              dx = dz = 0;
+            }
+          }
+          w.checkT = rt.time;
+          w.checkX = p.x;
+          w.checkZ = p.z;
         }
       }
     }

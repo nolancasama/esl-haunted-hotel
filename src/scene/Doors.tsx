@@ -6,6 +6,9 @@ import { rt } from "../game/runtime";
 import { PartBuilder } from "./partBuilder";
 import { iconTexture } from "./textures";
 import { lineFade } from "./wallFade";
+import { director } from "../game/director";
+import { isCanvasTap } from "../input/tap";
+import { getGame } from "../game/store";
 
 type Style = "plain" | "entrance" | "attic" | "gate";
 
@@ -141,7 +144,11 @@ export function Door({ door }: { door: DoorDef }) {
   });
 
   return (
-    <group ref={root} position={origin} rotation={[0, rotY, 0]}>
+    <group ref={root} position={origin} rotation={[0, rotY, 0]} onClick={(e) => {
+      if (getGame().phase !== "explore" || door.floor !== rt.view.floor || !root.current?.visible || !isCanvasTap(e.delta)) return;
+      e.stopPropagation();
+      director.tapDoor(door.id);
+    }}>
       <mesh geometry={frame} material={mat} />
       <group ref={(g) => void (hinges.current[0] = g)}>
         <mesh geometry={leaves[0]} material={mat} />

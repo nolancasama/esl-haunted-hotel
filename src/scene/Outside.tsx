@@ -6,6 +6,8 @@ import { PartBuilder } from "./partBuilder";
 import { glowPartMaterial, glowSpriteMaterial } from "./materials";
 import { beamTexture, glowTexture } from "./textures";
 import { Rain } from "./Rain";
+import { director } from "../game/director";
+import { isCanvasTap } from "../input/tap";
 
 const NIGHT_GRASS = new THREE.Color("#141c1a");
 const DAY_GRASS = new THREE.Color("#6aa84f");
@@ -129,7 +131,13 @@ export function Outside() {
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.03, 0]} material={grassMat}>
         <planeGeometry args={[90, 90]} />
       </mesh>
-      <mesh geometry={porch} material={mat} />
+      <mesh geometry={porch} material={mat} onClick={(e) => {
+        if (rt.view.floor !== 0 || !rt.doorsOpen.has("entrance") || !isCanvasTap(e.delta)) return;
+        if (e.point.x >= -11 && e.point.x < -8 && Math.abs(e.point.z) < 2.5) {
+          e.stopPropagation();
+          director.tapFloor(e.point.x, e.point.z, 0);
+        }
+      }} />
       <mesh geometry={lamps} material={glowPartMaterial} />
       {[-2.1, 2.1].map((z) => (
         <sprite key={z} material={lampGlow} position={[-10.7, 2.2, z]} scale={[1.2, 1.2, 1]} />

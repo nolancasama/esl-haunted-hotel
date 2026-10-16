@@ -11,6 +11,7 @@ import { Effects } from "./Effects";
 import { Cobwebs } from "./Cobwebs";
 import { Lights } from "./Lights";
 import { CameraRig } from "./CameraRig";
+import { Destination } from "./Destination";
 
 /** The WebGL renderer (for the e2e hook's performance numbers). */
 export const rendererRef: { current: THREE.WebGLRenderer | null } = { current: null };
@@ -68,6 +69,7 @@ export function GameScene() {
       <Hotel />
       <Furniture />
       <Player />
+      <Destination />
       <Boo />
       <GhostActor />
       <Markers />

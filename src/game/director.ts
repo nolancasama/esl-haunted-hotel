@@ -31,6 +31,7 @@ import { PREPS, type Floor, type GhostId, type Prep, type RoomId } from "./types
 import { LINE_JA } from "../ui/i18n";
 import { captureShot, revealShot, searchShot, standPoint, viewDir } from "../scene/framing";
 import { collidersFor, resolveCollisions } from "./world/collision";
+import { findPath, type NavPoint } from "./world/nav";
 import { cameraRef } from "../scene/CameraRig";
 import { bubbles, sparkle } from "../scene/Effects";
 import * as THREE from "three";
@@ -100,6 +101,36 @@ const isOpen = (id: string) => rt.doorsOpen.has(id);
 function micUsable(): boolean {
   const g = getGame();
   return g.settings.mic && recognition.supported && g.micState !== "blocked" && g.micState !== "unsupported";
+}
+
+function canTapMove(): boolean {
+  const g = getGame();
+  return g.screen === "game" && g.phase === "explore" && !g.settingsOpen && !rt.player.frozen;
+}
+
+/** Shared by taps and keyboard bumps. */
+function lockedFeedback() {
+  lastLockedBump = performance.now();
+  audio.play("locked");
+  toast("locked", 1800);
+}
+
+function walkTo(destination: NavPoint, objectId: string | null = null) {
+  const p = rt.player;
+  p.walkTo = null;
+  rt.destination.visible = false;
+  const path = findPath(p, destination, isOpen, objectId);
+  if (!path?.length) {
+    const room = roomAt(destination.x, destination.z, destination.floor);
+    const door = room && ROOM_DOOR[room];
+    if ((door && !isOpen(door)) || (p.floor !== destination.floor && !isOpen("stairs"))) lockedFeedback();
+    else toast("cantGo", 1800);
+    return;
+  }
+  const end = path[path.length - 1];
+  p.walkTo = { ...end, objectId, t0: rt.time, path, index: 0, replans: 0, checkT: rt.time, checkX: p.x, checkZ: p.z };
+  Object.assign(rt.destination, end, { t0: rt.time, arrived: -1, visible: !objectId });
+  touchActivity();
 }
 
 /** Put the player somewhere (a scene cut), on a floor, facing `yaw`. */
@@ -1203,9 +1234,7 @@ function tick() {
       const r =
         d.axis === "x" ? { x0: d.from, x1: d.to, z0: d.at - 0.1, z1: d.at + 0.1 } : { x0: d.at - 0.1, x1: d.at + 0.1, z0: d.from, z1: d.to };
       if (rectDistance(r, rt.player.x, rt.player.z) < 0.42) {
-        lastLockedBump = performance.now();
-        audio.play("locked");
-        toast("locked", 1800);
+        lockedFeedback();
         break;
       }
     }
@@ -1555,19 +1584,64 @@ export const director = {
 
   /** A searchable object (or the fan switch) was tapped/clicked in 3D. */
   tapObject(objectId: string) {
-    const g = getGame();
-    if (g.phase !== "explore" || g.settingsOpen) return;
+    if (!canTapMove()) return;
+    rt.player.walkTo = null;
+    rt.destination.visible = false;
+    const obj = WORLD.objectById.get(objectId);
+    if (!obj?.interactive) return;
     if (canReach(objectId)) {
       enterSearch(objectId);
       return;
     }
-    const obj = WORLD.objectById.get(objectId);
-    if (!obj || obj.floor !== rt.player.floor || rt.player.stairs) return;
-    // Only walk to things in the room you are in (no walking through walls).
-    const room = playerRoom();
-    if (room && room !== obj.room) return;
     const c = rectCenter(obj.rect);
-    rt.player.walkTo = { x: c.x, z: c.z, objectId, t0: rt.time };
+    walkTo({ ...c, floor: obj.floor }, objectId);
+  },
+
+  /** Only the drawn floor (or the always-visible stair geometry) emits these taps. */
+  tapFloor(x: number, z: number, floor: Floor) {
+    if (!canTapMove()) return;
+    // A tap in an open threshold should carry the student through the opening.
+    const door = DOORS.find((d) => d.floor === floor && d.id !== "entrance" && d.id !== "stairs" &&
+      Math.abs((d.axis === "x" ? z : x) - d.at) < 0.45 &&
+      (d.axis === "x" ? x : z) > d.from && (d.axis === "x" ? x : z) < d.to);
+    if (door) {
+      director.tapDoor(door.id);
+      return;
+    }
+    walkTo({ x, z, floor });
+  },
+
+  tapStairs() {
+    if (!canTapMove()) return;
+    if (!isOpen("stairs")) {
+      rt.player.walkTo = null;
+      rt.destination.visible = false;
+      lockedFeedback();
+      return;
+    }
+    const up = rt.player.floor === 0;
+    walkTo({ x: up ? STAIRS.walk.x1 + 0.6 : STAIRS.walk.x0 - 0.7, z: 0, floor: up ? 1 : 0 });
+  },
+
+  tapDoor(id: string) {
+    if (!canTapMove()) return;
+    rt.player.walkTo = null;
+    rt.destination.visible = false;
+    if (!isOpen(id)) {
+      lockedFeedback();
+      return;
+    }
+    if (id === "stairs") {
+      director.tapStairs();
+      return;
+    }
+    const d = DOORS.find((door) => door.id === id);
+    if (!d) return;
+    const bounds = ROOMS[d.room].bounds;
+    const intoRoom = Math.sign((d.axis === "x" ? (bounds.z0 + bounds.z1) / 2 : (bounds.x0 + bounds.x1) / 2) - d.at);
+    const side = playerRoom() === d.room ? -intoRoom : intoRoom;
+    const mid = (d.from + d.to) / 2;
+    walkTo({ x: d.axis === "x" ? mid : d.at + side * 0.9, z: d.axis === "x" ? d.at + side * 0.9 : mid, floor: d.floor });
   },
 
   chooseSpot(spotId: string) {

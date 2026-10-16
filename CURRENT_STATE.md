@@ -16,6 +16,10 @@ screenshots on GPU and SwiftShader: `node scripts/intro.mjs` (`.tmp/intro`) and
 `node scripts/rain.mjs` (`.tmp/rain`), both against a dev server on 5199.
 
 ## What Exists
+- **Controls:** tap/click floor destinations to follow smoothed collision-safe
+  paths through open doors and the gated stair ramp. Furniture taps approach and
+  search automatically. A cyan floor ring marks the destination. WASD/arrows and
+  the virtual joystick interrupt travel; camera drags never start travel.
 - **Chapter 1 (ground floor):** lobby hub, bedroom (Sleepy), dining (Hungry), storage
   (Sneaky), library (Mischief, 4 rounds). Intro, story, sunrise ending, replay.
 - **Two stacked floors.** `FLOOR_Y = {0: 0, 1: 2.8}`. Rooms, walls, doors and objects carry
@@ -41,11 +45,20 @@ screenshots on GPU and SwiftShader: `node scripts/intro.mjs` (`.tmp/intro`) and
 - **Test hooks** (`src/game/e2e.ts`): `teleport(x,z,floor,yaw?)`, `goTo`, `jump(index, round)`,
   `setYaw`, `steam`, `wobble`, `fanSwitchTest`, `look(pos, target, keepPlayer?)` (fixed camera shot),
   `timeScale(s)` (slow motion for filming). State includes floor, chapter, scope, steam,
-  fanOn, blackout, player yaw/startle/opacity.
+  fanOn, blackout, player yaw/startle/opacity, path length/index/destination and
+  camera yaw. Tap tests use `project(x,y,z)`, `objectInfo(id)` and
+  `startTrace`/`stopTrace` for real canvas pixels and frame-by-frame movement.
 - **Scripts:** `scripts/upstairs.mjs --part=rooms|stairs|tricks|cutscene`,
   `scripts/ending.mjs [url] [WxH] [--touch]`, `scripts/intro.mjs [url] [--speed=] [--gpu]`,
   `scripts/rain.mjs [url] [--gpu]` (all need a dev server on 5199).
-- **E2E:** `story.spec.ts`, `practice.spec.ts`, `chapter2.spec.ts`. In chapter2, tests B–E
+- **E2E:** `story.spec.ts`, `practice.spec.ts`, `chapter2.spec.ts`, `tapmove.spec.ts`.
+  Tap movement covers floor/furniture taps, retargeting, obstacles, doors, both
+  floors/stairs, drag rejection, keyboard interruption and existing UI/markers.
+  The drag test was shown to fail with tap drag-rejection disabled (0.31 m of
+  unintended movement); the injected change was restored exactly.
+  The intro-skip check holds its speech stub for 2 s so assertion polling cannot
+  miss the first accelerated subtitle; production intro timing is unchanged.
+  In chapter2, tests B–E
   were shown to fail on injected bugs (Chapter 2 starting downstairs, floor never flipping,
   no blackout on escape, fan doing nothing). The intro movement test in `story.spec.ts`
   was shown to fail on the old teleport, on the old instant half-turn, and (2026-10-16) on

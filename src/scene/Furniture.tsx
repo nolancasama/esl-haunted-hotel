@@ -10,6 +10,7 @@ import { director } from "../game/director";
 import { buildObject, type AnimatedPart } from "./models";
 import { furnitureMaterial, glowPartMaterial, glowSpriteMaterial, texturedMaterial } from "./materials";
 import { lineFade } from "./wallFade";
+import { isCanvasTap } from "../input/tap";
 
 const HIGHLIGHT = new THREE.Color("#8f7bff");
 const HELP = new THREE.Color("#ffd36b");
@@ -166,10 +167,11 @@ function FurnitureItem({ obj }: { obj: WorldObject }) {
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     // Only claim the click while exploring; in a close-up it must reach the markers.
-    if (!obj.interactive || getGame().phase !== "explore") return;
-    if (e.delta > 8) return; // it was a camera drag
+    if ((!obj.interactive && obj.id !== "lobby.stairs") || getGame().phase !== "explore" || !root.current?.visible) return;
+    if (!isCanvasTap(e.delta)) return;
     e.stopPropagation();
-    director.tapObject(obj.id);
+    if (obj.id === "lobby.stairs") director.tapStairs();
+    else director.tapObject(obj.id);
   };
 
   return (

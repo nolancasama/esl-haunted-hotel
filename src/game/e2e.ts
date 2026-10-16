@@ -35,6 +35,14 @@ function place(x: number, z: number, floor: Floor) {
  * to steer around furniture.
  */
 export function installE2eHook() {
+  type MoveFrame = { x: number; z: number; y: number; floor: Floor; stairs: boolean; phase: string };
+  let frames: MoveFrame[] = [];
+  let traceFrame: number | null = null;
+  const recordFrame = () => {
+    const p = rt.player;
+    frames.push({ x: p.x, z: p.z, y: p.y, floor: p.floor, stairs: p.stairs, phase: getGame().phase });
+    traceFrame = requestAnimationFrame(recordFrame);
+  };
   const api = {
     state() {
       const g = getGame();
@@ -57,7 +65,18 @@ export function installE2eHook() {
         searchId: g.searchId,
         selectedSpot: g.selectedSpot,
         helpLevel: g.helpLevel,
-        player: { x: rt.player.x, z: rt.player.z, y: rt.player.y, yaw: rt.player.yaw, floor: rt.player.floor, stairs: rt.player.stairs, startle: Boolean(rt.player.startle), opacity: rt.player.opacity },
+        player: {
+          x: rt.player.x, z: rt.player.z, y: rt.player.y, yaw: rt.player.yaw, floor: rt.player.floor,
+          stairs: rt.player.stairs, startle: Boolean(rt.player.startle), opacity: rt.player.opacity,
+          frozen: rt.player.frozen,
+          stepping: Boolean(rt.player.stepTo),
+          speed: rt.player.speed,
+          pathLength: rt.player.walkTo?.path.length ?? 0,
+          pathIndex: rt.player.walkTo?.index ?? 0,
+          destination: rt.player.walkTo ? { x: rt.player.walkTo.x, z: rt.player.walkTo.z, floor: rt.player.walkTo.floor, objectId: rt.player.walkTo.objectId } : null
+        },
+        settingsOpen: g.settingsOpen,
+        cameraYaw: rt.camera.yaw,
         viewFloor: rt.view.floor,
         scope: g.scope,
         chapter: g.chapter,
@@ -105,6 +124,33 @@ export function installE2eHook() {
     /** Floor heights, for tests that check the player really went up the stairs. */
     floorY() {
       return FLOOR_Y;
+    },
+    /** Project a world point to real canvas pixels; tests still send ordinary pointer events. */
+    project(x: number, y: number, z: number) {
+      const cam = cameraRef.current;
+      const canvas = document.querySelector("canvas");
+      if (!cam || !canvas) return null;
+      const v = new THREE.Vector3(x, y, z).project(cam);
+      const r = canvas.getBoundingClientRect();
+      return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+    },
+    /** Geometry only: useful for clicking furniture and checking paths against its footprint. */
+    objectInfo(objectId: string) {
+      const obj = WORLD.objectById.get(objectId);
+      if (!obj) throw new Error(`no object ${objectId}`);
+      const c = rectCenter(obj.rect);
+      return { ...c, y: obj.y + (obj.spec.on?.y ?? obj.spec.h * 0.65), floor: obj.floor, rect: { ...obj.rect } };
+    },
+    /** Capture every animation frame, including slow software-rendered frames, without Node polling gaps. */
+    startTrace() {
+      if (traceFrame !== null) cancelAnimationFrame(traceFrame);
+      frames = [];
+      recordFrame();
+    },
+    stopTrace() {
+      if (traceFrame !== null) cancelAnimationFrame(traceFrame);
+      traceFrame = null;
+      return frames;
     },
     /** Screen position (CSS px) of a search marker or any world point. */
     screenOf(spotId: string) {

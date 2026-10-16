@@ -11,6 +11,9 @@ import { GhostBoard } from "./GhostBoard";
 import { Outside } from "./Outside";
 import { lineFade } from "./wallFade";
 import type { Rect } from "../game/types";
+import { director } from "../game/director";
+import { isCanvasTap } from "../input/tap";
+import { getGame } from "../game/store";
 
 const TILE = 1.6;
 
@@ -243,7 +246,12 @@ function Floors() {
   return (
     <group>
       {pieces.map((p, i) => (
-        <mesh key={p.key} ref={(m) => void (refs.current[i] = m)} rotation={[-Math.PI / 2, 0, 0]} position={p.pos} geometry={p.geo} material={p.mat} />
+        <mesh key={p.key} ref={(m) => void (refs.current[i] = m)} rotation={[-Math.PI / 2, 0, 0]} position={p.pos} geometry={p.geo} material={p.mat}
+          onClick={(e) => {
+            if (getGame().phase !== "explore" || p.floor !== rt.view.floor || !isCanvasTap(e.delta)) return;
+            e.stopPropagation();
+            director.tapFloor(e.point.x, e.point.z, p.floor);
+          }} />
       ))}
     </group>
   );

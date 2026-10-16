@@ -68,6 +68,7 @@ export type HintId =
   | "buttons"
   | "goDoor"
   | "locked"
+  | "cantGo"
   | "micBlocked"
   | "exit"
   | "goStairs"
