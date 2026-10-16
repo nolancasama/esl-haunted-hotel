@@ -193,7 +193,7 @@ function FurnitureItem({ obj }: { obj: WorldObject }) {
             </group>
           ))}
           {built.textured.map((t, i) => (
-            <mesh key={i} geometry={t.geometry} material={texturedMaterial(t.key)} position={t.position} rotation={t.rotation ?? [0, 0, 0]} />
+            <mesh key={i} geometry={t.geometry} material={texturedMaterial(t.key)} position={t.position} rotation={t.rotation ?? [0, 0, 0]} renderOrder={t.key === "glass" ? 11 : 0} />
           ))}
           {built.lamps.map((l, i) => (
             <sprite key={i} position={l} scale={[0.75, 0.75, 1]} material={lampMat} />

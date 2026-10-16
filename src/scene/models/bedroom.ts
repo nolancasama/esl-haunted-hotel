@@ -179,8 +179,14 @@ export const bedroomModels: BuilderSet = {
     b.cylAt(0.025, 2.0, [0, 2.55, 0.12], [0, 0, Math.PI / 2], C.brass);
     b.sphere(0.05, -1.0, 2.55, 0.12, C.brass);
     b.sphere(0.05, 1.0, 2.55, 0.12, C.brass);
-    out.textured.push({ key: "night", geometry: plane(1.3, 1.35), position: [0, 1.625, 0.015] });
-    out.textured.push({ key: "rain", geometry: plane(1.3, 1.35), position: [0, 1.625, 0.025] });
+    // Real glass in a real hole (rooms.ts WINDOW_GLASS), at the middle of the wall: the model's
+    // origin is the inner wall face, the wall is 0.2 thick. The garden and rain are behind it.
+    out.textured.push({ key: "glass", geometry: plane(1.3, 1.35), position: [0, 1.625, -0.1] });
+    // A plain frame on the outside face, so the hole looks finished from the garden.
+    b.box(1.5, 0.1, 0.04, 0, 0.85, -0.22, frame);
+    b.box(1.5, 0.1, 0.04, 0, 2.3, -0.22, frame);
+    b.box(0.1, 1.55, 0.04, -0.7, 0.85, -0.22, frame);
+    b.box(0.1, 1.55, 0.04, 0.7, 0.85, -0.22, frame);
     // tied-back curtains: outer edge at +-0.93 (KINDS.window.by.edge)
     for (const side of [-1, 1] as const) {
       const c = new PartBuilder();

@@ -40,9 +40,31 @@ function porchGeometry(): THREE.BufferGeometry {
   ] as const) {
     b.sphere(s, x, s * 0.7, z, "#2f5a34", [1.3, 1, 1.3], 10);
   }
+  // The garden round the other sides, seen through the windows: bushes between the windows
+  // (never right in front of one), trees further out.
+  for (const [x, z, s] of [
+    [-6.2, -12.4, 0.6],
+    [0.4, -12.6, 0.7],
+    [5.6, -12.3, 0.55],
+    [-6.0, 12.5, 0.65],
+    [1.6, 12.4, 0.6],
+    [9.4, -6.5, 0.7],
+    [9.5, 2.5, 0.6],
+    [9.3, 8.0, 0.65],
+    [-9.4, -7.6, 0.55],
+    [-9.5, 9.2, 0.6]
+  ] as const) {
+    b.sphere(s, x, s * 0.7, z, "#2f5a34", [1.3, 1, 1.3], 10);
+  }
   for (const [x, z] of [
     [-14.5, -4.5],
-    [-15.5, 4.2]
+    [-15.5, 4.2],
+    [-2.0, -16.0],
+    [4.8, -15.4],
+    [-5.5, 15.6],
+    [3.0, 16.2],
+    [13.0, -3.0],
+    [12.6, 7.5]
   ] as const) {
     b.cyl(0.18, 0.24, 1.6, x, 0, z, "#4a3020", 8);
     b.cone(1.2, 2.6, x, 1.4, z, "#2c5a38", 10);
