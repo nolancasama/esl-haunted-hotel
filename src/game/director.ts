@@ -32,6 +32,7 @@ import { LINE_JA } from "../ui/i18n";
 import { captureShot, revealShot, searchShot, standPoint, viewDir } from "../scene/framing";
 import { collidersFor, resolveCollisions } from "./world/collision";
 import { findPath, type NavPoint } from "./world/nav";
+import { beaconSpot, withinBeacon } from "./beacon";
 import { cameraRef } from "../scene/CameraRig";
 import { bubbles, sparkle } from "../scene/Effects";
 import * as THREE from "three";
@@ -105,7 +106,7 @@ function micUsable(): boolean {
 
 function canTapMove(): boolean {
   const g = getGame();
-  return g.screen === "game" && g.phase === "explore" && !g.settingsOpen && !rt.player.frozen;
+  return g.screen === "game" && g.phase === "explore" && !g.settingsOpen && !rt.player.frozen && !cutscene && !g.searchId;
 }
 
 /** Shared by taps and keyboard bumps. */
@@ -502,6 +503,7 @@ function faceIntoRoom(room: RoomId) {
 
 async function startEncounter() {
   awaitingEntry = false;
+  rt.beaconEntry.introductions++;
   rt.beaconDoor = null;
   const hint = getGame().hint;
   if (hint === "goDoor" || hint === "goStairs") showHint(null);
@@ -1609,6 +1611,29 @@ export const director = {
       return;
     }
     walkTo({ x, z, floor });
+  },
+
+  /** Called once per player frame, before applying manual movement. */
+  checkBeacon() {
+    const id = rt.beaconDoor;
+    const entry = rt.beaconEntry;
+    if (id !== entry.door) {
+      entry.door = id;
+      entry.spent = false;
+    }
+    if (!id || entry.spent || !canTapMove() || !isOpen(id)) return;
+    const spot = beaconSpot(id);
+    const p = rt.player;
+    if (!spot || !withinBeacon(p.x, p.z, p.floor, spot)) return;
+    // Consume before planning: cancellation or an unreachable target cannot loop.
+    entry.spent = true;
+    if (id === "stairs") director.tapStairs();
+    else walkTo({ x: spot.x + spot.dirX * 1.7, z: spot.z + spot.dirZ * 1.7, floor: spot.floor });
+    if (p.walkTo) {
+      p.walkTo.auto = { dirX: spot.dirX, dirZ: spot.dirZ, ramp: id === "stairs" };
+      rt.destination.visible = false;
+      entry.starts++;
+    }
   },
 
   tapStairs() {

@@ -12,6 +12,7 @@ import type { Floor } from "./types";
 import { cameraRef } from "../scene/CameraRig";
 import { rendererRef } from "../scene/GameScene";
 import { audio } from "../audio/audio";
+import { beaconSpot } from "./beacon";
 
 /** Put the player at (x, z) on a floor, collision-resolved for wherever that is (the stairs included). */
 function place(x: number, z: number, floor: Floor) {
@@ -69,6 +70,7 @@ export function installE2eHook() {
           x: rt.player.x, z: rt.player.z, y: rt.player.y, yaw: rt.player.yaw, floor: rt.player.floor,
           stairs: rt.player.stairs, startle: Boolean(rt.player.startle), opacity: rt.player.opacity,
           frozen: rt.player.frozen,
+          autoEntry: Boolean(rt.player.walkTo?.auto),
           stepping: Boolean(rt.player.stepTo),
           speed: rt.player.speed,
           pathLength: rt.player.walkTo?.path.length ?? 0,
@@ -96,6 +98,8 @@ export function installE2eHook() {
         toast: g.toast?.id ?? null,
         lastToast: g.lastToast,
         beaconDoor: rt.beaconDoor,
+        beaconStarts: rt.beaconEntry.starts,
+        roomIntroductions: rt.beaconEntry.introductions,
         doorsOpen: [...rt.doorsOpen.keys()],
         sunrise: rt.sunriseT0 >= 0,
         sunriseT0: rt.sunriseT0,
@@ -103,6 +107,20 @@ export function installE2eHook() {
         replayUnlocked: g.replayUnlocked,
         ...director.debug()
       };
+    },
+    /** Test setup only; movement still runs through the normal controller. */
+    beaconSetup(id: string, open = true) {
+      rt.beaconDoor = id;
+      rt.beaconEntry.door = null;
+      rt.beaconEntry.spent = false;
+      if (open) rt.doorsOpen.set(id, rt.time);
+      else rt.doorsOpen.delete(id);
+      return beaconSpot(id);
+    },
+    joy(x: number, y: number) {
+      rt.joy.x = x;
+      rt.joy.y = y;
+      rt.joy.active = x !== 0 || y !== 0;
     },
     /** Put the player somewhere (collision-resolved), on a floor (default: the one they are on), optionally facing `yaw`. */
     teleport(x: number, z: number, floor?: number, yaw?: number) {

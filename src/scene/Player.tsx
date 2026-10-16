@@ -11,6 +11,7 @@ import { GHOSTS } from "../game/ghosts";
 import { audio } from "../audio/audio";
 import { director } from "../game/director";
 import { startlePose } from "../game/logic/startle";
+import { cancelsAutoEntry } from "../game/beacon";
 import { PartBuilder } from "./partBuilder";
 import { glowSpriteMaterial } from "./materials";
 import { glowTexture } from "./textures";
@@ -99,6 +100,7 @@ export function Player() {
     const p = rt.player;
     const game = getGame();
     const canMove = game.screen === "game" && game.phase === "explore" && !game.settingsOpen && !p.frozen;
+    director.checkBeacon();
 
     let mx = 0;
     let my = 0;
@@ -106,10 +108,6 @@ export function Player() {
       const k = keyboardMove();
       mx = k.x + rt.joy.x;
       my = k.y + rt.joy.y;
-      if (mx !== 0 || my !== 0) {
-        p.walkTo = null;
-        rt.destination.visible = false;
-      }
     } else {
       p.walkTo = null;
       rt.destination.visible = false;
@@ -123,6 +121,10 @@ export function Player() {
     const rz = -Math.sin(yaw);
     let dx = rx * mx + fx * my;
     let dz = rz * mx + fz * my;
+    if ((mx !== 0 || my !== 0) && (!p.walkTo?.auto || cancelsAutoEntry(dx, dz, p.walkTo.auto))) {
+      p.walkTo = null;
+      rt.destination.visible = false;
+    }
 
     // Paths only supply intent: acceleration, turning and moveBody stay shared with keys/joystick.
     if (canMove && p.walkTo) {
@@ -143,7 +145,9 @@ export function Player() {
         const ax = point.x - p.x;
         const az = point.z - p.z;
         const l = Math.hypot(ax, az) || 1;
-        const throttle = Math.min(1, l * 4, l / (SPEED * dt));
+        // The ramp rises 1 m per horizontal metre: keep automatic entry's
+        // actual 3D speed at walking speed, even at the 0.1 s frame cap.
+        const throttle = Math.min(w.auto?.ramp ? Math.SQRT1_2 : 1, l * 4, l / (SPEED * dt));
         dx = ax / l * throttle;
         dz = az / l * throttle;
         // Retry once from the actual body position, then retain the old stuck give-up behavior.

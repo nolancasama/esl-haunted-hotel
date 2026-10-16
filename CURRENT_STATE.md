@@ -16,6 +16,21 @@ screenshots on GPU and SwiftShader: `node scripts/intro.mjs` (`.tmp/intro`) and
 `node scripts/rain.mjs` (`.tmp/rain`), both against a dev server on 5199.
 
 ## What Exists
+- **2026-10-16 beacon entry:** the current open gold ring starts a normal nav
+  walk about 1 m inside its room; the stairs ring follows the gated ramp.
+  Held input into the room preserves this walk; sideways/away input cancels.
+  Each beacon arming fires once, including after cancellation. Existing room
+  entry still owns the ghost introduction and clue. Door lock billboards sit
+  proud of the camera-facing door surface, including the double entrance.
+  `beacon.spec.ts` passes all six keyboard/mouse/joystick, cancellation, locked
+  gate and continuous stair tests; 378 unit tests, typecheck and build pass.
+  The held-input helper test failed on an injected cancellation bug; its source
+  was restored exactly (SHA-256 verified). Screenshots of entry/clue and the
+  entrance/room locks are under `.tmp/beacon` for Claude's visual review.
+  The requested `story.spec.ts -g "rooms open in order"` regression remains
+  unverified: both combined and isolated runs stopped reporting progress; the
+  isolated run was interrupted after exceeding its configured five-minute
+  timeout without returning a result. No broader browser suite was run.
 - **Controls:** tap/click floor destinations to follow smoothed collision-safe
   paths through open doors and the gated stair ramp. Furniture taps approach and
   search automatically. A cyan floor ring marks the destination. WASD/arrows and

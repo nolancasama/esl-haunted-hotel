@@ -1,5 +1,25 @@
 # Design Decisions
 
+## 2026-10-16 — Beacon proximity entry
+
+- The gold ring is an entry trigger at its nominal 0.62 m outer radius, on
+  the player's floor, for the current open beacon door only. It shares the
+  tap movement guard. Fixed beacon positions are cached; each frame needs one
+  squared-distance check and no allocation.
+- Entry supplies a path to the existing tap follower, about 1 m across the
+  threshold (snapped by navigation). Stairs reuse the ramp route to the landing,
+  accounting for its 1:1 slope in automatic walking speed so a 0.1 s controller
+  frame travels less than 0.4 m in 3D.
+  There is no extra destination ring. Collision, floor changes and the existing
+  once-only room introduction/clue detector remain responsible for arrival.
+- Held keys or joystick input pointing into the room (positive world-space dot
+  product) preserve automatic entry. Sideways/away input cancels immediately;
+  taps replace the path normally. This lets students keep holding the movement
+  that brought them onto the ring without accidentally cancelling the assist.
+- An arming is consumed before planning and remains consumed after cancellation,
+  even after leaving the ring. A different beacon value or progression re-arming
+  permits another entry. Returning over a used ring cannot start a loop.
+
 ## 2026-10-16 — Global tap-to-move navigation
 
 - **Taps supply waypoints to the existing player controller.** A cached 0.25 m
