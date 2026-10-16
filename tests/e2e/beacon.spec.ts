@@ -129,28 +129,55 @@ test("held joystick movement onto the beacon continues into the room", async ({ 
   expect(errors).toEqual([]);
 });
 
-test("away input cancels immediately and resting on the same circle cannot retrigger", async ({ page }) => {
+test("walking along the wall onto the circle (sideways key held) still carries the player into the room", async ({ page }) => {
   const errors = await ready(page);
-  const spot = await setup(page);
+  await setup(page);
+  // West of the ring, on its line: with camera yaw 0, D walks +x along the lobby wall onto it.
+  await hook(page, "teleport", -6.4, -3.3, 0);
+  const before = await read(page);
+  await page.keyboard.down("KeyD");
+  try {
+    await autoStarted(page);
+    // Arrived ~1 m inside: let go (after that the key moves the player freely again, as it should).
+    await page.waitForFunction(() => {
+      const p = (window as unknown as { __hh: Api }).__hh.state().player;
+      return !p.autoEntry && !p.destination && p.z < -4.6;
+    }, null, { timeout: 60_000 });
+  } finally {
+    await page.keyboard.up("KeyD");
+  }
+  await settledEntry(page, before.beaconStarts, before.roomIntroductions);
+  expect(errors).toEqual([]);
+});
+
+test("backwards input cancels; the circle stays quiet until the player steps off it, then works again", async ({ page }) => {
+  const errors = await ready(page);
+  await setup(page);
   await page.keyboard.down("KeyW");
   await autoStarted(page);
   await page.keyboard.up("KeyW");
   const triggered = await read(page);
+  // S points back out of the doorway: cancel, and keep walking back off the ring.
   await page.keyboard.down("KeyS");
   try {
     await page.waitForFunction(() => {
       const p = (window as unknown as { __hh: Api }).__hh.state().player;
       return !p.autoEntry && !p.destination;
     });
-  } finally { await page.keyboard.up("KeyS"); }
-  // Stop velocity without re-arming the beacon, then observe several rendered frames inside it.
-  await hook(page, "teleport", spot.x, spot.z, spot.floor);
-  await letFramesPass(page, 1.2);
+    await letFramesPass(page, 1.2);
+  } finally {
+    await page.keyboard.up("KeyS");
+  }
   const cancelled = await read(page);
-  expect(cancelled.player.autoEntry).toBe(false);
-  expect(cancelled.player.destination).toBeNull();
-  expect(cancelled.beaconStarts).toBe(triggered.beaconStarts);
-  expect(cancelled.player.z).toBeCloseTo(spot.z, 1);
+  expect(cancelled.beaconStarts).toBe(triggered.beaconStarts); // no retrigger on the way off
+  expect(cancelled.player.z).toBeGreaterThan(-3.3 + 0.62); // off the ring, back in the lobby
+  // Walking onto it again tries again.
+  await page.keyboard.down("KeyW");
+  try {
+    await settledEntry(page, triggered.beaconStarts, triggered.roomIntroductions);
+  } finally {
+    await page.keyboard.up("KeyW");
+  }
   expect(errors).toEqual([]);
 });
 

@@ -34,6 +34,12 @@ export function withinBeacon(x: number, z: number, floor: number, spot: { x: num
   return floor === spot.floor && dx * dx + dz * dz <= BEACON_RADIUS * BEACON_RADIUS;
 }
 
+/**
+ * Held input cancels the automatic entry only when it clearly points back out of the
+ * doorway (more than ~107 degrees off "into the room"). Sideways input does not: a
+ * student who walked along the wall onto the ring is still holding that key.
+ */
 export function cancelsAutoEntry(dx: number, dz: number, auto: { dirX: number; dirZ: number }) {
-  return (dx !== 0 || dz !== 0) && dx * auto.dirX + dz * auto.dirZ <= 0;
+  const l = Math.hypot(dx, dz);
+  return l > 0 && dx * auto.dirX + dz * auto.dirZ < -0.3 * l;
 }

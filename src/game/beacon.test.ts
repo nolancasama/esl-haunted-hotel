@@ -22,12 +22,15 @@ describe("beacon entry", () => {
     expect(beaconSpot("stairs")).toMatchObject({ dirX: 1, dirZ: 0, floor: 0 });
   });
 
-  it("keeps held input toward the room, cancels sideways/away, ignores idle", () => {
+  it("keeps held input toward the room or sideways (walking along the wall), cancels clearly away, ignores idle", () => {
     const auto = { dirX: 0, dirZ: -1 };
     expect(cancelsAutoEntry(0, -1, auto)).toBe(false);
     expect(cancelsAutoEntry(0.5, -0.1, auto)).toBe(false);
     expect(cancelsAutoEntry(0, 0, auto)).toBe(false);
-    expect(cancelsAutoEntry(1, 0, auto)).toBe(true);
+    expect(cancelsAutoEntry(1, 0, auto)).toBe(false);
+    expect(cancelsAutoEntry(-1, 0, auto)).toBe(false);
+    expect(cancelsAutoEntry(0.8, 0.2, auto)).toBe(false);
     expect(cancelsAutoEntry(0, 1, auto)).toBe(true);
+    expect(cancelsAutoEntry(0.5, 0.8, auto)).toBe(true);
   });
 });

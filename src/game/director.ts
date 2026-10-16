@@ -1645,14 +1645,21 @@ export const director = {
       entry.door = id;
       entry.spent = false;
     }
-    if (!id || entry.spent || !canTapMove() || !isOpen(id)) return;
-    // A tap walk that only passes over the ring is going somewhere else (furniture in that room,
-    // up the stairs): don't take it over. Stopping on the ring, or walking onto it, still counts.
-    if (rt.player.walkTo && !rt.player.walkTo.auto) return;
+    if (!id) return;
     const spot = beaconSpot(id);
     const p = rt.player;
-    if (!spot || !withinBeacon(p.x, p.z, p.floor, spot)) return;
-    // Consume before planning: cancellation or an unreachable target cannot loop.
+    if (!spot) return;
+    const inside = withinBeacon(p.x, p.z, p.floor, spot);
+    // Stepping off the ring re-arms it (a cancelled entry can be tried again); while still
+    // on it, it stays spent, so a cancel or an unreachable target cannot loop.
+    if (entry.spent) {
+      if (!inside && !p.walkTo?.auto) entry.spent = false;
+      return;
+    }
+    if (!inside || !canTapMove() || !isOpen(id)) return;
+    // A tap walk that only passes over the ring is going somewhere else (furniture in that room,
+    // up the stairs): don't take it over. Stopping on the ring, or walking onto it, still counts.
+    if (p.walkTo && !p.walkTo.auto) return;
     entry.spent = true;
     if (id === "stairs") director.tapStairs();
     else walkTo({ x: spot.x + spot.dirX * 1.7, z: spot.z + spot.dirZ * 1.7, floor: spot.floor });

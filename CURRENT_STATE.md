@@ -6,7 +6,7 @@ Unit tests, typecheck, build and all e2e specs (including `tests/e2e/chapter2.sp
 pass. The visuals were checked in screenshots at 1366x768 and 844x390 touch
 (`.tmp/upstairs`, `.tmp/ending`). The repository is public and every push to `main`
 deploys to GitHub Pages (https://nolancasama.github.io/esl-haunted-hotel/).
-**2026-10-16:** All 33 e2e specs pass (tap-to-move, beacon entry included). The intro's startled hop and turn are now actually visible. Before, the
+**2026-10-16:** All 34 e2e specs pass (tap-to-move, beacon entry included). The intro's startled hop and turn are now actually visible. Before, the
 player was faded out by the "standing in the camera's way" rule during the whole reaction.
 Camera shots can now set `keepPlayer`. The reaction is bigger (crouch, 0.3 m hop,
 squash/stretch, arms up, 0.75 s turn). **Outdoor rain** (`scene/Rain.tsx`): 2,600 instanced
@@ -21,8 +21,8 @@ screenshots on GPU and SwiftShader: `node scripts/intro.mjs` (`.tmp/intro`) and
   else moves them; results come once on the porch.
 - **Beacon entry (2026-10-16):** walking onto the current open gold ring (keys, joystick,
   or a tap walk that ends there) walks ~1 m into the room; the stairs ring walks up the
-  ramp. Input pointing into the room keeps the walk, input away cancels it. Fires once per
-  ring. A tap walk only passing over a ring is not taken over. `beacon.spec.ts`.
+  ramp. Only input clearly pointing back cancels it (sideways does not). Fires once, re-arms
+  after stepping off. A tap walk only passing over a ring is not taken over. `beacon.spec.ts`.
 - **Real windows (2026-10-16):** holes in the outer walls with faint glass; rain falls all
   round the hotel and is lit by the windows; garden on every side. `windows.test.ts`,
   `node scripts/windows.mjs` (`.tmp/windows`).

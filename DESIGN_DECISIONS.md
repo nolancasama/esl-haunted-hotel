@@ -66,18 +66,22 @@
   frame travels less than 0.4 m in 3D.
   There is no extra destination ring. Collision, floor changes and the existing
   once-only room introduction/clue detector remain responsible for arrival.
-- Held keys or joystick input pointing into the room (positive world-space dot
-  product) preserve automatic entry. Sideways/away input cancels immediately;
-  taps replace the path normally. This lets students keep holding the movement
-  that brought them onto the ring without accidentally cancelling the assist.
+- Held keys or joystick input keep the automatic entry going unless they point
+  clearly back out of the doorway (more than ~107 degrees off "into the room");
+  taps replace the path normally. **2026-10-17 fix:** the first version also
+  cancelled on sideways input, so a student walking along the lobby wall onto
+  the ring was cancelled in the same frame, and the ring then stayed dead (see
+  below). Reported as "the circle doesn't work"; reproduced on the live site.
 - **A tap walk passing over the ring is not taken over.** First version: a tap
   on the bed from the lobby crossed the bedroom ring, which replaced the walk
   with "1 m into the room", so the student stopped at the door and the search
   never opened (caught by `tapmove.spec.ts`). The ring fires when the student
   walks onto it with keys or joystick, or when a tap walk ends on it.
-- An arming is consumed before planning and remains consumed after cancellation,
-  even after leaving the ring. A different beacon value or progression re-arming
-  permits another entry. Returning over a used ring cannot start a loop.
+- A ring fires once, then stays quiet while the player is still on it (no loop
+  after a cancel or an unreachable target). **Stepping off it re-arms it**, so
+  a cancelled entry can be tried again by walking back on. (First version: once
+  spent, a ring never fired again until the next room.) Once the room is
+  entered, the beacon moves on, so walking back out over the ring does nothing.
 
 ## 2026-10-16 — Global tap-to-move navigation
 
