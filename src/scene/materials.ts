@@ -119,6 +119,10 @@ export function texturedMaterial(key: TexKey): THREE.Material {
       m = new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, opacity: 0.8, toneMapped: false });
       break;
     }
+    case "glass":
+      // Faint cool glass over the real garden and rain; drawn after the rain (Furniture.tsx).
+      m = new THREE.MeshBasicMaterial({ color: GLASS, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+      break;
     case "clockface":
       m = new THREE.MeshLambertMaterial({ map: clockFaceTexture() });
       break;
@@ -128,6 +132,9 @@ export function texturedMaterial(key: TexKey): THREE.Material {
 }
 
 const DAWN_GLASS = new THREE.Color(2.2, 1.7, 1.2);
+const GLASS = new THREE.Color("#a9bfe8");
+const FLASH = new THREE.Color("#f4f0ff");
+const DAWN_TINT = new THREE.Color("#ffe2b8");
 
 /** Rain streak textures scroll; window glass flashes with lightning and warms at sunrise. */
 export function animateSharedMaterials(time: number, flash: number, sun = 0) {
@@ -136,6 +143,12 @@ export function animateSharedMaterials(time: number, flash: number, sun = 0) {
   if (rain) rain.opacity = 0.8 * (1 - sun);
   const night = texMats.night as THREE.MeshBasicMaterial | undefined;
   if (night) night.color.setScalar(1 + flash * 2.2).lerp(DAWN_GLASS, sun);
+  // Real windows: lightning lights up the glass; at dawn it warms and nearly vanishes.
+  const glass = texMats.glass as THREE.MeshBasicMaterial | undefined;
+  if (glass) {
+    glass.color.copy(GLASS).lerp(FLASH, Math.min(1, flash)).lerp(DAWN_TINT, sun);
+    glass.opacity = 0.1 + flash * 0.45 - sun * 0.04;
+  }
 }
 
 export function floorMaterial(room: RoomId, w: number, d: number): THREE.MeshLambertMaterial {

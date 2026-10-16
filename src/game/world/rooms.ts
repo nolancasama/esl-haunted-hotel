@@ -162,6 +162,8 @@ export interface Opening {
   to: number;
   /** Top of the opening above the floor (a lintel fills the wall above). */
   top: number;
+  /** A window: bottom of the opening above the floor (a sill-height wall piece fills below). */
+  bottom?: number;
   door?: DoorId;
 }
 
@@ -183,10 +185,20 @@ export interface WallLine {
 
 const door = (from: number, to: number, id: DoorId, top = DOOR_H): Opening => ({ from, to, top, door: id });
 
+/**
+ * Real holes in the outer walls behind the window models (models/bedroom.ts window,
+ * models/upstairs.ts roundwindow), so the glass looks out at the actual garden and rain.
+ * Matches the glass: 1.3 wide, 0.95 to 2.3 above the floor (the round one's square
+ * hole is hidden behind a wooden surround). world.test.ts checks every window has one.
+ */
+export const WINDOW_GLASS = { half: 0.65, bottom: 0.95, top: 2.3 };
+export const ROUND_GLASS = { half: 0.68, bottom: 0.94, top: 2.3 };
+const win = (at: number, g = WINDOW_GLASS): Opening => ({ from: at - g.half, to: at + g.half, top: g.top, bottom: g.bottom });
+
 const GROUND_WALLS: WallLine[] = [
   // north (outside)
-  { id: "n-bed", floor: 0, axis: "x", at: -11, from: -8, to: 0, neg: null, pos: "bedroom" },
-  { id: "n-din", floor: 0, axis: "x", at: -11, from: 0, to: 8, neg: null, pos: "dining" },
+  { id: "n-bed", openings: [win(-3)], floor: 0, axis: "x", at: -11, from: -8, to: 0, neg: null, pos: "bedroom" },
+  { id: "n-din", openings: [win(2.2)], floor: 0, axis: "x", at: -11, from: 0, to: 8, neg: null, pos: "dining" },
   // lobby north wall
   { id: "m1-bed", floor: 0, axis: "x", at: -4, from: -8, to: 0, neg: "bedroom", pos: "lobby", openings: [door(-4.8, -3.2, "bedroom")] },
   { id: "m1-din", floor: 0, axis: "x", at: -4, from: 0, to: 8, neg: "dining", pos: "lobby", openings: [door(3.2, 4.8, "dining")] },
@@ -199,7 +211,7 @@ const GROUND_WALLS: WallLine[] = [
   // west (outside), with the entrance
   { id: "w-bed", floor: 0, axis: "z", at: -8, from: -11, to: -4, neg: null, pos: "bedroom" },
   { id: "w-lob", floor: 0, axis: "z", at: -8, from: -4, to: 4, neg: null, pos: "lobby", openings: [{ from: -1.1, to: 1.1, top: 2.45, door: "entrance" }] },
-  { id: "w-lib", floor: 0, axis: "z", at: -8, from: 4, to: 11, neg: null, pos: "library" },
+  { id: "w-lib", openings: [win(6.2)], floor: 0, axis: "z", at: -8, from: 4, to: 11, neg: null, pos: "library" },
   // east (outside)
   { id: "e-din", floor: 0, axis: "z", at: 8, from: -11, to: -4, neg: "dining", pos: null },
   { id: "e-lob", floor: 0, axis: "z", at: 8, from: -4, to: 4, neg: "lobby", pos: null },
@@ -210,17 +222,17 @@ const GROUND_WALLS: WallLine[] = [
 ];
 
 const UPPER_WALLS: WallLine[] = [
-  { id: "u-n-play", floor: 1, axis: "x", at: -11, from: -8, to: 0, neg: null, pos: "playroom" },
-  { id: "u-n-bath", floor: 1, axis: "x", at: -11, from: 0, to: 8, neg: null, pos: "bathroom" },
+  { id: "u-n-play", openings: [win(-4.6)], floor: 1, axis: "x", at: -11, from: -8, to: 0, neg: null, pos: "playroom" },
+  { id: "u-n-bath", openings: [win(2.6)], floor: 1, axis: "x", at: -11, from: 0, to: 8, neg: null, pos: "bathroom" },
   { id: "u-m1-play", floor: 1, axis: "x", at: -4, from: -8, to: 0, neg: "playroom", pos: "landing", openings: [door(-4.8, -3.2, "playroom")] },
   { id: "u-m1-bath", floor: 1, axis: "x", at: -4, from: 0, to: 8, neg: "bathroom", pos: "landing", openings: [door(3.2, 4.8, "bathroom")] },
   { id: "u-m2-mus", floor: 1, axis: "x", at: 4, from: -8, to: 0, neg: "landing", pos: "music", openings: [door(-4.8, -3.2, "music")] },
   // The attic door is lower and narrower than the others.
   { id: "u-m2-att", floor: 1, axis: "x", at: 4, from: 0, to: 8, neg: "landing", pos: "attic", openings: [door(3.4, 4.6, "attic", 1.95)] },
-  { id: "u-s-mus", floor: 1, axis: "x", at: 11, from: -8, to: 0, neg: "music", pos: null },
-  { id: "u-s-att", floor: 1, axis: "x", at: 11, from: 0, to: 8, neg: "attic", pos: null },
+  { id: "u-s-mus", openings: [win(-3.4)], floor: 1, axis: "x", at: 11, from: -8, to: 0, neg: "music", pos: null },
+  { id: "u-s-att", openings: [win(5.6, ROUND_GLASS)], floor: 1, axis: "x", at: 11, from: 0, to: 8, neg: "attic", pos: null },
   { id: "u-w-play", floor: 1, axis: "z", at: -8, from: -11, to: -4, neg: null, pos: "playroom" },
-  { id: "u-w-lan", floor: 1, axis: "z", at: -8, from: -4, to: 4, neg: null, pos: "landing" },
+  { id: "u-w-lan", openings: [win(0)], floor: 1, axis: "z", at: -8, from: -4, to: 4, neg: null, pos: "landing" },
   { id: "u-w-mus", floor: 1, axis: "z", at: -8, from: 4, to: 11, neg: null, pos: "music" },
   { id: "u-e-bath", floor: 1, axis: "z", at: 8, from: -11, to: -4, neg: "bathroom", pos: null },
   { id: "u-e-lan", floor: 1, axis: "z", at: 8, from: -4, to: 4, neg: "landing", pos: null },
@@ -300,6 +312,8 @@ export function wallPieces(lines: WallLine[] = WALL_LINES): WallPiece[] {
         : { x0: line.at - WALL_T / 2, x1: line.at + WALL_T / 2, z0: a, z1: b };
     for (const o of openings) {
       if (o.from > cursor) pieces.push({ id: `${line.id}-${n++}`, line, rect: rectFor(cursor, o.from), y0: base, y1: base + WALL_H });
+      // Below a window: a sill-height piece (it starts at the floor, so it still collides).
+      if (o.bottom) pieces.push({ id: `${line.id}-${n++}`, line, rect: rectFor(o.from, o.to), y0: base, y1: base + o.bottom });
       pieces.push({ id: `${line.id}-${n++}`, line, rect: rectFor(o.from, o.to), y0: base + o.top, y1: base + WALL_H });
       cursor = o.to;
     }

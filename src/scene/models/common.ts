@@ -20,6 +20,7 @@ export type TexKey =
   | "bathmat"
   | "runner"
   | "night"
+  | "glass"
   | "rain"
   | "clockface"
   | "paintingA"

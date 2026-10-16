@@ -550,7 +550,20 @@ export const upstairsModels: BuilderSet = {
     b.box(2 * r, 0.05, 0.05, 0, cy - 0.025, 0.05, C.woodDark);
     // sill: its underside is the "under" clearance (0.86)
     b.box(1.2, 0.06, 0.22, 0, 0.88, 0.11, C.woodDark);
-    out.textured.push({ key: "night", geometry: new THREE.CircleGeometry(r, 28), position: [0, cy, 0.02] });
+    // Real glass in a square hole (rooms.ts ROUND_GLASS), set in a wooden surround with a round
+    // cut-out on both faces of the wall, so only the circle is open.
+    out.textured.push({ key: "glass", geometry: new THREE.CircleGeometry(r, 28), position: [0, cy, -0.1] });
+    const surround = new THREE.Shape();
+    surround.moveTo(-0.74, cy - 0.74);
+    surround.lineTo(0.74, cy - 0.74);
+    surround.lineTo(0.74, cy + 0.74);
+    surround.lineTo(-0.74, cy + 0.74);
+    surround.closePath();
+    const hole = new THREE.Path();
+    hole.absarc(0, cy, r - 0.02, 0, Math.PI * 2, true);
+    surround.holes.push(hole);
+    for (const z of [0.012, -0.212]) b.add(new THREE.ShapeGeometry(surround, 28), C.woodDark, [0, 0, z], [0, z < 0 ? Math.PI : 0, 0]);
+    b.add(new THREE.TorusGeometry(r, 0.05, 8, 28), C.woodDark, [0, cy, -0.215]);
     // the mysterious glow round the glass
     g.add(new THREE.RingGeometry(r - 0.06, r - 0.01, 28), "#b8a6ff", [0, cy, 0.03]);
     out.lamps.push([0, cy, 0.25]);
