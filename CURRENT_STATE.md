@@ -6,7 +6,7 @@ Unit tests, typecheck, build and all e2e specs (including `tests/e2e/chapter2.sp
 pass. The visuals were checked in screenshots at 1366x768 and 844x390 touch
 (`.tmp/upstairs`, `.tmp/ending`). The repository is public and every push to `main`
 deploys to GitHub Pages (https://nolancasama.github.io/esl-haunted-hotel/).
-**2026-10-16:** The intro's startled hop and turn are now actually visible. Before, the
+**2026-10-16:** All 31 e2e specs pass (tap-to-move, beacon entry included). The intro's startled hop and turn are now actually visible. Before, the
 player was faded out by the "standing in the camera's way" rule during the whole reaction.
 Camera shots can now set `keepPlayer`. The reaction is bigger (crouch, 0.3 m hop,
 squash/stretch, arms up, 0.75 s turn). **Outdoor rain** (`scene/Rain.tsx`): 2,600 instanced
@@ -16,21 +16,15 @@ screenshots on GPU and SwiftShader: `node scripts/intro.mjs` (`.tmp/intro`) and
 `node scripts/rain.mjs` (`.tmp/rain`), both against a dev server on 5199.
 
 ## What Exists
-- **2026-10-16 beacon entry:** the current open gold ring starts a normal nav
-  walk about 1 m inside its room; the stairs ring follows the gated ramp.
-  Held input into the room preserves this walk; sideways/away input cancels.
-  Each beacon arming fires once, including after cancellation. Existing room
-  entry still owns the ghost introduction and clue. Door lock billboards sit
-  proud of the camera-facing door surface, including the double entrance.
-  `beacon.spec.ts` passes all six keyboard/mouse/joystick, cancellation, locked
-  gate and continuous stair tests; 378 unit tests, typecheck and build pass.
-  The held-input helper test failed on an injected cancellation bug; its source
-  was restored exactly (SHA-256 verified). Screenshots of entry/clue and the
-  entrance/room locks are under `.tmp/beacon` for Claude's visual review.
-  The requested `story.spec.ts -g "rooms open in order"` regression remains
-  unverified: both combined and isolated runs stopped reporting progress; the
-  isolated run was interrupted after exceeding its configured five-minute
-  timeout without returning a result. No broader browser suite was run.
+- **Beacon entry (2026-10-16):** walking onto the current open gold ring (keys, joystick,
+  or a tap walk that ends there) walks ~1 m into the room; the stairs ring walks up the
+  ramp. Input pointing into the room keeps the walk, input away cancels it. Fires once per
+  ring. A tap walk only passing over a ring is not taken over. `beacon.spec.ts`.
+- **Real windows (2026-10-16):** holes in the outer walls with faint glass; rain falls all
+  round the hotel and is lit by the windows; garden on every side. `windows.test.ts`,
+  `node scripts/windows.mjs` (`.tmp/windows`).
+- **Model polish (2026-10-16):** clock crowns, books, under-furniture shadows above rugs,
+  teddy, gramophone, chests/trunks. `models/polish.test.ts`, `node scripts/polish.mjs`.
 - **Controls:** tap/click floor destinations to follow smoothed collision-safe
   paths through open doors and the gated stair ramp. Furniture taps approach and
   search automatically. A cyan floor ring marks the destination. WASD/arrows and
@@ -66,7 +60,7 @@ screenshots on GPU and SwiftShader: `node scripts/intro.mjs` (`.tmp/intro`) and
 - **Scripts:** `scripts/upstairs.mjs --part=rooms|stairs|tricks|cutscene`,
   `scripts/ending.mjs [url] [WxH] [--touch]`, `scripts/intro.mjs [url] [--speed=] [--gpu]`,
   `scripts/rain.mjs [url] [--gpu]` (all need a dev server on 5199).
-- **E2E:** `story.spec.ts`, `practice.spec.ts`, `chapter2.spec.ts`, `tapmove.spec.ts`.
+- **E2E:** `story.spec.ts`, `practice.spec.ts`, `chapter2.spec.ts`, `tapmove.spec.ts`, `beacon.spec.ts`.
   Tap movement covers floor/furniture taps, retargeting, obstacles, doors, both
   floors/stairs, drag rejection, keyboard interruption and existing UI/markers.
   The drag test was shown to fail with tap drag-rejection disabled (0.31 m of

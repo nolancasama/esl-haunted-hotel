@@ -1,5 +1,24 @@
 # Design Decisions
 
+## 2026-10-16 — Real windows
+
+- **Windows are real holes in the outer walls** (`rooms.ts` window openings with
+  a `bottom`, `WINDOW_GLASS` / `ROUND_GLASS`), so students see the actual 3D
+  garden and falling rain through faint glass. This replaced the painted
+  night-sky texture and the scrolling rain texture on the pane. The wall below
+  each window is a sill-height piece that starts at the floor, so a window
+  still blocks walking; `windows.test.ts` checks every window has a hole and
+  still collides, and fails without the sill piece.
+- **Rain falls all round the hotel**, densest just outside each window, and
+  each window's room light warms the drops near it. Rain is still discarded
+  inside the hotel's footprint. Bushes and trees were added on the north,
+  south and east sides, so every window has something to look at.
+- The round attic window keeps a square wall hole hidden behind a wooden
+  surround with a circular cut-out on both faces.
+- Rejected: keeping a painted pane with better rain (still looks flat), and
+  render-to-texture views (one extra render pass per window is too costly for
+  Chromebooks).
+
 ## 2026-10-16 — Furniture construction polish
 
 - Furniture contact shadows use a single horizontal face at 12 mm, above the
@@ -30,6 +49,11 @@
   product) preserve automatic entry. Sideways/away input cancels immediately;
   taps replace the path normally. This lets students keep holding the movement
   that brought them onto the ring without accidentally cancelling the assist.
+- **A tap walk passing over the ring is not taken over.** First version: a tap
+  on the bed from the lobby crossed the bedroom ring, which replaced the walk
+  with "1 m into the room", so the student stopped at the door and the search
+  never opened (caught by `tapmove.spec.ts`). The ring fires when the student
+  walks onto it with keys or joystick, or when a tap walk ends on it.
 - An arming is consumed before planning and remains consumed after cancellation,
   even after leaving the ring. A different beacon value or progression re-arming
   permits another entry. Returning over a used ring cannot start a loop.

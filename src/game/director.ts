@@ -1622,6 +1622,9 @@ export const director = {
       entry.spent = false;
     }
     if (!id || entry.spent || !canTapMove() || !isOpen(id)) return;
+    // A tap walk that only passes over the ring is going somewhere else (furniture in that room,
+    // up the stairs): don't take it over. Stopping on the ring, or walking onto it, still counts.
+    if (rt.player.walkTo && !rt.player.walkTo.auto) return;
     const spot = beaconSpot(id);
     const p = rt.player;
     if (!spot || !withinBeacon(p.x, p.z, p.floor, spot)) return;
