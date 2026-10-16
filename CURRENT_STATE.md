@@ -6,7 +6,7 @@ Unit tests, typecheck, build and all e2e specs (including `tests/e2e/chapter2.sp
 pass. The visuals were checked in screenshots at 1366x768 and 844x390 touch
 (`.tmp/upstairs`, `.tmp/ending`). The repository is public and every push to `main`
 deploys to GitHub Pages (https://nolancasama.github.io/esl-haunted-hotel/).
-**2026-10-16:** All 31 e2e specs pass (tap-to-move, beacon entry included). The intro's startled hop and turn are now actually visible. Before, the
+**2026-10-16:** All 33 e2e specs pass (tap-to-move, beacon entry included). The intro's startled hop and turn are now actually visible. Before, the
 player was faded out by the "standing in the camera's way" rule during the whole reaction.
 Camera shots can now set `keepPlayer`. The reaction is bigger (crouch, 0.3 m hop,
 squash/stretch, arms up, 0.75 s turn). **Outdoor rain** (`scene/Rain.tsx`): 2,600 instanced
@@ -16,6 +16,9 @@ screenshots on GPU and SwiftShader: `node scripts/intro.mjs` (`.tmp/intro`) and
 `node scripts/rain.mjs` (`.tmp/rain`), both against a dev server on 5199.
 
 ## What Exists
+- **Ending exit (2026-10-16):** after the last ghost the player walks out on a one-way track
+  from just inside the front door (`logic/exitTrack.ts`); every input walks forward, nothing
+  else moves them; results come once on the porch.
 - **Beacon entry (2026-10-16):** walking onto the current open gold ring (keys, joystick,
   or a tap walk that ends there) walks ~1 m into the room; the stairs ring walks up the
   ramp. Input pointing into the room keeps the walk, input away cancels it. Fires once per
@@ -60,7 +63,7 @@ screenshots on GPU and SwiftShader: `node scripts/intro.mjs` (`.tmp/intro`) and
 - **Scripts:** `scripts/upstairs.mjs --part=rooms|stairs|tricks|cutscene`,
   `scripts/ending.mjs [url] [WxH] [--touch]`, `scripts/intro.mjs [url] [--speed=] [--gpu]`,
   `scripts/rain.mjs [url] [--gpu]` (all need a dev server on 5199).
-- **E2E:** `story.spec.ts`, `practice.spec.ts`, `chapter2.spec.ts`, `tapmove.spec.ts`, `beacon.spec.ts`.
+- **E2E:** `story.spec.ts`, `practice.spec.ts`, `chapter2.spec.ts`, `tapmove.spec.ts`, `beacon.spec.ts`, `exit.spec.ts`.
   Tap movement covers floor/furniture taps, retargeting, obstacles, doors, both
   floors/stairs, drag rejection, keyboard interruption and existing UI/markers.
   The drag test was shown to fail with tap drag-rejection disabled (0.31 m of

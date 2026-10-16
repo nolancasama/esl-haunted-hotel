@@ -33,6 +33,7 @@ import { captureShot, revealShot, searchShot, standPoint, viewDir } from "../sce
 import { collidersFor, resolveCollisions } from "./world/collision";
 import { findPath, type NavPoint } from "./world/nav";
 import { beaconSpot, withinBeacon } from "./beacon";
+import { EXIT_END_X, EXIT_START, EXIT_YAW } from "./logic/exitTrack";
 import { cameraRef } from "../scene/CameraRig";
 import { bubbles, sparkle } from "../scene/Effects";
 import * as THREE from "three";
@@ -62,7 +63,6 @@ let tickTimer = 0;
 let awaitingEntry = false;
 /** Ending: the player walks out of the open entrance. */
 let outroWalk = false;
-let outroWalkT0 = 0;
 let nextAmbient = 0;
 let lastLockedBump = 0;
 let pendingNext: (() => void) | null = null;
@@ -106,7 +106,15 @@ function micUsable(): boolean {
 
 function canTapMove(): boolean {
   const g = getGame();
-  return g.screen === "game" && g.phase === "explore" && !g.settingsOpen && !rt.player.frozen && !cutscene && !g.searchId;
+  return g.screen === "game" && g.phase === "explore" && !g.settingsOpen && !rt.player.frozen && !cutscene && !g.searchId && !rt.exit.active;
+}
+
+/** During the ending's exit walk, any tap in the scene just walks the player out (true = handled). */
+function exitTap(): boolean {
+  if (!rt.exit.active) return false;
+  const g = getGame();
+  if (g.screen === "game" && g.phase === "explore" && !g.settingsOpen && !rt.player.frozen) rt.exit.tapped = true;
+  return true;
 }
 
 /** Shared by taps and keyboard bumps. */
@@ -1134,11 +1142,12 @@ async function outro() {
   await sleep(500);
   setGame({ fade: 1 });
   await sleep(800);
-  // Back in the lobby, facing the front door.
-  placePlayer(-4.6, 0.3, 0, -Math.PI / 2);
+  // In the foyer, just inside the front door, facing out (the start of the exit track).
+  placePlayer(EXIT_START.x, EXIT_START.z, 0, EXIT_YAW);
+  rt.beaconDoor = null;
   rt.steam.target = 0;
   rt.boo.visible = true;
-  rt.boo.target = { x: -5.7, y: 1.45, z: 1.2 };
+  rt.boo.target = { x: -5.6, y: 1.45, z: 1.3 };
   rt.boo.appearT0 = rt.time;
   rt.camera.mode = "shot";
   rt.camera.shot = { pos: { x: -1.2, y: 2.1, z: 2.6 }, target: { x: -6.6, y: 1.1, z: 0 } };
@@ -1165,10 +1174,15 @@ async function outro() {
   await say("Go home!");
   rt.boo.target = null;
   outroWalk = true;
-  outroWalkT0 = performance.now();
+  rt.exit.active = true;
+  rt.exit.tapped = false;
   rt.camera.mode = "follow";
   rt.camera.shot = null;
+  // Behind the player, looking out of the door: stop any turn still easing in from the last room,
+  // so "forward" on the keys and joystick means out of the door.
   rt.camera.yaw = Math.PI / 2;
+  rt.camera.yawTarget = null;
+  rt.camera.inputLock = null;
   rt.player.frozen = false;
   setGame({ phase: "explore" });
   showHint("exit");
@@ -1176,6 +1190,9 @@ async function outro() {
 
 async function finishGame() {
   outroWalk = false;
+  // Out of the door: hold still through the fade to the results (a held key must not walk on).
+  rt.exit.active = false;
+  rt.player.frozen = true;
   rt.ghost.anim = { mode: "hidden" };
   const g = getGame();
   if (g.mode !== "practice") {
@@ -1204,12 +1221,11 @@ function tick() {
   if (g.screen !== "game" || !g.hunt) return;
   const room = playerRoom();
 
+  // The ending: room entry, beacons and mischief are all off until the player is out of the door.
   if (outroWalk) {
-    if (rt.player.x < -8.7) {
+    if (rt.player.x <= EXIT_END_X) {
       outroWalk = false;
       run(finishGame);
-    } else if (performance.now() - outroWalkT0 > 9000 && !rt.player.stepTo && rt.player.speed < 0.1) {
-      rt.player.stepTo = { x: -9.6, z: 0, face: { x: -12, z: 0 } };
     }
     return;
   }
@@ -1586,6 +1602,7 @@ export const director = {
 
   /** A searchable object (or the fan switch) was tapped/clicked in 3D. */
   tapObject(objectId: string) {
+    if (exitTap()) return;
     if (!canTapMove()) return;
     rt.player.walkTo = null;
     rt.destination.visible = false;
@@ -1600,7 +1617,13 @@ export const director = {
   },
 
   /** Only the drawn floor (or the always-visible stair geometry) emits these taps. */
+  /** A tap that hit nothing tappable: only the ending's exit walk uses it. */
+  tapExit() {
+    exitTap();
+  },
+
   tapFloor(x: number, z: number, floor: Floor) {
+    if (exitTap()) return;
     if (!canTapMove()) return;
     // A tap in an open threshold should carry the student through the opening.
     const door = DOORS.find((d) => d.floor === floor && d.id !== "entrance" && d.id !== "stairs" &&
@@ -1615,6 +1638,7 @@ export const director = {
 
   /** Called once per player frame, before applying manual movement. */
   checkBeacon() {
+    if (rt.exit.active) return;
     const id = rt.beaconDoor;
     const entry = rt.beaconEntry;
     if (id !== entry.door) {
@@ -1640,6 +1664,7 @@ export const director = {
   },
 
   tapStairs() {
+    if (exitTap()) return;
     if (!canTapMove()) return;
     if (!isOpen("stairs")) {
       rt.player.walkTo = null;
@@ -1652,6 +1677,7 @@ export const director = {
   },
 
   tapDoor(id: string) {
+    if (exitTap()) return;
     if (!canTapMove()) return;
     rt.player.walkTo = null;
     rt.destination.visible = false;

@@ -12,6 +12,8 @@ import { Cobwebs } from "./Cobwebs";
 import { Lights } from "./Lights";
 import { CameraRig } from "./CameraRig";
 import { Destination } from "./Destination";
+import { director } from "../game/director";
+import { isCanvasTap } from "../input/tap";
 
 /** The WebGL renderer (for the e2e hook's performance numbers). */
 export const rendererRef: { current: THREE.WebGLRenderer | null } = { current: null };
@@ -57,6 +59,10 @@ export function GameScene() {
       gl={{ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: false }}
       camera={{ fov: 50, near: 0.1, far: 70, position: [0, 6, 6] }}
       flat
+      // A tap on nothing in particular (the sky, the grass) still walks the player out at the end.
+      onPointerMissed={() => {
+        if (isCanvasTap(0)) director.tapExit();
+      }}
       onCreated={({ gl, scene }) => {
         rendererRef.current = gl;
         gl.setClearColor("#0d0719");

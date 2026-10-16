@@ -1,5 +1,26 @@
 # Design Decisions
 
+## 2026-10-16 — One-way exit track at the end
+
+- **After the last ghost, the player walks out on a fixed track** (`logic/exitTrack.ts`):
+  they start in the foyer just inside the open front door, facing out, and the
+  only possible movement is forward along z = 0 through the middle of the
+  doorway. Keys, joystick and taps all feed it: any input that is not clearly
+  backwards walks forward, and one tap anywhere (furniture, floor, sky)
+  walks the rest of the way. Backwards input does nothing.
+- **Everything else is off while it is active** (`rt.exit.active`): tap-to-move,
+  furniture taps, door and stairs taps, beacon rings, room entry. Before, the
+  student could wander the house after "Go home!", and a beacon ring or a tap
+  could start an automatic walk into a wall. The old 9-second scripted push
+  toward the door is gone; nothing on the track can block the player.
+- Reaching x −9.0 (on the porch) starts the existing results fade exactly
+  once, and the player is frozen through that fade (a held key used to walk
+  them on). The camera's turn from the last room is stopped when the track
+  starts, so "forward" on the keys means out of the door (a sideways key could
+  briefly point back into the house and do nothing). `exit.spec.ts` checks backwards does nothing, a sideways tap or
+  key walks straight out, and the results come once. It fails with the track
+  switched off.
+
 ## 2026-10-16 — Real windows
 
 - **Windows are real holes in the outer walls** (`rooms.ts` window openings with

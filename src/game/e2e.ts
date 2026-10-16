@@ -98,6 +98,7 @@ export function installE2eHook() {
         toast: g.toast?.id ?? null,
         lastToast: g.lastToast,
         beaconDoor: rt.beaconDoor,
+        exitActive: rt.exit.active,
         beaconStarts: rt.beaconEntry.starts,
         roomIntroductions: rt.beaconEntry.introductions,
         doorsOpen: [...rt.doorsOpen.keys()],

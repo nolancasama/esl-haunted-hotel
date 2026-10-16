@@ -140,6 +140,8 @@ export const rt = {
   /** The door to walk to next (a beacon floats over it); "stairs" floats at the foot of the stairs. */
   beaconDoor: null as string | null,
   beaconEntry: { door: null as string | null, spent: false, starts: 0, introductions: 0 },
+  /** The ending's one-way walk out of the front door (logic/exitTrack.ts). `tapped`: a tap walks the rest of the way. */
+  exit: { active: false, tapped: false },
   /** Lights flicker from this time (intro, the bang upstairs). */
   flickerT0: -100,
   /** Shadow switches the lights off for a moment. */
@@ -184,6 +186,8 @@ export function resetRuntime() {
   rt.doorSlam.clear();
   rt.beaconDoor = null;
   Object.assign(rt.beaconEntry, { door: null, spent: false, starts: 0, introductions: 0 });
+  rt.exit.active = false;
+  rt.exit.tapped = false;
   rt.flickerT0 = -100;
   rt.blackoutT0 = -100;
   rt.sunriseT0 = -1;

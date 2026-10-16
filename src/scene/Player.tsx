@@ -12,6 +12,7 @@ import { audio } from "../audio/audio";
 import { director } from "../game/director";
 import { startlePose } from "../game/logic/startle";
 import { cancelsAutoEntry } from "../game/beacon";
+import { exitIntent } from "../game/logic/exitTrack";
 import { PartBuilder } from "./partBuilder";
 import { glowSpriteMaterial } from "./materials";
 import { glowTexture } from "./textures";
@@ -170,6 +171,15 @@ export function Player() {
           w.checkZ = p.z;
         }
       }
+    }
+
+    // The ending: only forward along the exit track, whatever the input (keys, joystick, a tap).
+    if (rt.exit.active) {
+      p.walkTo = null;
+      rt.destination.visible = false;
+      const go = canMove ? exitIntent(dx, dz, rt.exit.tapped, p.z) : { x: 0, z: 0 };
+      dx = go.x;
+      dz = go.z;
     }
 
     // Scripted step aside (close-ups), in any phase.

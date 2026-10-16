@@ -75,6 +75,13 @@ await until(() => window.__hh.state().sunrise, null, 60000);
 await page.waitForTimeout(1800);
 await shot("sunrise");
 await until(() => window.__hh.state().phase === "explore", null, 60000);
+await page.waitForTimeout(1500);
+await shot("exit-start");
+// One tap anywhere walks the player out along the exit track.
+await page.mouse.click(vw / 2, vh * 0.75);
+await page.waitForTimeout(1200);
+await shot("exit-walking");
+await until(() => window.__hh.state().screen === "results" || window.__hh.state().player.x < -8, null, 30000);
 await hook("teleport", -8.3, 0, 0);
 await page.waitForTimeout(400);
 await hook("teleport", -9.2, 0, 0);
