@@ -28,6 +28,8 @@ export interface Gag {
 export interface CameraShot {
   pos: Vec3;
   target: Vec3;
+  /** The player is the subject of this shot: never fade them out for standing in the way. */
+  keepPlayer?: boolean;
 }
 
 /** A harmless shake, wobble or rock of one object (Sneaky's rattles, Bouncy's toys, the chandelier). */
@@ -70,7 +72,9 @@ export const rt = {
     /** Scripted step (any phase): move here, then face `face`. Used to step aside in close-ups. */
     stepTo: null as null | { x: number; z: number; face: { x: number; z: number } },
     /** The intro's startled hop and turn (logic/startle.ts), from `t0` (rt.time). */
-    startle: null as null | { t0: number; from: number; delta: number }
+    startle: null as null | { t0: number; from: number; delta: number },
+    /** How visible the player is drawn (0..1; they fade out when in the camera's way). */
+    opacity: 1
   },
   /** Which floor is drawn (switches halfway up the stairs). */
   view: { floor: 0 as Floor },

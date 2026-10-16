@@ -871,8 +871,11 @@ async function relocate(fromSpotId: string) {
 
 // ------------------------------------------------------------ intro/outro
 
-const SHOT_ENTRANCE = { pos: { x: -3.4, y: 2.3, z: 3.1 }, target: { x: -7.4, y: 1.0, z: 0 } };
-const SHOT_BOO = { pos: { x: -3.0, y: 1.9, z: 2.3 }, target: { x: -5.6, y: 1.05, z: -0.1 } };
+// The walk-in and the startle in one held shot: the doorway (and the rain outside) on the left, the
+// player clear of it on the right. Off the door's axis, so the player never stands in front of the
+// door; keepPlayer stops the "in the camera's way" fade, which used to hide the whole reaction.
+const SHOT_ENTRANCE = { pos: { x: -4.3, y: 1.75, z: 3.0 }, target: { x: -7.2, y: 0.95, z: -0.3 }, keepPlayer: true };
+const SHOT_BOO = { pos: { x: -3.0, y: 1.9, z: 2.3 }, target: { x: -5.6, y: 1.05, z: -0.1 }, keepPlayer: true };
 const SHOT_BOARD = { pos: { x: 0.2, y: 1.85, z: 0.9 }, target: { x: 0, y: 1.85, z: -3.9 } };
 // Chapter 2: the lobby, the chandelier, the gate at the foot of the stairs.
 const SHOT_STAIRS = { pos: { x: -1.4, y: 2.7, z: 3.4 }, target: { x: 4.4, y: 1.5, z: -0.2 } };
@@ -942,7 +945,8 @@ async function intro() {
     rt.player.yaw = rt.player.startle.from + rt.player.startle.delta;
     rt.player.startle = null;
   }
-  await sleep(900);
+  // A beat staring at the shut door before Boo shows up.
+  await sleep(1200);
   // Boo appears.
   rt.boo.visible = true;
   rt.boo.appearT0 = rt.time;

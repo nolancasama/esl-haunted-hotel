@@ -207,12 +207,14 @@ export function Player() {
     let lift = 0;
     let lean = 0;
     let arms = 0;
+    let stretch = 1;
     if (p.startle) {
       const pose = startlePose(rt.time - p.startle.t0);
       p.yaw = p.startle.from + p.startle.delta * pose.turn;
       lift = pose.lift;
       lean = pose.lean;
       arms = pose.arms;
+      stretch = pose.stretch;
       if (pose.done) p.startle = null;
     }
 
@@ -223,16 +225,19 @@ export function Player() {
     if (legL.current) legL.current.rotation.x = swing;
     if (legR.current) legR.current.rotation.x = -swing;
     if (armL.current) {
-      armL.current.rotation.x = -swing * 0.8 - arms * 0.5;
-      armL.current.rotation.z = -0.15 - arms * 0.85;
+      armL.current.rotation.x = -swing * 0.8 - arms * 0.35;
+      armL.current.rotation.z = -0.15 - arms * 1.85;
     }
     if (armR.current) {
-      armR.current.rotation.x = 0.35 + swing * 0.25 - arms * 0.5;
-      armR.current.rotation.z = 0.15 + arms * 0.85;
+      armR.current.rotation.x = 0.35 + swing * 0.25 - arms * 0.6;
+      armR.current.rotation.z = 0.15 + arms * 1.85;
+      // the lantern keeps hanging upright from the hand, however the arm moves
+      if (lanternRef.current) lanternRef.current.quaternion.copy(armR.current.quaternion).invert();
     }
     if (bob.current) {
       bob.current.position.y = Math.abs(Math.cos(p.step)) * 0.045 * moving + Math.sin(rt.time * 2) * 0.004 + lift;
       bob.current.rotation.x = lean;
+      bob.current.scale.set(1 / Math.sqrt(stretch), stretch, 1 / Math.sqrt(stretch));
     }
     const stepIndex = Math.floor(p.step / Math.PI);
     if (stepIndex !== lastStep.current) {
@@ -257,11 +262,12 @@ export function Player() {
     const cx = cam.x + sx * Math.min(1, Math.max(0, t)) - p.x;
     const cy = cam.y + sy * Math.min(1, Math.max(0, t)) - chest;
     const cz = cam.z + sz * Math.min(1, Math.max(0, t)) - p.z;
-    const blocking = rt.camera.mode !== "follow" && t > 0.02 && t < 0.98 && Math.hypot(cx, cy, cz) < 0.8;
+    const blocking = rt.camera.mode !== "follow" && !rt.camera.shot?.keepPlayer && t > 0.02 && t < 0.98 && Math.hypot(cx, cy, cz) < 0.8;
     const tooClose = Math.hypot(cam.x - p.x, cam.z - p.z) < 1.0 && cam.y < p.y + 2.2;
     const wantOpacity = blocking || tooClose ? 0 : 1;
     fade.current += (wantOpacity - fade.current) * Math.min(1, dt * 9);
     const o = fade.current;
+    p.opacity = o;
     mat.opacity = o;
     mat.depthWrite = o > 0.98;
     coreMat.opacity = o;

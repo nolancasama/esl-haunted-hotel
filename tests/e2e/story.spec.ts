@@ -48,9 +48,9 @@ test("the intro: walk in, the door slams once you are inside, a hop and a smooth
   const errors = await boot(page, "&mode=story");
   // Record every rendered frame from the start of the intro until Boo speaks.
   await page.evaluate(() => {
-    type P = { x: number; z: number; yaw: number; startle: boolean };
+    type P = { x: number; z: number; yaw: number; startle: boolean; opacity: number };
     const api = (window as unknown as { __hh: { state(): { phase: string; player: P; doorsOpen: string[]; line: unknown } } }).__hh;
-    const w = window as unknown as { introFrames: { x: number; z: number; yaw: number; startle: boolean; door: boolean }[]; introDone: boolean };
+    const w = window as unknown as { introFrames: { x: number; z: number; yaw: number; startle: boolean; opacity: number; door: boolean }[]; introDone: boolean };
     w.introFrames = [];
     w.introDone = false;
     const tick = () => {
@@ -63,7 +63,7 @@ test("the intro: walk in, the door slams once you are inside, a hop and a smooth
   });
   await page.getByTestId("start").click();
   await page.waitForFunction(() => (window as unknown as { introDone: boolean }).introDone, null, { timeout: 60_000 });
-  const frames = await page.evaluate(() => (window as unknown as { introFrames: { x: number; z: number; yaw: number; startle: boolean; door: boolean }[] }).introFrames);
+  const frames = await page.evaluate(() => (window as unknown as { introFrames: { x: number; z: number; yaw: number; startle: boolean; opacity: number; door: boolean }[] }).introFrames);
   const walk = frames.slice(frames.findIndex((f) => f.x < -9)); // after the cut to the doorstep
   expect(walk.length).toBeGreaterThan(5);
   let maxStep = 0;
@@ -81,6 +81,8 @@ test("the intro: walk in, the door slams once you are inside, a hop and a smooth
   expect(walk[slam].x).toBeGreaterThan(-7.6); // inside before the door shuts
   const reaction = walk.slice(slam);
   expect(reaction.some((f) => f.startle)).toBe(true);
+  // the whole reaction is on screen: the player is never faded out for standing in the camera's way
+  for (const f of reaction) expect(f.opacity).toBeGreaterThan(0.9);
   // the hop and turn happen on the spot
   for (const f of reaction) expect(Math.hypot(f.x - walk[slam].x, f.z - walk[slam].z)).toBeLessThan(0.05);
   // ...through some in-between headings, ending up looking at the door (west)

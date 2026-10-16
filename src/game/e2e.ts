@@ -57,7 +57,7 @@ export function installE2eHook() {
         searchId: g.searchId,
         selectedSpot: g.selectedSpot,
         helpLevel: g.helpLevel,
-        player: { x: rt.player.x, z: rt.player.z, y: rt.player.y, yaw: rt.player.yaw, floor: rt.player.floor, stairs: rt.player.stairs, startle: Boolean(rt.player.startle) },
+        player: { x: rt.player.x, z: rt.player.z, y: rt.player.y, yaw: rt.player.yaw, floor: rt.player.floor, stairs: rt.player.stairs, startle: Boolean(rt.player.startle), opacity: rt.player.opacity },
         viewFloor: rt.view.floor,
         scope: g.scope,
         chapter: g.chapter,
@@ -85,9 +85,10 @@ export function installE2eHook() {
         ...director.debug()
       };
     },
-    /** Put the player somewhere (collision-resolved), on a floor (default: the one they are on). */
-    teleport(x: number, z: number, floor?: number) {
+    /** Put the player somewhere (collision-resolved), on a floor (default: the one they are on), optionally facing `yaw`. */
+    teleport(x: number, z: number, floor?: number, yaw?: number) {
       const f = (floor === 1 ? 1 : floor === 0 ? 0 : rt.player.floor) as Floor;
+      if (yaw !== undefined) rt.player.yaw = yaw;
       return place(x, z, f);
     },
     /** Stand in front of an object, facing it (on its floor). */
@@ -195,9 +196,9 @@ export function installE2eHook() {
       return { ...rt.camera.pos, mode: rt.camera.mode };
     },
     /** Visual checks: hold the camera on a fixed shot (null = back to following the player). */
-    look(pos: { x: number; y: number; z: number } | null, target?: { x: number; y: number; z: number }) {
+    look(pos: { x: number; y: number; z: number } | null, target?: { x: number; y: number; z: number }, keepPlayer?: boolean) {
       rt.camera.mode = pos && target ? "shot" : "follow";
-      rt.camera.shot = pos && target ? { pos, target } : null;
+      rt.camera.shot = pos && target ? { pos, target, keepPlayer } : null;
       rt.camera.snap = true;
     },
     /** Visual checks: slow down (or speed up) game time, to film a quick animation. */
