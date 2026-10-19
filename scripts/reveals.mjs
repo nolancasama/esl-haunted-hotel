@@ -18,7 +18,7 @@ const page = await browser.newPage({ viewport: { width: 1366, height: 768 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 await page.addInitScript(stubs);
-await page.goto(`${base}?e2e=1&seed=5${process.argv[4] ? "&" + process.argv[4] : ""}`);
+await page.goto(`${base}?e2e=1&seed=5${process.argv[4] ? "&" + process.argv[4] : ""}&mode=story`);
 await page.waitForTimeout(1200);
 await page.getByTestId("start").click();
 await page.waitForFunction(() => window.__hh.state().phase === "explore", null, { timeout: 30000 });

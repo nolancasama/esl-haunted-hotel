@@ -36,7 +36,7 @@ const EXTERIOR = [{ x: -17.5, y: 2.2, z: 1.2 }, { x: -9.4, y: 1.3, z: 0 }];
 const PORCH = [{ x: -12.2, y: 1.5, z: -2.6 }, { x: -9.2, y: 0.9, z: 0.4 }];
 
 // 1. The intro: the player arrives from the rain.
-await page.goto(`${base}?e2e=1&seed=4`);
+await page.goto(`${base}?e2e=1&seed=4&mode=story`);
 await page.waitForTimeout(1500);
 await page.evaluate(() => (window.__ttsMs = 4000));
 await page.getByTestId("start").click();
@@ -54,7 +54,7 @@ await hook("look", null);
 await hook("timeScale", 1);
 
 // 2. The ending: the same exterior shot as the sun comes up.
-await page.goto(`${base}?e2e=1&seed=4&intro=0`);
+await page.goto(`${base}?e2e=1&seed=4&intro=0&mode=story`);
 await page.waitForTimeout(1500);
 await page.getByTestId("start").click();
 await until(() => window.__hh.state().phase === "explore");

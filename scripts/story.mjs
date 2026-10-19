@@ -29,7 +29,7 @@ await page.addInitScript(() => {
   window.addEventListener("keydown", log("down"), true);
   window.addEventListener("keyup", log("up"), true);
 });
-await page.goto(`${base}?e2e=1&seed=4${extra}`);
+await page.goto(`${base}?e2e=1&seed=4${extra}&mode=story`);
 await page.waitForTimeout(1500);
 
 let n = 0;

@@ -76,8 +76,10 @@ async function captureViewport({ size, touch }) {
       const shown = (id) => Boolean(el(id)?.getClientRects().length);
       const frozen = (selector) => document.querySelector(selector)?.getAnimations({ subtree: true }).some((a) => a.playState === "paused" && a.currentTime > 0);
       switch (label) {
-        case "title-first-visit-locked": return s.screen === "title" && el("choice-ch2")?.disabled && el("choice-all")?.getAttribute("aria-checked") === "true";
-        case "title-unlocked": return s.screen === "title" && !el("choice-ch2")?.disabled && shown("replay-mode");
+        case "title-first-visit": return s.screen === "title" && shown("start") && document.querySelectorAll(".title-portrait").length === 5;
+        case "stages-first-visit-locked": return shown("stages") && el("choice-ch2")?.disabled;
+        case "title-unlocked": return s.screen === "title" && shown("start") && document.querySelectorAll(".title-portrait").length === 9;
+        case "stages-unlocked": return shown("stages") && !el("choice-ch2")?.disabled && shown("replay-mode");
         case "intro-boo-next-skip": return s.phase === "intro" && s.line?.wait && shown("next") && shown("skip");
         case "hint-bar": return shown("hint");
         case "explore-boo-speaking": return s.phase === "explore" && el("clue")?.classList.contains("speaking");
@@ -197,19 +199,22 @@ async function captureViewport({ size, touch }) {
 
   try {
     await open("");
-    await until("Chapter 2 locked on first visit", () => document.querySelector('[data-testid="choice-ch2"]').disabled);
-    await shot("title-first-visit-locked");
+    await shot("title-first-visit");
+    await page.getByTestId("start").click();
+    await until("Chapter 2 locked on first visit", () => document.querySelector('[data-testid="choice-ch2"]')?.disabled);
+    await shot("stages-first-visit-locked");
     await page.evaluate(() => {
       localStorage.setItem("hh.ch2.v1", "1");
       localStorage.setItem("hh.replay.v1", "1");
       localStorage.setItem("hh.menu.v1", JSON.stringify({ choice: "all", random: false }));
     });
     await open("");
-    await until("Chapter 2 and replay unlocked", () => !document.querySelector('[data-testid="choice-ch2"]').disabled && Boolean(document.querySelector('[data-testid="replay-mode"]')));
     await shot("title-unlocked");
-    await page.getByTestId("choice-ch1").click();
-    await page.evaluate(() => { window.__ttsMs = 60000; });
     await page.getByTestId("start").click();
+    await until("Chapter 2 and replay unlocked", () => document.querySelector('[data-testid="choice-ch2"]')?.disabled === false && Boolean(document.querySelector('[data-testid="replay-mode"]')));
+    await shot("stages-unlocked");
+    await page.evaluate(() => { window.__ttsMs = 60000; });
+    await page.getByTestId("choice-ch1").click();
     await visible("next");
     await visible("skip");
     await shot("intro-boo-next-skip");
@@ -297,8 +302,8 @@ async function captureViewport({ size, touch }) {
     // A second adventure exercises all eight names/answer sentences, the chapter
     // banner and the two-row counter without altering any store state directly.
     await open("&intro=0");
-    await page.getByTestId("choice-all").click();
     await page.getByTestId("start").click();
+    await page.getByTestId("choice-all").click();
     await phase("explore");
     await hook("setMic", false);
     await hook("setPace", 0.15);

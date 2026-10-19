@@ -30,7 +30,7 @@ async function open(query, unlocked = true) {
     localStorage.setItem("hh.ch2.v1", "1");
     localStorage.setItem("hh.replay.v1", "1");
   });
-  await page.goto(`${base}?e2e=1&seed=4${query}`);
+  await page.goto(`${base}?e2e=1&seed=4${query}&mode=story`);
   await page.waitForTimeout(1500);
   return page;
 }

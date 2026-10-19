@@ -1,5 +1,21 @@
 # Design Decisions
 
+## 2026-10-19 — Title: "in Matsubara", stages after Start
+
+- **The title shows only the name, Start and Settings** (Settings directly
+  under Start). The subtitle is "in Matsubara" (replacing "Ghost Hunt"); the
+  in / on / under / by tagline is gone. Decided by the teacher.
+- **Start opens a stage list** (Full Adventure, Chapter 1, Chapter 2, Practice,
+  the Random toggle once unlocked, Back). One tap on a stage plays it, so there
+  is no separate selected state; the last stage played gets keyboard focus.
+  Before, the four choices sat under Start as radio chips and Start played the
+  selected one.
+- **A link that names the stage skips the list** (`?mode=story|practice|replay`,
+  `?chapter=1|2`): the teacher already chose, so Start plays it. A story or
+  replay link without a chapter plays the adventure, never the practice room.
+  The e2e specs and dev scripts all boot with such a link; `title.spec.ts`
+  covers the list itself and fails if Start skips it.
+
 ## 2026-10-19 — Storybook hotel UI design system
 
 - Shared plum, antique gold, ivory and teal tokens now drive the title, HUD,
@@ -9,7 +25,7 @@
   strongest text cue; Japanese stays secondary and lavender.
 - The display serif uses system fonts only, matching the hotel sign without
   webfonts, downloads or CDNs that school networks may block.
-- The full-game menu label is **Full Adventure** (ぜんぶ), with ghost counts and
+- The full-game stage is **Full Adventure** (ぜんぶ), with ghost counts and
   explicit Chapter 2 unlock instructions rather than an unexplained faded option.
 - Looping decoration is limited to title ghost bobbing, Boo's speaking indicator,
   the listening mic rings and results star twinkles. Capture and answer flourishes

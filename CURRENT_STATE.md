@@ -23,8 +23,11 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
 - **UI design system (2026-10-19):** tokens and shared classes at the top of `src/styles.css`
   (`.panel`, `.btn-primary`/`.btn-secondary` aliased to `primary`/`secondary`, `.icon-btn`,
   `.ghost-medallion`, word tiles, switches, sliders). System serif display font only.
-  Title: "Full Adventure" / Chapter 1 / Chapter 2 (locked card says "Finish Chapter 1") /
-  Practice cards. Counter medallions flash once on capture. Settings grouped Speech /
+  Title: HAUNTED HOTEL "in Matsubara", Start, Settings. Start opens the stage list
+  (`data-testid=stages`): Full Adventure / Chapter 1 / Chapter 2 (locked card says
+  "Finish Chapter 1") / Practice, tap to play, Random toggle once unlocked, Back. A link
+  naming the stage (`?mode=story|practice|replay`, `?chapter=1|2`) skips the list; every
+  e2e spec and dev script boots with one. `title.spec.ts` covers the list. Counter medallions flash once on capture. Settings grouped Speech /
   Sound / Language / Camera (two columns on short screens). Reduced-motion supported.
 - **Doors (2026-10-19):** leaves fill the opening up to the frame head (3 mm clearance);
   heights come from the wall opening via `doorFit()` (`rooms.ts`), checked by `doors.test.ts`.
@@ -61,9 +64,9 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
   4th capture in the full adventure, the Chapter 2 cutscene plays (`director.chapterTwo`,
   skippable) and opens the gate. HUD and lobby board show 4 ghosts, then 8. After the 8th,
   the lantern blazes and the sunrise ending plays. Chapter 1 on its own still ends after 4.
-- **Title:** Start plus chips All 8 / Chapter 1 / Chapter 2 (locked until Chapter 1 is done,
-  `hh.ch2.v1`) / Practice, and "Random hiding places" once replay is unlocked. URL:
-  `?chapter=1|2`, `?mode=practice|replay`. Results: up to 8 ghost cards, Time, Main Menu.
+- **Unlocks:** Chapter 2 on its own opens once Chapter 1 is done (`hh.ch2.v1`); "Random
+  hiding places" once replay is unlocked; last stage and toggle in `hh.menu.v1`.
+  Results: up to 8 ghost cards, Time, Main Menu.
 - **Short screens:** the round pips sit under the ghost count (grid in the
   `max-height: 520px` block), so they stay clear of the clue card.
 - **Test hooks** (`src/game/e2e.ts`): `teleport(x,z,floor,yaw?)`, `goTo`, `jump(index, round)`,
@@ -90,6 +93,10 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
   the old entrance shot that faded the player out during the reaction.
 
 ## Known Issues
+- `beacon.spec.ts` "backwards input cancels…" failed once in a full e2e run (2026-10-19:
+  the player ended 0.2 m deeper than the ~1 m entry allows, W held under SwiftShader
+  load) and passed the other three times, alone and in a full run. A timing flake in
+  the walk-distance check; not investigated.
 - Software-rendered (SwiftShader) runs are only 2–7 fps, so the full-adventure e2e test
   takes a few minutes (timeout 420 s). Draw calls: ~100–200 per floor.
 - `fanSwitchTest` forces the steam to its target in one frame instead of waiting for the

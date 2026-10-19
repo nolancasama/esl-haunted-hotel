@@ -29,7 +29,7 @@ const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 await page.addInitScript(stubs);
-await page.goto(`${base}?e2e=1&seed=4`);
+await page.goto(`${base}?e2e=1&seed=4&mode=story`);
 await page.waitForTimeout(1500);
 await page.evaluate(() => (window.__ttsMs = 4000));
 await page.getByTestId("start").click();

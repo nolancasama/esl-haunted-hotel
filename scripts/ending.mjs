@@ -38,7 +38,7 @@ const st = () => page.evaluate(() => window.__hh.state());
 const until = (fn, arg, timeout = 40000) => page.waitForFunction(fn, arg, { timeout });
 const hook = (name, ...args) => page.evaluate(([f, a]) => window.__hh[f](...a), [name, args]);
 
-await page.goto(`${base}?e2e=1&seed=4&intro=0`);
+await page.goto(`${base}?e2e=1&seed=4&intro=0&mode=story`);
 await page.waitForTimeout(1500);
 await shot("title");
 await page.getByTestId("start").click();

@@ -71,10 +71,12 @@ places (always valid, unambiguous ones).
   tries, the word buttons appear automatically — nobody gets stuck.
 - English clues are spoken with the device's text-to-speech and always shown on
   screen.
-- **Links:** `?chapter=1` / `?chapter=2` — one floor only (for two lessons);
-  `?mode=practice` — one room, one ghost, all four prepositions (about 3
-  minutes); `?mode=replay` — random hiding places straight away; `?intro=0` —
-  skip the opening.
+- **Links:** Start normally opens a stage list (Full Adventure, Chapter 1,
+  Chapter 2, Practice). A link that names the stage skips the list, so Start
+  plays it at once: `?mode=story` — the full adventure; `?chapter=1` /
+  `?chapter=2` — one floor only (for two lessons); `?mode=practice` — one room,
+  one ghost, all four prepositions (about 3 minutes); `?mode=replay` — random
+  hiding places; `?intro=0` — skip the opening.
 - No accounts, no downloads, no tracking. Nothing is sent anywhere except the
   browser's own speech recognition.
 
