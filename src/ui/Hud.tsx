@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGame, setGame, visibleGhosts } from "../game/store";
 import { WORLD } from "../game/world/world";
 import { director } from "../game/director";
@@ -40,6 +40,13 @@ function Counter() {
   const scope = useGame((s) => s.scope);
   const chapter = useGame((s) => s.chapter);
   const mode = useGame((s) => s.mode);
+  // Seed from the current lantern: mounting an already-lit plaque never replays a capture.
+  const previous = useRef(new Set(lantern));
+  const [flashing, setFlashing] = useState(new Set<string>());
+  useEffect(() => {
+    setFlashing(new Set(lantern.filter((g) => !previous.current.has(g))));
+    previous.current = new Set(lantern);
+  }, [lantern]);
   if (!hunt) return null;
   const enc = currentEncounter(hunt);
   const single = hunt.encounters.length === 1;
@@ -47,12 +54,14 @@ function Counter() {
   const caught = lantern.filter((g) => ghosts.includes(g)).length;
   const rows = ghosts.length > 4 ? [ghosts.slice(0, 4), ghosts.slice(4)] : [ghosts];
   return (
-    <div className="counter" data-testid="counter">
+    <div className="counter panel compact" data-testid="counter">
       <div className={`counter-ghosts ${rows.length > 1 ? "two" : ""}`}>
         {rows.map((row, r) => (
           <div className="counter-row" key={r}>
             {row.map((g) => (
-              <GhostPortrait key={g} ghost={g} size={rows.length > 1 ? 28 : 38} dim={!lantern.includes(g)} face="smile" />
+              <span key={g} className={`ghost-medallion counter-portrait ${lantern.includes(g) ? "captured" : "uncaptured"} ${flashing.has(g) ? "capture-flash" : ""}`}>
+                <GhostPortrait ghost={g} size={rows.length > 1 ? 22 : 30} dim={!lantern.includes(g)} face="smile" />
+              </span>
             ))}
           </div>
         ))}
@@ -89,9 +98,10 @@ function ClueCard() {
   if (!hunt || !shown || hunt.status !== "hunting") return null;
   const spot = currentSpot(hunt);
   return (
-    <div className={`clue-card ${speaking ? "speaking" : ""}`} data-testid="clue" key={hunt.clueId}>
-      <div className="clue-boo">
+    <div className={`clue-card panel ${speaking ? "speaking" : ""}`} data-testid="clue" key={hunt.clueId}>
+      <div className="clue-boo ghost-medallion">
         <GhostPortrait boo size={46} face={speaking ? "happy" : "smile"} />
+        <span className="sound-waves" aria-hidden="true"><i /><i /><i /></span>
       </div>
       <div className="clue-text" data-testid="clue-text">
         <PrepText text={clueText(spot)} />
@@ -120,8 +130,8 @@ function Subtitle() {
   const ja = useGame((s) => s.settings.japanese);
   if (!line) return null;
   return (
-    <div className={`subtitle ${line.speaker} ${line.wait ? "wait" : ""}`} key={line.id} data-testid="subtitle">
-      {line.speaker === "boo" && <GhostPortrait boo size={line.wait ? 52 : 36} face="happy" />}
+    <div className={`subtitle panel ${line.speaker} ${line.wait ? "wait" : ""}`} key={line.id} data-testid="subtitle">
+      {line.speaker === "boo" && <span className="ghost-medallion subtitle-portrait"><GhostPortrait boo size={line.wait ? 52 : 36} face="happy" /></span>}
       <div>
         <div className="subtitle-en">
           <PrepText text={line.en} />
@@ -129,7 +139,7 @@ function Subtitle() {
         {line.ja && <Ja on={ja}>{line.ja}</Ja>}
       </div>
       {line.wait && (
-        <button className="next-button" onClick={() => director.next()} aria-label="Next" data-testid="next">
+        <button className="next-button icon-button" onClick={() => director.next()} aria-label="Next" data-testid="next">
           ▶
         </button>
       )}
@@ -142,7 +152,7 @@ function SkipButton() {
   const ja = useGame((s) => s.settings.japanese);
   if (phase !== "intro") return null;
   return (
-    <button className="skip-button" onClick={() => director.skipIntro()} data-testid="skip">
+    <button className="skip-button btn-secondary" onClick={() => director.skipIntro()} data-testid="skip">
       {ja ? "スキップ" : "Skip"} ▶▶
     </button>
   );
@@ -209,7 +219,7 @@ function HintBar() {
     <div className="hint-bar" data-testid="hint">
       {ja ? <span lang="ja">{h.ja}</span> : h.en}
       {phase === "search" && (
-        <button className="back-button" onClick={() => director.back()} data-testid="back">
+        <button className="back-button btn-secondary" onClick={() => director.back()} data-testid="back">
           {ja ? "もどる" : "Back"}
         </button>
       )}

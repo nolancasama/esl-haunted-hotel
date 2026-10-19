@@ -47,14 +47,18 @@ export function AnswerPanel() {
   const blank = answer.filled ?? (answer.status === "wrong" && answer.wrongWord ? answer.wrongWord : "");
 
   return (
-    <div className={`answer-panel ${answer.status}`} data-testid="answer-panel">
+    <div className={`answer-panel panel ui ${answer.status}`} data-testid="answer-panel">
+      {answer.status === "correct" && <span className="celebration-ring" aria-hidden="true" />}
       <div className="question" data-testid="question">
         {QUESTION}
       </div>
       <div className="frame" data-testid="frame">
         {frame.before}{" "}
-        <span className={`blank ${answer.filled ? "filled" : answer.status === "wrong" ? "wrong" : ""}`} data-testid="blank">
-          {blank || " "}
+        <span className="blank-wrap">
+          <span className={`blank ${answer.filled ? "filled" : answer.status === "wrong" ? "wrong" : ""}`} data-testid="blank">
+            {blank || " "}
+          </span>
+          {answer.status === "correct" && <span className="answer-sparkles" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ "--i": i } as React.CSSProperties} />)}</span>}
         </span>{" "}
         {frame.after}
       </div>
@@ -76,7 +80,7 @@ export function AnswerPanel() {
             return (
               <button
                 key={p}
-                className={`word ${answer.buttons ? "tap" : "inert"} ${answer.disabled.includes(p) ? "used" : ""} ${answer.filled === p ? "right" : ""}`}
+                className={`word ${tappable ? "tap" : "inert"} ${answer.disabled.includes(p) ? "used" : ""} ${answer.filled === p ? "right" : ""}`}
                 disabled={!tappable}
                 onClick={() => director.answerButton(p)}
                 data-testid={`word-${p}`}

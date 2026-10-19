@@ -15,7 +15,19 @@ hidden above the drawn walls when indoors, fading out over the sunrise. Checked 
 screenshots on GPU and SwiftShader: `node scripts/intro.mjs` (`.tmp/intro`) and
 `node scripts/rain.mjs` (`.tmp/rain`), both against a dev server on 5199.
 
+**2026-10-19:** Storybook-hotel UI redesign (title, HUD, answer panel, dialogue, settings,
+results) and the door-gap fix. Checked in `node scripts/ui.mjs` screenshots at all three
+sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`.tmp/doors`).
+
 ## What Exists
+- **UI design system (2026-10-19):** tokens and shared classes at the top of `src/styles.css`
+  (`.panel`, `.btn-primary`/`.btn-secondary` aliased to `primary`/`secondary`, `.icon-btn`,
+  `.ghost-medallion`, word tiles, switches, sliders). System serif display font only.
+  Title: "Full Adventure" / Chapter 1 / Chapter 2 (locked card says "Finish Chapter 1") /
+  Practice cards. Counter medallions flash once on capture. Settings grouped Speech /
+  Sound / Language / Camera (two columns on short screens). Reduced-motion supported.
+- **Doors (2026-10-19):** leaves fill the opening up to the frame head (3 mm clearance);
+  heights come from the wall opening via `doorFit()` (`rooms.ts`), checked by `doors.test.ts`.
 - **Ending exit (2026-10-16):** after the last ghost the player walks out on a one-way track
   from just inside the front door (`logic/exitTrack.ts`); every input walks forward, nothing
   else moves them; results come once on the porch.
@@ -62,7 +74,8 @@ screenshots on GPU and SwiftShader: `node scripts/intro.mjs` (`.tmp/intro`) and
   `startTrace`/`stopTrace` for real canvas pixels and frame-by-frame movement.
 - **Scripts:** `scripts/upstairs.mjs --part=rooms|stairs|tricks|cutscene`,
   `scripts/ending.mjs [url] [WxH] [--touch]`, `scripts/intro.mjs [url] [--speed=] [--gpu]`,
-  `scripts/rain.mjs [url] [--gpu]` (all need a dev server on 5199).
+  `scripts/rain.mjs [url] [--gpu]`, `scripts/ui.mjs [url] [WxH] [--touch]` (all three sizes by
+  default), `scripts/doors.mjs [url] [--out=dir]` (all need a dev server on 5199).
 - **E2E:** `story.spec.ts`, `practice.spec.ts`, `chapter2.spec.ts`, `tapmove.spec.ts`, `beacon.spec.ts`, `exit.spec.ts`.
   Tap movement covers floor/furniture taps, retargeting, obstacles, doors, both
   floors/stairs, drag rejection, keyboard interruption and existing UI/markers.
@@ -85,10 +98,14 @@ screenshots on GPU and SwiftShader: `node scripts/intro.mjs` (`.tmp/intro`) and
   because `jump` skips the earlier answers.
 
 ## Next Steps
-1. Play it on a real Chromebook / phone: stairs feel, attic blackout, bathroom steam.
+1. Play it on a real Chromebook / phone: stairs feel, attic blackout, bathroom steam, and
+   the new UI (system serif title on ChromeOS fonts, touch sizes, results scrolling at 390 px).
 2. When ready, publish (make the repo public, enable Pages; commands in README).
 
 ## Codex / Delegated Work
+The 2026-10-19 UI redesign was written by Codex (routed) until it hit its usage limit;
+Claude reviewed the partial work, finished it (results layout, button contrast, tap-through
+subtitles/hints, Prettier formatting) and accepted it. Nothing is pending.
 `tests/e2e/chapter2.spec.ts` and the `fanSwitchTest` hook were written by Codex (routed),
 reviewed and accepted by Claude. Codex's run timed out after the spec was green. Every
 mutation it injected was checked as reverted.

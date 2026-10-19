@@ -1,5 +1,53 @@
 # Design Decisions
 
+## 2026-10-19 — Storybook hotel UI design system
+
+- Shared plum, antique gold, ivory and teal tokens now drive the title, HUD,
+  answer panel, dialogue, settings and results. Book-binding `.panel` corners,
+  beveled primary/secondary buttons, brass icon medallions, word tiles and pill
+  switches form one consistent component language. Gold prepositions remain the
+  strongest text cue; Japanese stays secondary and lavender.
+- The display serif uses system fonts only, matching the hotel sign without
+  webfonts, downloads or CDNs that school networks may block.
+- The full-game menu label is **Full Adventure** (ぜんぶ), with ghost counts and
+  explicit Chapter 2 unlock instructions rather than an unexplained faded option.
+- Looping decoration is limited to title ghost bobbing, Boo's speaking indicator,
+  the listening mic rings and results star twinkles. Capture and answer flourishes
+  run once, use transform/opacity only and never gate input. Reduced-motion
+  preferences disable all animation and transitions.
+- The answer panel keeps its existing height budget (no more than 10% taller at
+  target viewports). `CameraRig` shifts the lens by half the panel height, capped
+  at 30% of the screen: extra panel height would obscure the found ghost.
+- Japanese on a gold button is dark plum, not lavender (lavender on gold was
+  unreadable on Start and Play Again).
+- Subtitles and the hint bar stay tap-through (no `ui` class): a tap on the floor
+  under them still walks the player. Only their buttons take pointer input.
+- Eight-ghost results put each medallion beside its name with the sentences
+  below, so all eight, the stats and the unlock ticket fit above the buttons at
+  1366x768 and 1024x600; on 844x390 the card scrolls under its sticky buttons.
+- `scripts/ui.mjs` shoots every screen and state at 1366x768, 1024x600 and
+  844x390 touch (`.tmp/ui/<size>/`) and writes `measurements.json` (clipped text,
+  overlapping HUD boxes, page overflow, answer-panel size).
+- Rejected: a webfont for the title (school networks), backdrop blur on panels
+  (Chromebook GPU cost), and a 'processing' mic state (the recognizer does not
+  report one, so it would misrepresent the microphone).
+
+## 2026-10-19 — Door leaves fill their openings
+
+- **A closed leaf now reaches the frame head with a 3 mm clearance.** Every
+  hinged leaf was built 4 cm shorter than its opening (`height - 0.04`) while the
+  frame head sat at the full opening top, so a see-through slot showed above
+  each closed door. The entrance door was also 2.40 m in a 2.45 m wall opening.
+- **The wall opening is the single source of door height** (`DOOR_H`,
+  `ENTRANCE_H`, `ATTIC_DOOR_H` in `rooms.ts`, used by both the opening and the
+  `DoorDef`); `doorFit()` derives head and leaf. `doors.test.ts` checks every
+  hinged door matches its opening and leaves at most 5 mm, and fails on the old
+  geometry. The thin dark line still visible under the head from below is the
+  frame's soffit (the leaf sits ~10 cm back from the frame face), not a gap.
+- The stairs gate keeps its open iron-bar construction and its old dimensions.
+  Rejected: trim strips over the slot (would hide wrong geometry, not fix it).
+  `scripts/doors.mjs` shoots every door from both sides plus the swing.
+
 ## 2026-10-16 — One-way exit track at the end
 
 - **After the last ghost, the player walks out on a fixed track** (`logic/exitTrack.ts`):
