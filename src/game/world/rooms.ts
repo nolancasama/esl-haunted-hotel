@@ -3,6 +3,9 @@ import type { Floor, Rect, RoomId } from "../types";
 export const WALL_H = 2.8;
 export const WALL_T = 0.2;
 export const DOOR_H = 2.15;
+/** The front doors are taller, the attic door lower. Wall opening and door share these. */
+export const ENTRANCE_H = 2.45;
+export const ATTIC_DOOR_H = 1.95;
 
 /** Height of each floor. Upstairs sits directly on top of the ground-floor walls. */
 export const FLOOR_Y: Record<Floor, number> = { 0: 0, 1: WALL_H };
@@ -210,7 +213,7 @@ const GROUND_WALLS: WallLine[] = [
   { id: "s-sto", floor: 0, axis: "x", at: 11, from: 0, to: 8, neg: "storage", pos: null },
   // west (outside), with the entrance
   { id: "w-bed", floor: 0, axis: "z", at: -8, from: -11, to: -4, neg: null, pos: "bedroom" },
-  { id: "w-lob", floor: 0, axis: "z", at: -8, from: -4, to: 4, neg: null, pos: "lobby", openings: [{ from: -1.1, to: 1.1, top: 2.45, door: "entrance" }] },
+  { id: "w-lob", floor: 0, axis: "z", at: -8, from: -4, to: 4, neg: null, pos: "lobby", openings: [door(-1.1, 1.1, "entrance", ENTRANCE_H)] },
   { id: "w-lib", openings: [win(6.2)], floor: 0, axis: "z", at: -8, from: 4, to: 11, neg: null, pos: "library" },
   // east (outside)
   { id: "e-din", floor: 0, axis: "z", at: 8, from: -11, to: -4, neg: "dining", pos: null },
@@ -228,7 +231,7 @@ const UPPER_WALLS: WallLine[] = [
   { id: "u-m1-bath", floor: 1, axis: "x", at: -4, from: 0, to: 8, neg: "bathroom", pos: "landing", openings: [door(3.2, 4.8, "bathroom")] },
   { id: "u-m2-mus", floor: 1, axis: "x", at: 4, from: -8, to: 0, neg: "landing", pos: "music", openings: [door(-4.8, -3.2, "music")] },
   // The attic door is lower and narrower than the others.
-  { id: "u-m2-att", floor: 1, axis: "x", at: 4, from: 0, to: 8, neg: "landing", pos: "attic", openings: [door(3.4, 4.6, "attic", 1.95)] },
+  { id: "u-m2-att", floor: 1, axis: "x", at: 4, from: 0, to: 8, neg: "landing", pos: "attic", openings: [door(3.4, 4.6, "attic", ATTIC_DOOR_H)] },
   { id: "u-s-mus", openings: [win(-3.4)], floor: 1, axis: "x", at: 11, from: -8, to: 0, neg: "music", pos: null },
   { id: "u-s-att", openings: [win(5.6, ROUND_GLASS)], floor: 1, axis: "x", at: 11, from: 0, to: 8, neg: "attic", pos: null },
   { id: "u-w-play", floor: 1, axis: "z", at: -8, from: -11, to: -4, neg: null, pos: "playroom" },
@@ -263,13 +266,26 @@ export const DOORS: DoorDef[] = [
   { id: "dining", floor: 0, axis: "x", at: -4, from: 3.2, to: 4.8, room: "dining" },
   { id: "library", floor: 0, axis: "x", at: 4, from: -4.8, to: -3.2, room: "library" },
   { id: "storage", floor: 0, axis: "x", at: 4, from: 3.2, to: 4.8, room: "storage" },
-  { id: "entrance", floor: 0, axis: "z", at: -8, from: -1.1, to: 1.1, room: "lobby", double: true, height: 2.4 },
+  { id: "entrance", floor: 0, axis: "z", at: -8, from: -1.1, to: 1.1, room: "lobby", double: true, height: ENTRANCE_H },
   { id: "stairs", floor: 0, axis: "z", at: STAIRS.gateX, from: -1.25, to: 1.25, room: "lobby", double: true, height: 1.15, style: "gate" },
   { id: "playroom", floor: 1, axis: "x", at: -4, from: -4.8, to: -3.2, room: "playroom" },
   { id: "bathroom", floor: 1, axis: "x", at: -4, from: 3.2, to: 4.8, room: "bathroom" },
   { id: "music", floor: 1, axis: "x", at: 4, from: -4.8, to: -3.2, room: "music" },
-  { id: "attic", floor: 1, axis: "x", at: 4, from: 3.4, to: 4.6, room: "attic", height: 1.95, style: "attic" }
+  { id: "attic", floor: 1, axis: "x", at: 4, from: 3.4, to: 4.6, room: "attic", height: ATTIC_DOOR_H, style: "attic" }
 ];
+
+/** Gap between a closed leaf's top and the head of its frame: a hairline, not a slot. */
+export const LEAF_CLEARANCE = 0.003;
+
+/**
+ * Door heights. `head` is the underside of the frame's head piece, which is the top of the
+ * wall opening (doors.test.ts checks they agree), and a closed leaf fills the opening up to it.
+ * The iron gate stands free of any wall and keeps its open bar construction.
+ */
+export function doorFit(door: DoorDef): { head: number; leaf: number } {
+  const head = door.height ?? DOOR_H;
+  return { head, leaf: door.style === "gate" ? head - 0.04 : head - LEAF_CLEARANCE };
+}
 
 /** Which door leads into each ghost room. */
 export const ROOM_DOOR: Partial<Record<RoomId, DoorId>> = {

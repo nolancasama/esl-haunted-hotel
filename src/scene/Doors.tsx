@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { DOOR_H, FLOOR_Y, ROOMS, WALL_LINES, WALL_T, type DoorDef } from "../game/world/rooms";
+import { FLOOR_Y, ROOMS, WALL_LINES, WALL_T, doorFit, type DoorDef } from "../game/world/rooms";
 import { BEACON_RADIUS, beaconSpot, hallSide } from "../game/beacon";
 import { rt } from "../game/runtime";
 import { PartBuilder } from "./partBuilder";
@@ -80,7 +80,7 @@ const styleOf = (door: DoorDef): Style => (door.id === "entrance" ? "entrance" :
 
 export function Door({ door }: { door: DoorDef }) {
   const width = door.to - door.from;
-  const height = (door.height ?? DOOR_H) - 0.04;
+  const { head, leaf: height } = doorFit(door);
   const style = styleOf(door);
   const leaves = useMemo(
     () =>
@@ -89,7 +89,7 @@ export function Door({ door }: { door: DoorDef }) {
         : [panelGeometry(width, height, false, style)],
     [door.double, width, height, style]
   );
-  const frame = useMemo(() => frameGeometry(width, height + 0.04, style), [width, height, style]);
+  const frame = useMemo(() => frameGeometry(width, head, style), [width, head, style]);
   const hinges = useRef<Array<THREE.Group | null>>([]);
   const root = useRef<THREE.Group>(null);
   const lock = useRef<THREE.Sprite>(null);
