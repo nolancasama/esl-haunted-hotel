@@ -77,9 +77,9 @@ async function captureViewport({ size, touch }) {
       const frozen = (selector) => document.querySelector(selector)?.getAnimations({ subtree: true }).some((a) => a.playState === "paused" && a.currentTime > 0);
       switch (label) {
         case "title-first-visit": return s.screen === "title" && shown("start") && document.querySelectorAll(".title-portrait").length === 5;
-        case "stages-first-visit-locked": return shown("stages") && el("choice-ch2")?.disabled;
+        case "stages-first-visit-locked": return shown("stages") && el("choice-hideseek")?.disabled;
         case "title-unlocked": return s.screen === "title" && shown("start") && document.querySelectorAll(".title-portrait").length === 9;
-        case "stages-unlocked": return shown("stages") && !el("choice-ch2")?.disabled && shown("replay-mode");
+        case "stages-unlocked": return shown("stages") && el("choice-hideseek")?.disabled === false && shown("replay-mode");
         case "intro-boo-next-skip": return s.phase === "intro" && s.line?.wait && shown("next") && shown("skip");
         case "hint-bar": return shown("hint");
         case "explore-boo-speaking": return s.phase === "explore" && el("clue")?.classList.contains("speaking");
@@ -201,7 +201,7 @@ async function captureViewport({ size, touch }) {
     await open("");
     await shot("title-first-visit");
     await page.getByTestId("start").click();
-    await until("Chapter 2 locked on first visit", () => document.querySelector('[data-testid="choice-ch2"]')?.disabled);
+    await until("Hide & Seek locked on first visit", () => document.querySelector('[data-testid="choice-hideseek"]')?.disabled === true);
     await shot("stages-first-visit-locked");
     await page.evaluate(() => {
       localStorage.setItem("hh.ch2.v1", "1");
@@ -211,10 +211,12 @@ async function captureViewport({ size, touch }) {
     await open("");
     await shot("title-unlocked");
     await page.getByTestId("start").click();
-    await until("Chapter 2 and replay unlocked", () => document.querySelector('[data-testid="choice-ch2"]')?.disabled === false && Boolean(document.querySelector('[data-testid="replay-mode"]')));
+    await until("Hide & Seek and replay unlocked", () => document.querySelector('[data-testid="choice-hideseek"]')?.disabled === false && Boolean(document.querySelector('[data-testid="replay-mode"]')));
     await shot("stages-unlocked");
+    // The removed Chapter 1 card remains available through its teacher link.
+    await open("&chapter=1");
     await page.evaluate(() => { window.__ttsMs = 60000; });
-    await page.getByTestId("choice-ch1").click();
+    await page.getByTestId("start").click();
     await visible("next");
     await visible("skip");
     await shot("intro-boo-next-skip");

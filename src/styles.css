@@ -981,7 +981,7 @@ small[lang="ja"] {
   gap: 12px;
 }
 .stage-card .chip {
-  min-height: 112px;
+  min-height: 210px;
   font-size: 22px;
   cursor: pointer;
   transition:
@@ -993,6 +993,43 @@ small[lang="ja"] {
 }
 .stage-card .mode-count {
   font-size: 14px;
+}
+.stage-portraits {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  margin: 8px 0;
+}
+.mode-description {
+  font-size: 16px;
+  color: var(--gold-light);
+}
+.stage-card .lock-note {
+  margin-top: 6px;
+  font-size: 13px;
+}
+.stage-card .lock-note small {
+  font-size: 12px;
+}
+.english-help {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.english-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.english-levels button {
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+.english-levels button[aria-pressed="true"] {
+  border-color: var(--gold);
+  background: var(--plum-700);
+  color: var(--gold-light);
 }
 .stage-card .chip:not(:disabled):hover {
   border-color: var(--gold);
@@ -1650,12 +1687,18 @@ input[type="range"]::-moz-range-thumb {
     margin-top: 2px;
   }
   .mode-choice {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
   .stage-card .chip {
-    min-height: 92px;
+    min-height: 156px;
     font-size: 17px;
+  }
+  .stage-portraits {
+    margin: 2px 0;
+  }
+  .mode-description {
+    font-size: 14px;
   }
   .stage-card .chip small,
   .stage-card .mode-count {

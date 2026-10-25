@@ -7,13 +7,13 @@ import { CHAPTER_GHOSTS, GHOSTS } from "../game/ghosts";
 import { sentenceWith } from "../game/logic/clues";
 
 /**
- * Start opens the stage list: the full adventure (both chapters), Chapter 1 or
- * Chapter 2 on its own, or the one-room practice; tapping a stage plays it.
+ * Start opens the two-card stage list. Legacy chapter/practice links still
+ * select those adventures directly from Start.
  * A link that already names what to play starts it straight from Start:
  * `?mode=story` (fixed hiding places), `?mode=practice`, `?mode=replay`
  * (random hiding places), `?chapter=1` / `?chapter=2`.
  */
-type Choice = Scope | "practice";
+type Choice = Scope | "practice" | "hideseek";
 
 const PARAMS = new URLSearchParams(location.search);
 const URL_MODE = PARAMS.get("mode");
@@ -44,11 +44,9 @@ function saveMenu(m: { choice: Choice; random: boolean }) {
   }
 }
 
-const CHOICES: Array<{ id: Choice; en: string; ja: string; count: number }> = [
-  { id: "all", en: "Full Adventure", ja: "ぜんぶ", count: 8 },
-  { id: "ch1", en: "Chapter 1", ja: "1かい", count: 4 },
-  { id: "ch2", en: "Chapter 2", ja: "2かい", count: 4 },
-  { id: "practice", en: "Practice", ja: "れんしゅう", count: 1 }
+const CHOICES: Array<{ id: "all" | "hideseek"; en: string; ja: string; description: string }> = [
+  { id: "all", en: "All Levels", ja: "ぜんぶのステージ", description: "Find all eight ghosts!" },
+  { id: "hideseek", en: "Hide & Seek", ja: "かくれんぼ", description: "Become a ghost and hide!" }
 ];
 
 function GhostCountMark() {
@@ -89,6 +87,7 @@ export function TitleScreen() {
   const screen = useGame((s) => s.screen);
   const replayUnlocked = useGame((s) => s.replayUnlocked);
   const ch2Unlocked = useGame((s) => s.ch2Unlocked);
+  const hideSeekUnlocked = useGame((s) => s.hideSeekUnlocked);
   const [starting, setStarting] = useState(false);
   const [stages, setStages] = useState(false);
   const [menu, setMenu] = useState(() => {
@@ -106,6 +105,10 @@ export function TitleScreen() {
   const randomOpen = replayUnlocked || URL_RANDOM;
   const play = (choice: Choice) => {
     if (starting) return;
+    if (choice === "hideseek") {
+      if (hideSeekUnlocked) setGame({ screen: "hideseek", hideSeekLink: null });
+      return;
+    }
     setStarting(true);
     const random = menu.random && randomOpen && choice !== "practice";
     const mode: Mode = choice === "practice" ? "practice" : random ? "replay" : "story";
@@ -120,7 +123,7 @@ export function TitleScreen() {
   };
   const start = () => {
     // A story or replay link without a chapter plays the adventure, never the practice room.
-    if (URL_LINKED) play(URL_CHOICE ?? (remembered === "practice" ? "all" : remembered));
+    if (URL_LINKED) play(URL_CHOICE ?? (remembered === "practice" || remembered === "hideseek" ? "all" : remembered));
     else setStages(true);
   };
 
@@ -134,15 +137,15 @@ export function TitleScreen() {
           </h2>
           <div className="mode-choice" role="group" aria-label="What to play" data-testid="mode-choice">
             {CHOICES.map((c) => {
-              const locked = c.id === "ch2" && !ch2Open;
+              const locked = c.id === "hideseek" && !hideSeekUnlocked;
               return (
                 <button
                   key={c.id}
                   className={`chip mode-card ${locked ? "locked" : ""}`}
                   disabled={locked || starting}
-                  autoFocus={c.id === remembered}
+                  autoFocus={c.id === (remembered === "hideseek" && hideSeekUnlocked ? "hideseek" : "all")}
                   onClick={() => pick(c.id)}
-                  title={locked ? "Finish Chapter 1 first" : undefined}
+                  title={locked ? "Complete Chapter 1 to unlock!" : undefined}
                   data-testid={`choice-${c.id}`}
                 >
                   {locked && (
@@ -152,8 +155,14 @@ export function TitleScreen() {
                   )}
                   <span className="mode-label">{c.en}</span>
                   <small lang="ja">{c.ja}</small>
-                  <span className="mode-count"><GhostCountMark /> {c.count}</span>
-                  {locked && <span className="lock-note">Finish Chapter 1<small lang="ja">さきに 1かいを クリア</small></span>}
+                  <span className="stage-portraits" aria-hidden="true">
+                    {(c.id === "hideseek" ? ["sneaky", "mischief", "bubbles", "shadow"] as const : CHAPTER_GHOSTS[1]).map((ghost) => (
+                      <GhostPortrait key={ghost} ghost={ghost} size={38} face="happy" />
+                    ))}
+                  </span>
+                  <span className="mode-description">{c.description}</span>
+                  {c.id === "all" && <span className="mode-count"><GhostCountMark /> 8</span>}
+                  {locked && <span className="lock-note">Complete Chapter 1 to unlock!<small lang="ja">1かいをクリアすると あそべるよ！</small></span>}
                 </button>
               );
             })}

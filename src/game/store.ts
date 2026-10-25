@@ -1,12 +1,36 @@
 import { create } from "zustand";
-import type { GhostId, Prep } from "./types";
+import type { GhostId, Prep, RoomId } from "./types";
 import type { HuntState } from "./logic/hunt";
 import type { Scope } from "./logic/plans";
 
 export type { Scope };
 
-export type Screen = "title" | "game" | "results";
+export type Screen = "title" | "game" | "results" | "hideseek";
 export type Mode = "practice" | "story" | "replay";
+
+export interface HideSeekLink {
+  ghost?: GhostId;
+  room?: RoomId;
+  seed?: number;
+}
+
+function loadHideSeekLink(): HideSeekLink | null {
+  if (typeof location === "undefined") return null;
+  const params = new URLSearchParams(location.search);
+  if (params.get("mode") !== "hideseek") return null;
+  const ghosts: Record<GhostId, true> = { sleepy: true, hungry: true, sneaky: true, mischief: true, bouncy: true, bubbles: true, melody: true, shadow: true };
+  const rooms: Record<RoomId, true> = { lobby: true, bedroom: true, dining: true, storage: true, library: true, landing: true, playroom: true, bathroom: true, music: true, attic: true };
+  const ghost = params.get("ghost");
+  const room = params.get("room");
+  const seed = params.get("seed");
+  return {
+    ...(ghost && Object.hasOwn(ghosts, ghost) ? { ghost: ghost as GhostId } : {}),
+    ...(room && Object.hasOwn(rooms, room) ? { room: room as RoomId } : {}),
+    ...(seed && /^-?\d+$/.test(seed) && Number.isSafeInteger(Number(seed)) ? { seed: Number(seed) } : {})
+  };
+}
+
+const HIDE_SEEK_LINK = loadHideSeekLink();
 
 /**
  * explore: walking around.  search: close-up of one object, choosing a spot.
@@ -24,6 +48,7 @@ export interface Settings {
   japanese: boolean;
   cameraSensitivity: number;
   slowVoice: boolean;
+  englishLevel: "beginner" | "standard" | "advanced";
 }
 
 export type MicState = "unknown" | "ready" | "blocked" | "unsupported";
@@ -117,6 +142,8 @@ export interface GameState {
   chapter: 1 | 2;
   /** Chapter 2 on its own is offered once Chapter 1 has been finished on this device. */
   ch2Unlocked: boolean;
+  hideSeekUnlocked: boolean;
+  hideSeekLink: HideSeekLink | null;
   chapterCard: ChapterCard | null;
   /** performance.now() when the hunt started and when the last ghost was caught. */
   startedAt: number | null;
@@ -132,7 +159,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sfx: 0.75,
   japanese: true,
   cameraSensitivity: 1,
-  slowVoice: false
+  slowVoice: false,
+  englishLevel: "standard"
 };
 
 function loadSettings(): Settings {
@@ -146,6 +174,7 @@ function loadSettings(): Settings {
 }
 
 const CH2_KEY = "hh.ch2.v1";
+const HIDE_SEEK_KEY = "hh.hideseek.v1";
 
 function loadFlag(key: string): boolean {
   try {
@@ -166,6 +195,8 @@ function saveFlag(key: string) {
 /** Chapter 1 has been finished on this device: Chapter 2 can be played on its own. */
 export function saveCh2Unlocked() {
   saveFlag(CH2_KEY);
+  saveFlag(HIDE_SEEK_KEY);
+  setGame({ hideSeekUnlocked: true });
 }
 
 export function saveSettings(s: Settings) {
@@ -193,7 +224,7 @@ export const EMPTY_ANSWER: AnswerUi = {
 };
 
 export const useGame = create<GameState>(() => ({
-  screen: "title",
+  screen: HIDE_SEEK_LINK ? "hideseek" : "title",
   mode: "practice",
   phase: "intro",
   hunt: null,
@@ -220,6 +251,8 @@ export const useGame = create<GameState>(() => ({
   scope: "all",
   chapter: 1,
   ch2Unlocked: loadFlag(CH2_KEY),
+  hideSeekUnlocked: loadFlag(HIDE_SEEK_KEY) || loadFlag(CH2_KEY),
+  hideSeekLink: HIDE_SEEK_LINK,
   chapterCard: null,
   startedAt: null,
   finishedAt: null

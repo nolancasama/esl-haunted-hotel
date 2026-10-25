@@ -4,6 +4,7 @@ import { Hud } from "./ui/Hud";
 import { TouchControls } from "./ui/TouchControls";
 import { SettingsModal } from "./ui/Settings";
 import { ResultsScreen, TitleScreen } from "./ui/Screens";
+import { HideSeekEntry } from "./ui/HideSeekEntry";
 import { installKeyboard } from "./input/keyboard";
 import { director } from "./game/director";
 import { getGame, setGame, useGame } from "./game/store";
@@ -93,6 +94,7 @@ export function App() {
       <Hud />
       <TouchControls />
       <TitleScreen />
+      <HideSeekEntry />
       <ResultsScreen />
       <SettingsModal />
       <Fade />

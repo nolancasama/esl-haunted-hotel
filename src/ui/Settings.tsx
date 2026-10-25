@@ -67,6 +67,20 @@ export function SettingsModal() {
           </section>
           <section className="settings-section">
             <h3>Language <small lang="ja">ことば</small></h3>
+            <div className="setting-row english-help">
+              <span className="setting-label" id="english-help-label">English help<small lang="ja">えいごのヒント</small></span>
+              <div className="english-levels" role="group" aria-labelledby="english-help-label">
+                {([
+                  ["beginner", "Beginner", "かんたん"],
+                  ["standard", "Standard", "ふつう"],
+                  ["advanced", "Advanced", "むずかしい"]
+                ] as const).map(([level, en, ja]) => (
+                  <button key={level} type="button" className="btn-secondary secondary" aria-pressed={s.englishLevel === level} onClick={() => set({ englishLevel: level })} data-testid={`english-${level}`}>
+                    {en}<small lang="ja">{ja}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
             <Row label="Japanese hints" ja="にほんごの ヒント">
               <Toggle value={s.japanese} onChange={(v) => set({ japanese: v })} testId="toggle-ja" />
             </Row>

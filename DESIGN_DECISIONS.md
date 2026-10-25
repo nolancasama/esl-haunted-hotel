@@ -1,5 +1,101 @@
 # Design Decisions
 
+## 2026-10-25 — Hide & Seek (Ghost Mode) and the two-card stage list
+
+The teacher's plan, with Claude's changes marked **(changed)** or **(added)**.
+
+**Stage list.** Exactly two cards: **All Levels** (ぜんぶのステージ, the existing
+eight-ghost adventure) and **Hide & Seek** (かくれんぼ). Chapter 1, Chapter 2 and
+Practice are no longer cards, but `?mode=`/`?chapter=` links still work
+(teacher links, e2e). The Random toggle stays under the cards once unlocked.
+Hide & Seek unlocks when Chapter 1 is complete. That is the existing `hh.ch2.v1`
+flag, already saved at the 4th capture in the full adventure (`chapterTwo()`) and
+at the end of Chapter 1 played alone. A dedicated `hh.hideseek.v1` flag is saved
+at the same points, and the mode is unlocked if either flag is set, so existing
+Chapter 1 graduates get it without a migration. **(added)** Link
+`?mode=hideseek[&ghost=&room=&seed=]` opens the mode directly (tests, teachers).
+It bypasses the lock the way `?chapter=2` already does.
+
+**Rules (frozen).**
+- One ghost (student), one human detective (the existing player figure, not Boo),
+  one room, 5 searches, 2 relocations, 1 ability. Surviving the 5th completed
+  search wins. Being found loses.
+- A *search* is a completed inspection of one hiding spot. Inspecting a decoy
+  counts as a search. **(changed)** Walking toward a sound is not a search,
+  but every investigation ends by inspecting a real spot.
+- **(added) Concealment by preposition.** Spots *in* and *under* are concealed.
+  Spots *on* and *by* are exposed: visible if they are in the detective's vision
+  cone, unoccluded, and within range. The exception is an *on* spot above eye line
+  (spot y > 1.4 m: shelf tops etc.), which is concealed. Being visible produces a
+  glimpse (suspicion), never an instant loss. In return, the detective's search
+  prior favours in/under over on/by. That keeps all four prepositions strategically
+  live: exposed spots are searched less but can be glimpsed.
+- **(added) One relocation per detective search**, and none while one is under way.
+  A relocation is spent when the English answer is accepted and the ghost starts
+  moving. Cancelling the panel before that spends nothing (time was frozen, so
+  nothing was gained). Moving is locked once the detective has started inspecting
+  the spot the ghost is in.
+- Normal relocation reach is limited (path distance, ~4.5 m, tuned per room so
+  every room has several options). Movement follows collision-safe floor paths.
+  The ghost floats, never teleports, and only ends on valid spots.
+- Discovery: (a) the detective inspects the occupied spot (or the spot the ghost
+  is arriving at), or (b) **caught in the open:** the ghost is in transit, not
+  invisible or behind bubbles, and continuously seen at close range (~2.5 m) for
+  ~0.6 s. Anything shorter is a glimpse that raises suspicion.
+
+**Detective fairness by construction.** The detective AI module never receives the
+ghost's position. Its inputs are the room's public spot list, its own pose and
+memory (searched spots), suspicion, a seeded RNG, and *clue events* produced by a
+separate perception module (sound, glimpse, munch, decoy, music, bubbles). Each
+clue carries an approximate position: sound is blurred by ~1 m, a glimpse is near
+exact. Only perception and search resolution see the truth. A unit test checks
+that the same seed and clues with a different true spot give identical decisions.
+Suspicion (0–100) rises with clues and decays without evidence. At 100 the
+detective investigates the clue region next (the nearest unsearched spots to the
+last clue), which is still not knowledge of the spot. Empty searched spots are
+avoided unless a newer clue points there, so moving quietly into a spot already
+searched is the core winning strategy.
+
+**Abilities** (one use each, all change what the detective perceives or decides):
+Sleepy *Deep Sleep*: for the current search, no incidental creaks (every hidden
+ghost may creak when the detective is close) and halved suspicion gain;
+suspicion −30. Hungry *Snack Distraction*: munching sound at a chosen spot; the
+detective usually (not always) retargets there, less often when it was already
+searched or suspicion points elsewhere. Sneaky *Silent Move*: the next relocation
+makes no sound. Mischief *Decoy*: a false silhouette at a chosen spot (a glimpse
+clue); inspecting it dissolves it and spends a search; a suspicious detective
+sometimes sees through it. Bouncy *Super Bounce*: the next relocation ignores
+reach, moves about 2× faster, about 1.6× louder. Bubbles *Bubble Screen*: a cloud
+(~1.5 m, ~8 s) at the ghost that blocks line of sight; a weak clue itself.
+Melody *Phantom Music*: ~10 s of music that masks movement sound (heard ×0.25)
+but is itself a blurred clue near where it started; works in every room. Shadow
+*Vanish*: the next relocation is invisible but makes normal sound. Movement
+abilities still spend the relocation. Choosing an ability's target spot asks no
+English.
+
+**English.** "Where are you?" on the starting spot and each relocation (at most 3
+per match, never for staying hidden). The sentence is generated from the actual
+spot (`I'm under the table.`); "I am" is accepted; speech reuses `speechMatch`,
+always has button fallback, and never costs anything strategically. While the
+panel is open, the whole simulation is frozen (detective, timers, suspicion).
+Support level is a setting, **English help: Beginner / Standard / Advanced**,
+separate from the detective (there is one tuned detective difficulty; a
+difficulty selector is out of scope). Beginner: the model is spoken, the spot is
+highlighted, and the student picks the preposition. Standard: `I'm ___ the table.`
+with preposition tiles, optional mic. Advanced: no frame; say it, or build it from
+tiles. Standard/Advanced never show the full sentence before the first attempt.
+The detective announces each target in English ("Maybe under the table!"). Only on
+Beginner is that spot also highlighted, so on the higher levels understanding the
+detective is the strategic edge. **(added)**
+
+**Presentation.** Fixed elevated three-quarter camera per room, with wall fade.
+The ghost has a player-only outline when hidden. The simulation is a pure,
+dt-stepped, seeded module (serializable state, commands in, events out), so the
+scene/UI only renders it. That also keeps a later multiplayer port possible.
+Rejected: real-time chase (reflex-based, unfair for Chromebooks), an English
+question on every stay (interrupts the strategy), and letting the AI peek at the
+true spot "for difficulty".
+
 ## 2026-10-19 — Title: "in Matsubara", stages after Start
 
 - **The title shows only the name, Start and Settings** (Settings directly
