@@ -14,6 +14,8 @@ import { CameraRig } from "./CameraRig";
 import { Destination } from "./Destination";
 import { director } from "../game/director";
 import { isCanvasTap } from "../input/tap";
+import { getGame, useGame } from "../game/store";
+import { HideSeekScene } from "./HideSeekScene";
 
 /** The WebGL renderer (for the e2e hook's performance numbers). */
 export const rendererRef: { current: THREE.WebGLRenderer | null } = { current: null };
@@ -52,6 +54,7 @@ function Clock() {
 }
 
 export function GameScene() {
+  const hideSeek = useGame((s) => s.screen === "hideseek");
   return (
     <Canvas
       className="scene"
@@ -61,7 +64,7 @@ export function GameScene() {
       flat
       // A tap on nothing in particular (the sky, the grass) still walks the player out at the end.
       onPointerMissed={() => {
-        if (isCanvasTap(0)) director.tapExit();
+        if (getGame().screen !== "hideseek" && isCanvasTap(0)) director.tapExit();
       }}
       onCreated={({ gl, scene }) => {
         rendererRef.current = gl;
@@ -69,8 +72,9 @@ export function GameScene() {
         scene.fog = new THREE.Fog("#120a22", 13, 30);
       }}
     >
-      <Clock />
       <AdaptivePixelRatio />
+      {hideSeek ? <HideSeekScene /> : <>
+      <Clock />
       <Lights />
       <Hotel />
       <Furniture />
@@ -82,6 +86,7 @@ export function GameScene() {
       <Effects />
       <Cobwebs />
       <CameraRig />
+      </>}
     </Canvas>
   );
 }

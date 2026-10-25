@@ -63,7 +63,7 @@ export const tts = {
     rateScale = scale;
   },
 
-  speak(text: string, opts: { pitch?: number; rate?: number } = {}): Promise<void> {
+  speak(text: string, opts: { pitch?: number; rate?: number; volume?: number } = {}): Promise<void> {
     const generation = cancelGeneration;
     const estimate = 900 + text.length * 75 / rateScale;
     return new Promise((resolve) => {
@@ -85,7 +85,7 @@ export const tts = {
       if (voice) u.voice = voice;
       u.rate = (opts.rate ?? 0.92) * rateScale;
       u.pitch = opts.pitch ?? 1.15;
-      u.volume = 1;
+      u.volume = opts.volume ?? 1;
       live.add(u);
       const end = () => {
         live.delete(u);

@@ -96,6 +96,22 @@ Rejected: real-time chase (reflex-based, unfair for Chromebooks), an English
 question on every stay (interrupts the strategy), and letting the AI peek at the
 true spot "for difficulty".
 
+**Playable-mode integration (2026-10-25).** A separate render-clock session owns
+the accepted simulation and drains its events into detective speech/subtitles,
+sounds and visual cues. Entering the mode cancels the story director and unmounts
+its scene controllers; leaving resets the story runtime through the existing menu
+path. The human figure's geometry and rig are shared with the story player, while
+its detective controller only reads the simulation pose. No simulation rules or
+the DetectiveView boundary change.
+
+Controls and English questions occupy a scrollable left rail (compact on short
+screens), with the fixed room camera framed into the remaining space. Hidden
+ghost silhouettes and faded furniture are presentation-only. `?e2e=1` exposes
+detached semantic snapshots through `__hh.hs()`, core commands through
+`hsCommand`, and a separate `hsTimeScale`; these never supply truth to detective
+decisions. `scripts/hideseek.mjs` produces the controller-owned visual acceptance
+artifacts under `.tmp/hideseek/<size>/`.
+
 ## 2026-10-19 — Title: "in Matsubara", stages after Start
 
 - **The title shows only the name, Start and Settings** (Settings directly

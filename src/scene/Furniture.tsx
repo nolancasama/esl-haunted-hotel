@@ -11,6 +11,8 @@ import { buildObject, type AnimatedPart } from "./models";
 import { furnitureMaterial, glowPartMaterial, glowSpriteMaterial, texturedMaterial } from "./materials";
 import { lineFade } from "./wallFade";
 import { isCanvasTap } from "../input/tap";
+import type { RoomId } from "../game/types";
+import { getHideSeek } from "../game/hideSeek/session";
 
 const HIGHLIGHT = new THREE.Color("#8f7bff");
 const HELP = new THREE.Color("#ffd36b");
@@ -59,10 +61,10 @@ function partOpenAmount(obj: WorldObject, part: AnimatedPart["name"]): number {
   }
 }
 
-function FurnitureItem({ obj }: { obj: WorldObject }) {
+function FurnitureItem({ obj, hideSeek = false }: { obj: WorldObject; hideSeek?: boolean }) {
   const built = useMemo(() => buildObject(obj), [obj]);
-  const material = useMemo(() => (obj.interactive ? new THREE.MeshLambertMaterial({ vertexColors: true }) : furnitureMaterial), [obj]);
-  const partMats = useMemo(() => new THREE.MeshLambertMaterial({ vertexColors: true }), []);
+  const material = useMemo(() => (obj.interactive || hideSeek ? new THREE.MeshLambertMaterial({ vertexColors: true, transparent: hideSeek }) : furnitureMaterial), [obj, hideSeek]);
+  const partMats = useMemo(() => new THREE.MeshLambertMaterial({ vertexColors: true, transparent: hideSeek }), [hideSeek]);
   const parts = useRef<Record<string, THREE.Group | null>>({});
   const root = useRef<THREE.Group>(null);
   const wob = useRef<THREE.Group>(null);
@@ -81,6 +83,28 @@ function FurnitureItem({ obj }: { obj: WorldObject }) {
     if (visible && obj.wallLines.length) visible = Math.min(...obj.wallLines.map((id) => lineFade.get(id) ?? 1)) > 0.4;
     r.visible = visible;
     if (!visible) return;
+    if (hideSeek) {
+      // Fade tall blockers for the student's view only; the simulation never reads this.
+      const match = getHideSeek().match;
+      let blocked = false;
+      if (match && obj.spec.h > 0.9) {
+        for (const actor of [match.ghost, { ...match.detective, y: obj.y + 0.45 }]) {
+          const cy = rt.camera.pos.y;
+          const top = obj.y + obj.spec.h;
+          const fraction = (top - actor.y) / (cy - actor.y);
+          if (fraction <= 0 || fraction >= 1) continue;
+          const x = actor.x + (rt.camera.pos.x - actor.x) * fraction;
+          const z = actor.z + (rt.camera.pos.z - actor.z) * fraction;
+          if (x > obj.rect.x0 - 0.15 && x < obj.rect.x1 + 0.15 && z > obj.rect.z0 - 0.15 && z < obj.rect.z1 + 0.15) blocked = true;
+        }
+      }
+      const mat = material as THREE.MeshLambertMaterial;
+      mat.opacity += ((blocked ? 0.24 : 1) - mat.opacity) * Math.min(1, dt * 9);
+      mat.depthWrite = mat.opacity > 0.98;
+      partMats.opacity = mat.opacity;
+      partMats.depthWrite = mat.depthWrite;
+      return;
+    }
     const game = getGame();
     // Highlight the object in reach (and the help glow after many empty searches).
     if (obj.interactive) {
@@ -167,7 +191,7 @@ function FurnitureItem({ obj }: { obj: WorldObject }) {
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     // Only claim the click while exploring; in a close-up it must reach the markers.
-    if ((!obj.interactive && obj.id !== "lobby.stairs") || getGame().phase !== "explore" || !root.current?.visible) return;
+    if (hideSeek || (!obj.interactive && obj.id !== "lobby.stairs") || getGame().phase !== "explore" || !root.current?.visible) return;
     if (!isCanvasTap(e.delta)) return;
     e.stopPropagation();
     if (obj.id === "lobby.stairs") director.tapStairs();
@@ -204,11 +228,11 @@ function FurnitureItem({ obj }: { obj: WorldObject }) {
   );
 }
 
-export function Furniture() {
+export function Furniture({ roomId }: { roomId?: RoomId }) {
   return (
     <group>
-      {WORLD.objects.map((o) => (
-        <FurnitureItem key={o.id} obj={o} />
+      {WORLD.objects.filter((o) => !roomId || o.room === roomId).map((o) => (
+        <FurnitureItem key={o.id} obj={o} hideSeek={Boolean(roomId)} />
       ))}
     </group>
   );

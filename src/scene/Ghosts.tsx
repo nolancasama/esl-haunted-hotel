@@ -10,6 +10,7 @@ import type { GhostId } from "../game/types";
 import { accessoryGeometry, ghostArm, ghostBody, ghostFace, propellerGeometry, type Accessory } from "./ghostModel";
 import { faceTexture, type Expression } from "./textures";
 import { glowSpriteMaterial } from "./materials";
+import { getHideSeek } from "../game/hideSeek/session";
 
 interface GhostLook {
   color: string;
@@ -115,6 +116,66 @@ const easeOutBack = (t: number) => {
 };
 
 const tmpV = new THREE.Vector3();
+
+/** The student's ghost and the false silhouette share the story model/accessories. */
+export function HideSeekGhost({ id, decoy = false }: { id: GhostId; decoy?: boolean }) {
+  const def = GHOSTS[id];
+  const look = useMemo<GhostLook>(() => ({ color: def.color, glow: def.glow, accessory: def.accessory, mask: def.accessory === "mask", glowEyes: def.glowEyes }), [def]);
+  const rig = useRef(newRig());
+  const outline = useRef<THREE.Mesh>(null);
+  const celebrationTime = useRef(0);
+  useFrame((_, dt) => {
+    const m = getHideSeek().match;
+    const r = rig.current;
+    if (!m || !r.root || !r.squash || !r.mats) return;
+    // Starting English previews the chosen place for the student; the canonical
+    // ghost pose is committed only by answerEnglish in the simulation.
+    const startingPreview = !decoy && m.status === "setup" && m.english?.starting ? m.english.spotId : null;
+    const spotId = decoy ? m.effects.decoy?.spotId : startingPreview ?? m.ghost.spotId ?? m.ghost.destination;
+    const spot = spotId ? WORLD.spotById.get(spotId) : null;
+    r.root.visible = Boolean(spot);
+    if (!spot) { if (outline.current) outline.current.visible = false; return; }
+    const p = decoy || startingPreview ? spot.hidePos : m.ghost;
+    const transit = !decoy && m.ghost.transit;
+    const frightened = !decoy && m.status === "playing" && Math.hypot(m.detective.x - p.x, m.detective.z - p.z) < 2.1;
+    const won = !decoy && m.status === "won";
+    celebrationTime.current = won ? celebrationTime.current + Math.min(dt, 0.1) : 0;
+    const visualTime = m.time + celebrationTime.current;
+    const bounce = transit && m.ghost.loudness > 1 ? Math.abs(Math.sin(m.time * 7)) * 0.65 : 0;
+    const float = spot.prep === "under" || spot.prep === "in" ? 0 : Math.sin(m.time * 2.2) * 0.025;
+    const shimmer = decoy ? Math.sin(m.time * 7.5) : 0;
+    r.root.position.set(p.x + (frightened ? Math.sin(m.time * 27) * 0.015 : 0), p.y + float + bounce + (won ? Math.abs(Math.sin(visualTime * 6)) * 0.25 : 0) + (decoy ? shimmer * 0.025 : 0), p.z);
+    faceCamera(r.root, Math.min(1, dt * 8));
+    const decoyScale = decoy ? 1 + shimmer * 0.035 : 1;
+    r.squash.scale.set((transit ? 0.75 : spot.scale[0]) * decoyScale, (transit ? 0.75 : spot.scale[1]) * decoyScale, (transit ? 0.75 : spot.scale[2]) * decoyScale);
+    r.squash.rotation.z = won ? Math.sin(visualTime * 7) * 0.17 : 0;
+    if (r.acc) r.acc.scale.y = !transit && spot.prep === "under" ? HAT_FLAT : 1;
+    if (r.armL) r.armL.rotation.z = frightened ? -0.9 : won ? -1.4 : 0;
+    if (r.armR) r.armR.rotation.z = frightened ? 0.9 : won ? 1.4 : 0;
+    if (r.prop && !m.english) r.prop.rotation.y += Math.min(dt, 0.1) * 12;
+    setExpression(r.mats, frightened ? "surprised" : id === "sleepy" ? "sleepy" : won ? "giggle" : "happy", look);
+    const opacity = decoy ? 0.3 + shimmer * 0.06 : m.ghost.invisible ? 0.06 : m.effects.sleepySearch !== null ? 0.48 : 0.88;
+    setOpacity(r.mats, opacity);
+    if (decoy) {
+      r.mats.body.depthTest = false;
+      r.mats.face.depthTest = false;
+      r.mats.acc.depthTest = false;
+    }
+    // This player-only silhouette has no relation to the perception module.
+    if (outline.current) {
+      outline.current.visible = !decoy && (m.ghost.hidden || Boolean(startingPreview));
+      outline.current.position.copy(r.root.position);
+      outline.current.rotation.copy(r.root.rotation);
+      outline.current.scale.set(spot.scale[0] * 1.09, spot.scale[1] * 1.06, spot.scale[2] * 1.09);
+    }
+  });
+  return <>
+    <GhostMesh look={look} rig={rig.current} />
+    {!decoy && <mesh ref={outline} geometry={ghostBody()} renderOrder={18} visible={false}>
+      <meshBasicMaterial color={def.glow} transparent opacity={0.32} depthTest={false} depthWrite={false} side={THREE.DoubleSide} />
+    </mesh>}
+  </>;
+}
 
 /** Turn to face the camera (yaw only). */
 function faceCamera(root: THREE.Group, k = 1) {

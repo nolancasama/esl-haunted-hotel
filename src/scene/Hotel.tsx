@@ -10,10 +10,11 @@ import { Beacon, Door } from "./Doors";
 import { GhostBoard } from "./GhostBoard";
 import { Outside } from "./Outside";
 import { lineFade } from "./wallFade";
-import type { Rect } from "../game/types";
+import type { Rect, RoomId } from "../game/types";
 import { director } from "../game/director";
 import { isCanvasTap } from "../input/tap";
 import { getGame } from "../game/store";
+import { getHideSeek } from "../game/hideSeek/session";
 
 const TILE = 1.6;
 
@@ -111,10 +112,22 @@ function GroundShell() {
   return <mesh ref={ref} geometry={geo} material={mat} visible={false} />;
 }
 
-function Walls() {
+function Walls({ roomId }: { roomId?: RoomId }) {
   const views = useMemo<WallView[]>(() => {
     const cap = () => new THREE.MeshLambertMaterial({ color: WALL_CAP, transparent: true });
-    return WORLD.walls.map((piece) => {
+    const room = roomId ? ROOMS[roomId] : null;
+    return WORLD.walls.filter((piece) => {
+      if (!room) return true;
+      const r = piece.rect;
+      const b = room.bounds;
+      return piece.line.floor === room.floor && r.x1 >= b.x0 && r.x0 <= b.x1 && r.z1 >= b.z0 && r.z0 <= b.z1;
+    }).map((original) => {
+      const piece = room ? { ...original, rect: {
+        x0: Math.max(original.rect.x0, room.bounds.x0 - WALL_T / 2),
+        x1: Math.min(original.rect.x1, room.bounds.x1 + WALL_T / 2),
+        z0: Math.max(original.rect.z0, room.bounds.z0 - WALL_T / 2),
+        z1: Math.min(original.rect.z1, room.bounds.z1 + WALL_T / 2)
+      } } : original;
       const along = piece.line.axis === "x";
       const neg = wallMaterial(piece.line.neg);
       const posM = wallMaterial(piece.line.pos);
@@ -130,7 +143,7 @@ function Walls() {
         pos: [(r.x0 + r.x1) / 2, (piece.y0 + piece.y1) / 2, (r.z0 + r.z1) / 2]
       };
     });
-  }, []);
+  }, [roomId]);
   const meshes = useRef<Array<THREE.Mesh | null>>([]);
 
   useFrame((_, dt) => {
@@ -148,6 +161,10 @@ function Walls() {
             [t.x, t.y, t.z],
             [t.x, floorY + 0.1, t.z]
           ];
+    if (roomId) {
+      const match = getHideSeek().match;
+      if (match) points.push([match.ghost.x, match.ghost.y + 0.2, match.ghost.z], [match.detective.x, floorY + 0.6, match.detective.z]);
+    }
     const k = Math.min(1, dt * 7);
     for (const line of WALL_LINES) {
       if (lineShown(line, rt.view.floor) === "hidden") {
@@ -208,10 +225,10 @@ function floorRects(bounds: Rect, holes: Rect[]): Rect[] {
   return rects;
 }
 
-function Floors() {
+function Floors({ roomId }: { roomId?: RoomId }) {
   const pieces = useMemo(
     () =>
-      Object.values(ROOMS).flatMap((room) => {
+      Object.values(ROOMS).filter((room) => !roomId || room.id === roomId).flatMap((room) => {
         const b = room.bounds;
         const mat = floorMaterial(room.id, b.x1 - b.x0, b.z1 - b.z0);
         return floorRects(b, FLOOR_HOLES[room.id] ?? []).map((r, i) => {
@@ -234,7 +251,7 @@ function Floors() {
           };
         });
       }),
-    []
+    [roomId]
   );
   const refs = useRef<Array<THREE.Mesh | null>>([]);
   useFrame(() => {
@@ -248,7 +265,7 @@ function Floors() {
       {pieces.map((p, i) => (
         <mesh key={p.key} ref={(m) => void (refs.current[i] = m)} rotation={[-Math.PI / 2, 0, 0]} position={p.pos} geometry={p.geo} material={p.mat}
           onClick={(e) => {
-            if (getGame().phase !== "explore" || p.floor !== rt.view.floor || !isCanvasTap(e.delta)) return;
+            if (roomId || getGame().phase !== "explore" || p.floor !== rt.view.floor || !isCanvasTap(e.delta)) return;
             e.stopPropagation();
             director.tapFloor(e.point.x, e.point.z, p.floor);
           }} />
@@ -257,11 +274,12 @@ function Floors() {
   );
 }
 
-export function Hotel() {
+export function Hotel({ roomId }: { roomId?: RoomId }) {
   return (
     <group>
-      <Floors />
-      <Walls />
+      <Floors roomId={roomId} />
+      <Walls roomId={roomId} />
+      {!roomId && <>
       <GroundShell />
       {DOORS.map((d) => (
         <Door key={d.id} door={d} />
@@ -269,6 +287,7 @@ export function Hotel() {
       <Beacon />
       <GhostBoard />
       <Outside />
+      </>}
     </group>
   );
 }

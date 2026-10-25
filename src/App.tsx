@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { GameScene } from "./scene/GameScene";
 import { Hud } from "./ui/Hud";
 import { TouchControls } from "./ui/TouchControls";
@@ -76,7 +76,13 @@ function Fade() {
 
 export function App() {
   const wrap = useRef<HTMLDivElement>(null);
-  useEffect(() => installKeyboard(director.onKey), []);
+  const screen = useGame((s) => s.screen);
+  useLayoutEffect(() => {
+    if (screen === "hideseek") director.suspendForHideSeek();
+  }, [screen]);
+  useEffect(() => installKeyboard((code) => {
+    if (getGame().screen !== "hideseek") director.onKey(code);
+  }), []);
   // Build the tap-to-move grid while the title screen is up, not on the first tap
   // (~0.3 s on a desktop, over a second on a slow Chromebook).
   useEffect(() => {

@@ -1,9 +1,18 @@
 # Current State
 
 ## Status
+**2026-10-25: Hide & Seek (Ghost Mode) is done.** The stage list is now All Levels /
+Hide & Seek, and Hide & Seek unlocks with Chapter 1. Eight ghosts x eight rooms
+lead into a 3D match against the human detective, with English questions, abilities
+and results. Typecheck, build and 477 unit tests pass. The full e2e suite passed
+59/61. The two failures (beacon backwards-cancel, story "locked door") both passed
+when rerun alone. Claude reviewed `node scripts/hideseek.mjs` screenshots at all three
+sizes (`.tmp/hideseek/`) after one visual correction pass (vision cone clipped to
+walls, decoy label, Melody notes, results buttons, Beginner tiles).
+
 **Chapter 2 (upstairs) is done and tested.** The full game has 8 ghosts on two floors.
-Unit tests, typecheck, build and all e2e specs (including `tests/e2e/chapter2.spec.ts`)
-pass. The visuals were checked in screenshots at 1366x768 and 844x390 touch
+That baseline passed unit tests, typecheck, build and the then-existing e2e specs
+(including `tests/e2e/chapter2.spec.ts`). Its visuals were checked at 1366x768 and 844x390 touch
 (`.tmp/upstairs`, `.tmp/ending`). The repository is public and every push to `main`
 deploys to GitHub Pages (https://nolancasama.github.io/esl-haunted-hotel/).
 **2026-10-16:** All 34 e2e specs pass (tap-to-move, beacon entry included). The intro's startled hop and turn are now actually visible. Before, the
@@ -24,13 +33,23 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
   (`.panel`, `.btn-primary`/`.btn-secondary` aliased to `primary`/`secondary`, `.icon-btn`,
   `.ghost-medallion`, word tiles, switches, sliders). System serif display font only.
   Title: HAUNTED HOTEL "in Matsubara", Start, Settings. Start opens the stage list
-  (`data-testid=stages`): Full Adventure / Chapter 1 / Chapter 2 (locked card says
-  "Finish Chapter 1") / Practice, tap to play, Random toggle once unlocked, Back. A link
+  (`data-testid=stages`): All Levels / Hide & Seek, tap to play, Random toggle once
+  unlocked, Back. Hide & Seek unlocks after Chapter 1 (`hh.ch2.v1` or
+  `hh.hideseek.v1`). Chapter and Practice teacher links remain available. A link
   naming the stage (`?mode=story|practice|replay`, `?chapter=1|2`) skips the list; every
   e2e spec and dev script boots with one. `title.spec.ts` covers the list. Counter medallions flash once on capture. Settings grouped Speech /
   Sound / Language / Camera (two columns on short screens). Reduced-motion supported.
 - **Doors (2026-10-19):** leaves fill the opening up to the frame head (3 mm clearance);
   heights come from the wall opening via `doorFit()` (`rooms.ts`), checked by `doors.test.ts`.
+- **Hide & Seek (2026-10-25):** ghost selection (all eight), room selection (all eight),
+  a live 3D detective match, and friendly Escaped!/Found! results. Direct links
+  `?mode=hideseek&ghost=&room=&seed=` skip the named selections. The accepted pure
+  simulation in `src/game/hideSeek/` owns all strategy and English rules; the session
+  store drives it from the render clock and translates events into speech, subtitles,
+  sounds and visual cues. Story input and its director are suspended during the mode.
+  Fixed room cameras, spot markers and an accessible spot list accompany Stay / Move /
+  Ability controls. English help uses Beginner / Standard / Advanced, with microphone
+  recognition and tile fallback; an open English panel freezes simulation time.
 - **Ending exit (2026-10-16):** after the last ghost the player walks out on a one-way track
   from just inside the front door (`logic/exitTrack.ts`); every input walks forward, nothing
   else moves them; results come once on the porch.
@@ -75,11 +94,26 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
   fanOn, blackout, player yaw/startle/opacity, path length/index/destination and
   camera yaw. Tap tests use `project(x,y,z)`, `objectInfo(id)` and
   `startTrace`/`stopTrace` for real canvas pixels and frame-by-frame movement.
+- **Hide & Seek hooks** (`window.__hh`, `?e2e=1`): `hs()` provides a read-only cloned
+  match snapshot, including phase, config, detective pose/target, ghost transit,
+  English panel, counters, effects, stats and public spot/reachable/target lists.
+  `hsCommand(name, ...args)` drives the core commands (plus session `start` and
+  `pickSpot`); `hsTimeScale(s)` scales only the match clock, with zero for visual
+  staging. Existing `project(x,y,z)` projects scene markers and actor measurements.
 - **Scripts:** `scripts/upstairs.mjs --part=rooms|stairs|tricks|cutscene`,
   `scripts/ending.mjs [url] [WxH] [--touch]`, `scripts/intro.mjs [url] [--speed=] [--gpu]`,
   `scripts/rain.mjs [url] [--gpu]`, `scripts/ui.mjs [url] [WxH] [--touch]` (all three sizes by
   default), `scripts/doors.mjs [url] [--out=dir]` (all need a dev server on 5199).
+- **Hide & Seek visual script:** `scripts/hideseek.mjs [url] [WxH] [--touch]`
+  captures ghost/room selection, three room matches, all English help levels, eight
+  ability effects and both results at 1366x768, 1024x600 and 844x390 touch. Output:
+  `.tmp/hideseek/<size>/`, including `measurements.json` for panel/actor overlaps,
+  clipping, overflow, semantic state and renderer workload. Running this script and
+  final aesthetic acceptance are controller-owned; implementation does not mark it accepted.
 - **E2E:** `story.spec.ts`, `practice.spec.ts`, `chapter2.spec.ts`, `tapmove.spec.ts`, `beacon.spec.ts`, `exit.spec.ts`.
+  `hideseek.spec.ts` covers selection, tile/speech English, frozen/walking detective,
+  seeded stay win/loss, relocation budget, Hungry/Shadow abilities, results navigation
+  and all eight room starts. `title.spec.ts` covers Hide & Seek unlock/deep links.
   Tap movement covers floor/furniture taps, retargeting, obstacles, doors, both
   floors/stairs, drag rejection, keyboard interruption and existing UI/markers.
   The drag test was shown to fail with tap drag-rejection disabled (0.31 m of
@@ -97,6 +131,10 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
   the player ended 0.2 m deeper than the ~1 m entry allows, W held under SwiftShader
   load) and passed the other three times, alone and in a full run. A timing flake in
   the walk-distance check; not investigated.
+- `story.spec.ts` "a locked door says so" timed out waiting for the toast late in the
+  19-minute full run (2026-10-25) and passed alone. Probably SwiftShader load; watch it.
+- Hide & Seek has no in-browser e2e for Shadow's Vanish move. The core unit tests cover it.
+  The detective has one tuned difficulty (no selector, by design).
 - Software-rendered (SwiftShader) runs are only 2–7 fps, so the full-adventure e2e test
   takes a few minutes (timeout 420 s). Draw calls: ~100–200 per floor.
 - `fanSwitchTest` forces the steam to its target in one frame instead of waiting for the
@@ -105,11 +143,16 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
   because `jump` skips the earlier answers.
 
 ## Next Steps
-1. Play it on a real Chromebook / phone: stairs feel, attic blackout, bathroom steam, and
-   the new UI (system serif title on ChromeOS fonts, touch sizes, results scrolling at 390 px).
-2. When ready, publish (make the repo public, enable Pages; commands in README).
+1. Play Hide & Seek with students on a real Chromebook: pacing of detective walks and the
+   decision window, whether children understand the detective's announcements, and
+   balance per ghost (seeded balance: stay ~19% win, sensible play 44–75%).
+2. Play the story on a real Chromebook / phone: stairs feel, attic blackout, bathroom steam,
+   touch sizes, results scrolling at 390 px.
 
 ## Codex / Delegated Work
+Hide & Seek (2026-10-25) was written by Codex (routed) in four orders: simulation core,
+stage list/unlock, playable integration, visual corrections. Claude froze the rules
+(DESIGN_DECISIONS), reviewed each and accepted them. Nothing is pending.
 The 2026-10-19 UI redesign was written by Codex (routed) until it hit its usage limit;
 Claude reviewed the partial work, finished it (results layout, button contrast, tap-through
 subtitles/hints, Prettier formatting) and accepted it. Nothing is pending.

@@ -1418,6 +1418,22 @@ function planFor(mode: Mode, scope: Scope): Encounter[] {
 
 // ------------------------------------------------------------------- API
 
+function stopStory() {
+  gen++;
+  busy = false;
+  awaitingEntry = false;
+  outroWalk = false;
+  pendingNext = null;
+  cutscene = null;
+  stopListening?.();
+  tts.cancel();
+  audio.setListening(false);
+  audio.stopMusic();
+  audio.stopRain(1);
+  window.clearInterval(tickTimer);
+  resetRuntime();
+}
+
 export const director = {
   onKey,
 
@@ -1562,20 +1578,14 @@ export const director = {
     p?.();
   },
 
+  /** Cancel story clocks, dialogue and input before mounting the independent mode. */
+  suspendForHideSeek() {
+    stopStory();
+    setGame({ line: null, caption: null, hint: null, toast: null, fade: 0, settingsOpen: false });
+  },
+
   toTitle() {
-    gen++;
-    busy = false;
-    awaitingEntry = false;
-    outroWalk = false;
-    pendingNext = null;
-    cutscene = null;
-    stopListening?.();
-    tts.cancel();
-    audio.setListening(false);
-    audio.stopMusic();
-    audio.stopRain(1);
-    window.clearInterval(tickTimer);
-    resetRuntime();
+    stopStory();
     setGame({
       screen: "title",
       phase: "intro",

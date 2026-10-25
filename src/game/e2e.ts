@@ -13,6 +13,9 @@ import { cameraRef } from "../scene/CameraRig";
 import { rendererRef } from "../scene/GameScene";
 import { audio } from "../audio/audio";
 import { beaconSpot } from "./beacon";
+import { command as hsCommand, hideSeekSnapshot, pickSpot, setHideSeekTimeScale, startHideSeek } from "./hideSeek/session";
+import type { GhostId } from "./types";
+import type { EnglishLevel, PlayRoom } from "./hideSeek/types";
 
 /** Put the player at (x, z) on a floor, collision-resolved for wherever that is (the stairs included). */
 function place(x: number, z: number, floor: Floor) {
@@ -45,6 +48,13 @@ export function installE2eHook() {
     traceFrame = requestAnimationFrame(recordFrame);
   };
   const api = {
+    hs: hideSeekSnapshot,
+    hsCommand(name: string, ...args: unknown[]) {
+      if (name === "start") return startHideSeek(args[0] as GhostId, args[1] as PlayRoom, args[2] as number | undefined, args[3] as EnglishLevel | undefined);
+      if (name === "pickSpot") return pickSpot(String(args[0]));
+      return hsCommand(name, ...args);
+    },
+    hsTimeScale: setHideSeekTimeScale,
     state() {
       const g = getGame();
       const s = g.hunt;
