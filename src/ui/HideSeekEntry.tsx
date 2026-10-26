@@ -5,7 +5,7 @@ import type { GhostId } from "../game/types";
 import { WORLD } from "../game/world/world";
 import { ROOMS } from "../game/world/rooms";
 import { abilityTargets, placePhrase, reachableSpots, type PlayRoom } from "../game/hideSeek";
-import { command, leaveHideSeek, pickSpot, setPickMode, startHideSeek, useHideSeek } from "../game/hideSeek/session";
+import { command, decideHideSeek, leaveHideSeek, pickSpot, setPickMode, startHideSeek, stayHere, useHideSeek } from "../game/hideSeek/session";
 import { GhostPortrait } from "./GhostPortrait";
 import { HideSeekEnglish } from "./HideSeekEnglish";
 
@@ -139,7 +139,8 @@ export function HideSeekEntry() {
   const spot = match.ghost.spotId ? WORLD.spotById.get(match.ghost.spotId) : null;
   const choices = session.pickMode === "ability" ? abilityTargets(match) : session.pickMode ? reachableSpots(match) : [];
   const picking = session.pickMode === "start" ? "Choose your hiding place" : session.pickMode === "ability" ? "Choose a distraction spot" : "Choose where to move";
-  const active = match.status === "playing" && !match.english;
+  const decision = session.decision;
+  const active = match.status === "playing" && !match.english && !decision;
   return (
     <div className="hs-container" data-testid="hideseek">
     <div className="hs-match" data-testid="hs-match" data-phase={match.detective.phase}>
@@ -156,9 +157,9 @@ export function HideSeekEntry() {
           <label className="hs-suspicion">Suspicion <meter min="0" max="100" value={match.detective.suspicion} aria-label="Detective suspicion" /><span>{Math.round(match.detective.suspicion)}%</span></label>
           <div className="hs-ability-status"><strong>{ability.name}</strong><span data-testid="hs-ability-status">{match.abilityUsed ? "Used" : "Available · once"}</span></div>
           <div className="hs-actions">
-            <button className="secondary" data-testid="hs-stay" disabled={!active} onClick={() => { setPickMode(null); command("stay"); }}>Stay</button>
-            <button className="secondary" data-testid="hs-move" disabled={!active} onClick={() => setPickMode("move")}>Move</button>
-            <button className="primary" data-testid="hs-ability" title={ability.text} disabled={!active || match.abilityUsed} onClick={() => { if (def.id === "hungry" || def.id === "mischief") setPickMode("ability"); else command("useAbility"); }}>Ability</button>
+            <button className="primary" data-testid="hs-ability" title={ability.text}
+              disabled={match.status !== "playing" || Boolean(match.english) || match.abilityUsed || decision?.phase === "destination"}
+              onClick={() => { if (def.id === "hungry" || def.id === "mischief") setPickMode("ability"); else command("useAbility"); }}>Ability · {ability.name}</button>
           </div>
           <p className="hs-action-message" role="status" data-testid="hs-message">{session.message || (match.status === "setup" ? "Choose a marker or a place below." : match.english ? "Take your time. The detective is waiting." : "Stay hidden, or choose a new place.")}</p>
         </section>
@@ -175,6 +176,45 @@ export function HideSeekEntry() {
         )}
       </aside>
       {session.subtitle && !match.english && <div className="hs-subtitle subtitle panel" data-testid="hs-subtitle" role="status"><span>{session.subtitle}</span></div>}
+      {decision && !match.english && (
+        <section className={`hs-decision-overlay ${decision.phase === "destination" ? "picking" : ""}`}
+          data-testid="hs-decision-overlay" data-phase={decision.phase}
+          aria-label={decision.phase === "decision" ? "Stay or move decision" : "Choose a hiding place"}>
+          <div className="panel hs-decision-card" role="group">
+            <div className="hs-decision-eyebrow">{decision.searchNumber === 1 ? "HIDE & SEEK!" : "NEXT SEARCH"}</div>
+            <div className="hs-decision-round">Search {decision.searchNumber} of 5</div>
+            <h2>{decision.phase === "decision" ? "STAY OR MOVE?" : "CHOOSE YOUR HIDING PLACE"}</h2>
+            {ja && <span className="ja" lang="ja">{decision.phase === "decision" ? "ここに いる？ いどうする？" : "かくれる ばしょを えらぼう"}</span>}
+            <div className="hs-decision-time" aria-live="off" data-testid="hs-decision-time">
+              {Math.ceil(decision.secondsLeft)}
+            </div>
+            <div className="hs-decision-track" aria-hidden="true">
+              <div style={{ width: `${Math.max(0, Math.min(100, decision.secondsLeft / (decision.phase === "decision" ? 5 : 10) * 100))}%` }} />
+            </div>
+            {decision.phase === "decision" ? (
+              <>
+                <p>Current hiding place: <strong>{spot ? placePhrase(spot) : "Unknown"}</strong></p>
+                <div className="hs-decision-buttons">
+                  <button className="secondary" data-testid="hs-stay" onClick={() => decideHideSeek("stay")}>
+                    STAY <small lang="ja">ここに いる</small>
+                  </button>
+                  <button className="primary" data-testid="hs-move" onClick={() => decideHideSeek("move")}>
+                    MOVE <small lang="ja">いどうする</small>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p>Tap a highlighted hiding place in the room or choose one from the list.</p>
+                <p className="hs-decision-note">English practice starts after you choose. You can take your time.</p>
+                <button className="secondary hs-decision-cancel" data-testid="hs-stay-here" onClick={() => stayHere()}>
+                  Stay Here <small lang="ja">ここに いる</small>
+                </button>
+              </>
+            )}
+          </div>
+        </section>
+      )}
     </div>
     </div>
   );
