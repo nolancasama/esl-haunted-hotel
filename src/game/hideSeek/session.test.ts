@@ -90,7 +90,7 @@ describe("Hide & Seek session boundary", () => {
     command("answerEnglish", ["under"]);
     const m = getHideSeek().match!;
     const pose = JSON.stringify(m);
-    tickHideSeek(2);
+    for (let i = 0; i < 4; i++) tickHideSeek(0.5);
     expect(getHideSeek().decision?.phase).toBe("decision");
     expect(getHideSeek().decision?.secondsLeft).toBeCloseTo(3);
     expect(JSON.stringify(m)).toBe(pose);
@@ -107,10 +107,10 @@ describe("Hide & Seek session boundary", () => {
     expect(decideHideSeek("move")).toEqual({ ok: true });
     expect(getHideSeek().decision).toMatchObject({ phase: "destination", secondsLeft: 10 });
     expect(getHideSeek().pickMode).toBe("move");
-    tickHideSeek(4);
+    for (let i = 0; i < 8; i++) tickHideSeek(0.5);
     expect(m.time).toBe(0);
     expect(getHideSeek().decision?.secondsLeft).toBeCloseTo(6);
-    tickHideSeek(6);
+    for (let i = 0; i < 12; i++) tickHideSeek(0.5);
     expect(getHideSeek().decision).toBeNull();
     expect(getHideSeek().pickMode).toBeNull();
     expect(m.relocationsLeft).toBe(2);
