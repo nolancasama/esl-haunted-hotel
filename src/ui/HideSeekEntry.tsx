@@ -140,7 +140,6 @@ export function HideSeekEntry() {
   const choices = session.pickMode === "ability" ? abilityTargets(match) : session.pickMode ? reachableSpots(match) : [];
   const picking = session.pickMode === "start" ? "Choose your hiding place" : session.pickMode === "ability" ? "Choose a distraction spot" : "Choose where to move";
   const decision = session.decision;
-  const active = match.status === "playing" && !match.english && !decision;
   return (
     <div className="hs-container" data-testid="hideseek">
     <div className="hs-match" data-testid="hs-match" data-phase={match.detective.phase}>
