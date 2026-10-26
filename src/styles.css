@@ -2075,6 +2075,109 @@ input[type="range"]::-moz-range-thumb {
 .hs-room-card:hover, .hs-room-card:focus-visible { border-color: var(--gold-light); transform: translateY(-3px); }
 .hs-room-card strong { display: block; font-size: 19px; }
 .hs-room-number { display: block; margin: 0 auto 8px; width: 25px; height: 25px; line-height: 25px; font: 700 20px/25px var(--display); color: var(--plum-900); background: var(--gold); border-radius: 50%; }
+
+/* Formal, timed Ghost Mode decision beat. Only the card catches pointer events;
+   3D spot markers and the accessibility list remain clickable around it. */
+.hs-decision-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 16;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 20px 16px 310px;
+  pointer-events: none;
+}
+.hs-decision-card {
+  pointer-events: auto;
+  width: min(480px, 100%);
+  max-height: calc(100% - 12px);
+  overflow-y: auto;
+  touch-action: pan-y;
+  padding: 24px 28px;
+  text-align: center;
+  border: 2px solid var(--gold);
+  box-shadow: 0 14px 65px #090312df, 0 0 0 5px #c9a45b1a;
+  animation: hs-decision-enter 240ms ease-out both;
+}
+.hs-decision-eyebrow {
+  font: 700 15px var(--display);
+  letter-spacing: .16em;
+  color: var(--gold-light);
+}
+.hs-decision-round { color: var(--lavender); font-size: 13px; margin: 4px 0 9px; }
+.hs-decision-card h2 {
+  margin: 2px 0 5px;
+  font: 700 clamp(23px, 3.3vw, 36px)/1.1 var(--display);
+  color: var(--gold-light);
+}
+.hs-decision-card .ja { font-size: 13px; margin: 3px 0; }
+.hs-decision-time {
+  margin: 8px auto 4px;
+  font: 700 clamp(42px, 6vw, 70px)/1 var(--display);
+  color: #fff6d5;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 15px #ebc86c90;
+}
+.hs-decision-track {
+  height: 9px;
+  margin: 9px auto 14px;
+  background: #463553;
+  border: 1px solid #8b6d94;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.hs-decision-track > div {
+  height: 100%;
+  background: linear-gradient(90deg, #a7e2d5, var(--gold));
+  transition: width 85ms linear;
+}
+.hs-decision-card p { font-size: 15px; line-height: 1.3; margin: 10px 0; }
+.hs-decision-card p strong { color: var(--prep); }
+.hs-decision-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+.hs-decision-buttons button { min-height: 60px; font-size: 21px; padding: 9px 8px; }
+.hs-decision-buttons button small { display: block; margin: 3px 0 0; font-size: 12px; }
+.hs-decision-overlay.picking { align-items: flex-start; padding-top: 14px; }
+.hs-decision-overlay.picking .hs-decision-card { max-width: 470px; padding: 13px 20px 15px; }
+.hs-decision-overlay.picking .hs-decision-card h2 { font-size: clamp(18px, 2.5vw, 27px); }
+.hs-decision-overlay.picking .hs-decision-time { font-size: 36px; margin: 2px auto; }
+.hs-decision-overlay.picking .hs-decision-track { margin: 5px auto 6px; }
+.hs-decision-overlay.picking .hs-decision-card p { font-size: 13px; margin: 6px 0; }
+.hs-decision-overlay.picking .hs-decision-eyebrow, .hs-decision-overlay.picking .hs-decision-round { display: none; }
+.hs-decision-note { color: var(--lavender); }
+.hs-decision-cancel { min-height: 36px; font-size: 14px; padding: 6px 20px; }
+.hs-actions:has(> :only-child) { grid-template-columns: 1fr; }
+@keyframes hs-decision-enter { from { opacity: 0; transform: translateY(12px) scale(.97); } to { opacity: 1; transform: none; } }
+@media (max-height: 650px) {
+  .hs-decision-card { padding: 15px 20px; }
+  .hs-decision-time { font-size: 48px; margin: 3px auto; }
+  .hs-decision-buttons { margin-top: 8px; }
+}
+@media (max-height: 450px) {
+  .hs-decision-overlay { padding: 5px 9px 5px 248px; }
+  .hs-decision-card { padding: 9px 14px; max-height: 100%; }
+  .hs-decision-eyebrow { font-size: 12px; }
+  .hs-decision-round { font-size: 11px; margin: 2px 0 4px; }
+  .hs-decision-card h2 { font-size: 22px; }
+  .hs-decision-card .ja { font-size: 11px; }
+  .hs-decision-time { font-size: 42px; margin: 2px auto; }
+  .hs-decision-track { margin: 5px auto 7px; }
+  .hs-decision-card p { font-size: 12px; margin: 5px 0; }
+  .hs-decision-buttons { gap: 8px; margin-top: 7px; }
+  .hs-decision-buttons button { min-height: 46px; font-size: 16px; padding: 4px; }
+  .hs-decision-buttons button small { font-size: 10px; }
+  .hs-decision-overlay.picking { padding-top: 5px; }
+  .hs-decision-overlay.picking .hs-decision-card { padding: 8px 14px; }
+  .hs-decision-overlay.picking .hs-decision-card h2 { font-size: 17px; }
+  .hs-decision-overlay.picking .hs-decision-card p { font-size: 11px; margin: 4px 0; }
+  .hs-decision-overlay.picking .hs-decision-note { display: none; }
+  .hs-decision-overlay.picking .hs-decision-time { font-size: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hs-decision-card { animation: none; }
+  .hs-decision-track > div { transition: none; }
+}
+
 .hs-match { position: absolute; inset: 0; pointer-events: none; }
 .hs-container { position: absolute; inset: 0; pointer-events: none; }
 .hs-rail { position: absolute; top: 10px; bottom: 10px; left: 10px; width: 280px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; touch-action: pan-y; pointer-events: auto; padding: 2px 4px 5px 2px; }
