@@ -12,6 +12,7 @@ type Snapshot = MatchState & {
   spots: HidingSpot[];
   reachable: HidingSpot[];
   targets: HidingSpot[];
+  decision: { phase: "decision" | "destination"; secondsLeft: number; searchNumber: number } | null;
 };
 const snapshot = (page: Page) => hook<Snapshot | null>(page, "hs");
 const command = (page: Page, name: string, ...args: unknown[]) => hook<{ ok: boolean; reason?: string }>(page, "hsCommand", name, ...args);
@@ -53,6 +54,48 @@ async function answerTiles(page: Page) {
   await page.getByTestId(`hs-word-${spot!.prep}`).click();
   await until(page, "accepted tile answer", (next) => !next.english && next.status === "playing");
 }
+
+test("formal decision pauses the detective, then opens a ten-second relocation picker", async ({ page }) => {
+  const errors = await open(page);
+  await chooseStart(page);
+  await answerTiles(page);
+  const before = (await snapshot(page))!;
+  await expect(page.getByTestId("hs-decision-overlay")).toBeVisible();
+  await expect(page.getByTestId("hs-decision-overlay")).toHaveAttribute("data-phase", "decision");
+  await expect(page.getByTestId("hs-decision-time")).toHaveText("5");
+  expect(before.decision).toMatchObject({ phase: "decision", secondsLeft: 5, searchNumber: 1 });
+  await scale(page, 1);
+  await expect.poll(async () => (await snapshot(page))?.decision?.secondsLeft ?? 0).toBeLessThan(4);
+  await scale(page, 0);
+  const paused = (await snapshot(page))!;
+  expect(paused.time).toBe(before.time);
+  expect(paused.detective.x).toBe(before.detective.x);
+  expect(paused.detective.z).toBe(before.detective.z);
+  expect(paused.detective.suspicion).toBe(before.detective.suspicion);
+  await page.getByTestId("hs-move").click();
+  await expect(page.getByTestId("hs-decision-overlay")).toHaveAttribute("data-phase", "destination");
+  await expect(page.getByTestId("hs-decision-time")).toHaveText("10");
+  await page.getByTestId("hs-spot-dining.window.by").click();
+  await until(page, "relocation English opens without a timer", (s) => s.english?.spotId === "dining.window.by" && !s.decision);
+  expect((await snapshot(page))!.relocationsLeft).toBe(2);
+  await page.getByTestId("hs-word-by").click();
+  await until(page, "English accepted and move spent", (s) => !s.english && s.relocationsLeft === 1);
+  expect(errors).toEqual([]);
+});
+
+test("ten-second destination timeout defaults to Stay without using a relocation", async ({ page }) => {
+  const errors = await open(page);
+  await chooseStart(page);
+  await answerTiles(page);
+  await page.getByTestId("hs-move").click();
+  await expect(page.getByTestId("hs-stay-here")).toBeVisible();
+  await scale(page, 30);
+  await until(page, "timed selection expired and detective resumed", (s) => s.time > 0 && s.relocationsLeft === 2 && s.decision?.phase !== "destination", 30_000);
+  await scale(page, 0);
+  const current = (await snapshot(page))!;
+  expect(current.stats.relocations).toBe(0);
+  expect(errors).toEqual([]);
+});
 
 test("all eight ghosts and rooms are selectable; button English retries without advancing the match", async ({ page }) => {
   const errors = await open(page, "");
