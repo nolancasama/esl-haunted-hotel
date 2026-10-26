@@ -13,8 +13,11 @@ import type { CommandResult, EnglishLevel, MatchState, PlayRoom } from "./types"
 import { sentenceFor } from "./english";
 
 export type PickMode = "start" | "move" | "ability" | null;
+export interface TimedDecision { phase: "decision" | "destination"; secondsLeft: number; searchNumber: number }
 interface Session {
   match: MatchState | null;
+  decision: TimedDecision | null;
+  pendingDecision: boolean;
   revision: number;
   pickMode: PickMode;
   subtitle: string;
@@ -28,7 +31,7 @@ interface Session {
 
 /** The only live match owner. Views read it; commands and the render clock drive the core. */
 export const useHideSeek = create<Session>(() => ({
-  match: null, revision: 0, pickMode: null, subtitle: "", message: "", clue: null, fx: null, decoyPop: null, lossReason: null
+  match: null, decision: null, pendingDecision: false, revision: 0, pickMode: null, subtitle: "", message: "", clue: null, fx: null, decoyPop: null, lossReason: null
 }));
 export const getHideSeek = useHideSeek.getState;
 let timeScale = 1;
@@ -50,7 +53,8 @@ const FRIENDLY: Record<string, string> = {
   "answer-not-accepted": "Try again. Think about where your ghost is.",
   "ability-used": "Your special ability helped once. Keep hiding!",
   "invalid-target": "Choose a marked spot for your distraction.",
-  "match-finished": "This round is finished. Let's play again!"
+  "match-finished": "This round is finished. Let's play again!",
+  "decision-only": "Choose Stay or Move when the countdown appears."
 };
 
 function publish(result: CommandResult): CommandResult {
@@ -71,6 +75,48 @@ const ABILITY_SOUND: Record<GhostId, SfxName> = {
   bouncy: "boing", bubbles: "bubbles", melody: "musicbox", shadow: "blackout"
 };
 
+/** A new decision is a real simulation pause, never just an overlay. */
+function beginDecision(match: MatchState) {
+  if (match.status !== "playing" || match.searchesLeft <= 0) return;
+  if (match.ghost.transit) {
+    useHideSeek.setState({ pendingDecision: true });
+    return;
+  }
+  if (match.relocationsLeft <= 0 || reachableSpots(match).length === 0) {
+    useHideSeek.setState({
+      decision: null, pendingDecision: false, pickMode: null,
+      message: "No moves left. Stay hidden and watch the detective!"
+    });
+    return;
+  }
+  useHideSeek.setState({
+    decision: { phase: "decision", secondsLeft: 5, searchNumber: match.stats.completedSearches + 1 },
+    pendingDecision: false, pickMode: null, message: ""
+  });
+}
+
+export function decideHideSeek(choice: "stay" | "move"): CommandResult {
+  const s = getHideSeek();
+  if (!s.match || s.decision?.phase !== "decision") return publish({ ok: false, reason: "decision-only" });
+  if (choice === "move" && s.match.relocationsLeft > 0 && reachableSpots(s.match).length > 0) {
+    useHideSeek.setState({
+      decision: { phase: "destination", secondsLeft: 10, searchNumber: s.decision.searchNumber },
+      pickMode: "move", message: "Choose a nearby hiding place before the timer ends."
+    });
+    return publish({ ok: true });
+  }
+  useHideSeek.setState({ decision: null, pickMode: null });
+  return command("stay");
+}
+
+/** Timed selection expired or was cancelled: the ghost stays; no move is spent. */
+export function stayHere(): CommandResult {
+  const s = getHideSeek();
+  if (!s.match || s.decision?.phase !== "destination") return publish({ ok: false, reason: "decision-only" });
+  useHideSeek.setState({ decision: null, pickMode: null });
+  return command("stay");
+}
+
 function drain() {
   const s = getHideSeek();
   if (!s.match) return;
@@ -84,6 +130,7 @@ function drain() {
         subtitleUntil = performance.now() + 6500;
         speakModel(event.line);
         if (event.type === "searchEmpty") {
+          beginDecision(match);
           audio.play(event.decoy ? "pop" : "rustle");
           if (event.decoy) useHideSeek.setState({ decoyPop: { spotId: event.spotId, at: match.time } });
         }
@@ -119,14 +166,14 @@ export function startHideSeek(ghost: GhostId, room: PlayRoom, seed = Date.now() 
   timeScale = 1;
   subtitleUntil = 0;
   lastMusic = -100;
-  useHideSeek.setState({ match, pickMode: "start", subtitle: "", message: "Choose a spot to hide.", clue: null, fx: null, decoyPop: null, lossReason: null, revision: getHideSeek().revision + 1 });
+  useHideSeek.setState({ match, decision: null, pendingDecision: false, pickMode: "start", subtitle: "", message: "Choose a spot to hide.", clue: null, fx: null, decoyPop: null, lossReason: null, revision: getHideSeek().revision + 1 });
   return { ok: true } as const;
 }
 
 export function leaveHideSeek() {
   tts.cancel();
   audio.setListening(false);
-  useHideSeek.setState({ match: null, pickMode: null, subtitle: "", message: "", clue: null, fx: null, decoyPop: null, lossReason: null, revision: getHideSeek().revision + 1 });
+  useHideSeek.setState({ match: null, decision: null, pendingDecision: false, pickMode: null, subtitle: "", message: "", clue: null, fx: null, decoyPop: null, lossReason: null, revision: getHideSeek().revision + 1 });
   timeScale = 1;
   director.toTitle();
 }
@@ -135,6 +182,11 @@ export function setPickMode(mode: PickMode): CommandResult {
   const match = getHideSeek().match;
   if (!match) return publish({ ok: false, reason: "not-playing" });
   if (match.english) return publish({ ok: false, reason: "english-open" });
+  if (mode === "move" && getHideSeek().decision?.phase === "decision") return decideHideSeek("move");
+  if (mode === "move" && getHideSeek().decision?.phase !== "destination") {
+    return publish({ ok: false, reason: "decision-only" });
+  }
+  if (mode === null && getHideSeek().decision?.phase === "destination") return stayHere();
   if (mode === "move" && !reachableSpots(match).length) {
     return publish(requestMove(match, match.ghost.spotId ?? ""));
   }
@@ -150,7 +202,12 @@ export function pickSpot(spotId: string): CommandResult {
   if (pickMode === "ability") return command("useAbility", spotId);
   if (pickMode === "move") {
     const result = command("requestMove", spotId);
-    return result.ok ? command("beginEnglish") : result;
+    if (!result.ok) return result;
+    const englishResult = command("beginEnglish");
+    if (englishResult.ok && getHideSeek().decision?.phase === "destination") {
+      useHideSeek.setState({ decision: null, pickMode: null });
+    }
+    return englishResult;
   }
   return publish({ ok: false, reason: "no-pending-move" });
 }
@@ -166,6 +223,7 @@ export function command(name: string, ...args: unknown[]): CommandResult {
     case "requestMove": result = requestMove(match, String(args[0])); break;
     case "beginEnglish": result = beginEnglish(match); break;
     case "answerEnglish": {
+      const wasStarting = Boolean(match.english?.starting);
       const answeredSpot = match.english ? WORLD.spotById.get(match.english.spotId) : null;
       const alternatives = Array.isArray(args[0]) ? args[0].map(String) : args.map(String);
       result = answerEnglish(match, alternatives);
@@ -173,12 +231,16 @@ export function command(name: string, ...args: unknown[]): CommandResult {
         audio.play("correct");
         useHideSeek.setState({ pickMode: null });
         successMessage = answeredSpot ? sentenceFor(answeredSpot) : "";
+        if (wasStarting) beginDecision(match);
       }
       break;
     }
     case "cancelMove":
       result = cancelMove(match);
-      if (result.ok) useHideSeek.setState({ pickMode: match.status === "setup" ? "start" : null });
+      if (result.ok) {
+        if (getHideSeek().decision?.phase === "destination") useHideSeek.setState({ decision: null });
+        useHideSeek.setState({ pickMode: match.status === "setup" ? "start" : null });
+      }
       break;
     case "useAbility":
       result = useAbility(match, args[0] === undefined ? undefined : String(args[0]));
@@ -202,11 +264,37 @@ export function command(name: string, ...args: unknown[]): CommandResult {
 export function tickHideSeek(dt: number) {
   const { match } = getHideSeek();
   if (!match || getGame().screen !== "hideseek" || getGame().settingsOpen) return;
-  // Bound long background-tab gaps; software rendering still advances at the requested test pace.
-  step(match, Math.min(Math.max(dt, 0), 0.5) * timeScale);
-  drain();
-  // Continue Melody's motif for the core effect's lifetime, on the same frozen clock.
-  if (match.status === "playing" && !match.english && match.effects.music && match.time - lastMusic >= 1.8) {
+  // A background tab must never secretly consume the student's decision timer.
+  if (typeof document !== "undefined" && document.hidden) return;
+  // Fixed-size steps let us stop the simulation at exactly the next completed search.
+  // This also allows accelerated e2e playback to pass through several decision cycles.
+  let budget = Math.min(Math.max(dt, 0), 0.5) * timeScale;
+  let iterations = 0;
+  while (budget > 1e-8 && iterations++ < 2000) {
+    const prompt = getHideSeek().decision;
+    if (prompt) {
+      const spent = Math.min(budget, prompt.secondsLeft);
+      budget -= spent;
+      const remaining = Math.max(0, prompt.secondsLeft - spent);
+      if (remaining <= 1e-8) {
+        if (prompt.phase === "decision") decideHideSeek("stay");
+        else stayHere();
+      } else {
+        useHideSeek.setState({ decision: { ...prompt, secondsLeft: remaining } });
+        break;
+      }
+      continue;
+    }
+    if (match.status !== "playing" || match.english) break;
+    const slice = Math.min(0.05, budget);
+    step(match, slice);
+    budget -= slice;
+    drain();
+    if (getHideSeek().pendingDecision && !match.ghost.transit) beginDecision(match);
+  }
+  // Melody's music is tied to simulation time and does not continue while paused.
+  if (match.status === "playing" && !match.english && !getHideSeek().decision &&
+    match.effects.music && match.time - lastMusic >= 1.8) {
     audio.play("musicbox");
     lastMusic = match.time;
   }
@@ -224,15 +312,15 @@ export function setHideSeekTimeScale(scale: number) {
 
 /** Read-only, detached semantic state for e2e/acceptance; no mutable simulation references. */
 export function hideSeekSnapshot() {
-  const { match, pickMode, lossReason, decoyPop } = getHideSeek();
+  const { match, pickMode, decision, pendingDecision, lossReason, decoyPop } = getHideSeek();
   if (!match) return null;
   return JSON.parse(JSON.stringify({
     ...match, phase: match.detective.phase, englishOpen: Boolean(match.english),
-    suspicion: match.detective.suspicion, pickMode, timeScale, lossReason, decoyPopSpotId: decoyPop?.spotId ?? null,
+    suspicion: match.detective.suspicion, pickMode, decision, pendingDecision, timeScale, lossReason, decoyPopSpotId: decoyPop?.spotId ?? null,
     spots: WORLD.spots.filter((spot) => spot.room === match.config.room),
     reachable: reachableSpots(match), targets: abilityTargets(match)
   })) as MatchState & {
-    phase: string; englishOpen: boolean; suspicion: number; pickMode: PickMode; timeScale: number; lossReason: Session["lossReason"]; decoyPopSpotId: string | null;
+    phase: string; englishOpen: boolean; suspicion: number; pickMode: PickMode; decision: TimedDecision | null; pendingDecision: boolean; timeScale: number; lossReason: Session["lossReason"]; decoyPopSpotId: string | null;
     spots: typeof WORLD.spots; reachable: typeof WORLD.spots; targets: typeof WORLD.spots;
   };
 }
