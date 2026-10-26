@@ -4,7 +4,7 @@ vi.mock("../../audio/audio", () => ({ audio: { unlock: vi.fn(), setVolumes: vi.f
 vi.mock("../../audio/tts", () => ({ tts: { cancel: vi.fn(), setRate: vi.fn(), speak: vi.fn().mockResolvedValue(undefined) } }));
 import { audio } from "../../audio/audio";
 import { setGame } from "../store";
-import { command, getHideSeek, hideSeekSnapshot, leaveHideSeek, pickSpot, setHideSeekTimeScale, setPickMode, startHideSeek, tickHideSeek } from "./session";
+import { command, decideHideSeek, getHideSeek, hideSeekSnapshot, leaveHideSeek, pickSpot, setHideSeekTimeScale, setPickMode, startHideSeek, stayHere, tickHideSeek } from "./session";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -23,6 +23,10 @@ describe("Hide & Seek session boundary", () => {
     tickHideSeek(0.5);
     expect(getHideSeek().match!.time).toBe(0);
     expect(command("answerEnglish", ["under"])).toEqual({ ok: true });
+    expect(getHideSeek().decision).toMatchObject({ phase: "decision", secondsLeft: 5 });
+    tickHideSeek(0.1);
+    expect(getHideSeek().match!.time).toBe(0);
+    expect(getHideSeek().decision).toBeNull();
     tickHideSeek(0.1);
     expect(getHideSeek().match!.time).toBe(5);
     expect(getHideSeek().match!.stats.firstTryAccuracy).toBe(0);
@@ -58,14 +62,15 @@ describe("Hide & Seek session boundary", () => {
     expect(getHideSeek().match!.relocationsLeft).toBe(2);
   });
 
-  it("sustains Melody's music only while its simulation effect advances", () => {
+  it("sustains Melody's music only while simulation advances, not during a timed decision or English", () => {
     startHideSeek("melody", "dining", 4, "standard");
     pickSpot("dining.table.under");
     command("answerEnglish", ["under"]);
     command("useAbility");
     for (let i = 0; i < 4; i++) tickHideSeek(0.5);
-    expect(vi.mocked(audio.play).mock.calls.filter(([name]) => name === "musicbox")).toHaveLength(2);
-    setPickMode("move");
+    expect(getHideSeek().match!.time).toBe(0);
+    expect(vi.mocked(audio.play).mock.calls.filter(([name]) => name === "musicbox")).toHaveLength(1);
+    expect(setPickMode("move")).toEqual({ ok: true });
     const next = hideSeekSnapshot()!.reachable[0];
     pickSpot(next.id);
     expect(getHideSeek().match!.english).not.toBeNull();
@@ -73,7 +78,68 @@ describe("Hide & Seek session boundary", () => {
     setHideSeekTimeScale(50);
     for (let i = 0; i < 4; i++) tickHideSeek(0.5);
     expect(getHideSeek().match!.effects.music!.remaining).toBe(before);
+    expect(vi.mocked(audio.play).mock.calls.filter(([name]) => name === "musicbox")).toHaveLength(1);
+    setHideSeekTimeScale(1);
+    expect(command("answerEnglish", [next.prep])).toEqual({ ok: true });
+    for (let i = 0; i < 4; i++) tickHideSeek(0.5);
     expect(vi.mocked(audio.play).mock.calls.filter(([name]) => name === "musicbox")).toHaveLength(2);
+  });
+
+  it("pauses detective and suspicion during five-second decision, then resumes on Stay", () => {
+    pickSpot("dining.table.under");
+    command("answerEnglish", ["under"]);
+    const m = getHideSeek().match!;
+    const pose = JSON.stringify(m);
+    tickHideSeek(2);
+    expect(getHideSeek().decision?.phase).toBe("decision");
+    expect(getHideSeek().decision?.secondsLeft).toBeCloseTo(3);
+    expect(JSON.stringify(m)).toBe(pose);
+    expect(decideHideSeek("stay")).toEqual({ ok: true });
+    expect(getHideSeek().decision).toBeNull();
+    tickHideSeek(0.25);
+    expect(m.time).toBeGreaterThan(0);
+  });
+
+  it("opens a ten-second destination choice and does not charge for its timeout", () => {
+    pickSpot("dining.table.under");
+    command("answerEnglish", ["under"]);
+    const m = getHideSeek().match!;
+    expect(decideHideSeek("move")).toEqual({ ok: true });
+    expect(getHideSeek().decision).toMatchObject({ phase: "destination", secondsLeft: 10 });
+    expect(getHideSeek().pickMode).toBe("move");
+    tickHideSeek(4);
+    expect(m.time).toBe(0);
+    expect(getHideSeek().decision?.secondsLeft).toBeCloseTo(6);
+    tickHideSeek(6);
+    expect(getHideSeek().decision).toBeNull();
+    expect(getHideSeek().pickMode).toBeNull();
+    expect(m.relocationsLeft).toBe(2);
+    expect(m.stats.relocations).toBe(0);
+  });
+
+  it("freezes the move countdown after choosing a valid spot and waits for English", () => {
+    pickSpot("dining.table.under");
+    command("answerEnglish", ["under"]);
+    decideHideSeek("move");
+    const spot = hideSeekSnapshot()!.reachable[0];
+    expect(pickSpot(spot.id)).toEqual({ ok: true });
+    expect(getHideSeek().decision).toBeNull();
+    expect(getHideSeek().match!.english?.spotId).toBe(spot.id);
+    const time = getHideSeek().match!.time;
+    tickHideSeek(20);
+    expect(getHideSeek().match!.time).toBe(time);
+    expect(getHideSeek().match!.relocationsLeft).toBe(2);
+    expect(command("answerEnglish", [spot.prep])).toEqual({ ok: true });
+    expect(getHideSeek().match!.relocationsLeft).toBe(1);
+  });
+
+  it("cancels a destination selection as Stay and keeps the movement budget", () => {
+    pickSpot("dining.table.under");
+    command("answerEnglish", ["under"]);
+    decideHideSeek("move");
+    expect(stayHere()).toEqual({ ok: true });
+    expect(getHideSeek().decision).toBeNull();
+    expect(getHideSeek().match!.relocationsLeft).toBe(2);
   });
 
   it("stops its clock on other screens and discards the session on exit", () => {
