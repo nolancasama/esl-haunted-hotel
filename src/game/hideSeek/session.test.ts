@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../director", () => ({ director: { toTitle: vi.fn() } }));
-vi.mock("../../audio/audio", () => ({ audio: { unlock: vi.fn(), setVolumes: vi.fn(), setListening: vi.fn(), play: vi.fn() } }));
+vi.mock("../../audio/audio", () => ({ audio: { unlock: vi.fn(), setVolumes: vi.fn(), setListening: vi.fn(), setHeartbeat: vi.fn(), play: vi.fn() } }));
 vi.mock("../../audio/tts", () => ({ tts: { cancel: vi.fn(), setRate: vi.fn(), speak: vi.fn().mockResolvedValue(undefined) } }));
 import { audio } from "../../audio/audio";
 import { setGame } from "../store";
-import { command, decideHideSeek, getHideSeek, hideSeekSnapshot, leaveHideSeek, pickSpot, setHideSeekTimeScale, setPickMode, startHideSeek, stayHere, tickHideSeek } from "./session";
+import { command, decideHideSeek, getHideSeek, hideSeekSnapshot, hsPresentation, leaveHideSeek, pickSpot, setHideSeekTimeScale, setPickMode, startHideSeek, stayHere, tickHideSeek } from "./session";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -150,5 +150,38 @@ describe("Hide & Seek session boundary", () => {
     expect(getHideSeek().match!.time).toBe(0);
     leaveHideSeek();
     expect(hideSeekSnapshot()).toBeNull();
+    expect(audio.setHeartbeat).toHaveBeenCalledWith(0);
+  });
+
+  it("never spends a decision countdown while the camera is still travelling", () => {
+    pickSpot("dining.table.under");
+    command("answerEnglish", ["under"]);
+    hsPresentation.cameraSettling = true;
+    tickHideSeek(0.5);
+    tickHideSeek(0.5);
+    expect(getHideSeek().decision).toMatchObject({ phase: "decision", secondsLeft: 5 });
+    expect(getHideSeek().match!.time).toBe(0);
+    hsPresentation.cameraSettling = false;
+    tickHideSeek(0.5);
+    expect(getHideSeek().decision!.secondsLeft).toBeCloseTo(4.5);
+    expect(decideHideSeek("move")).toEqual({ ok: true });
+    hsPresentation.cameraSettling = true;
+    tickHideSeek(0.5);
+    expect(getHideSeek().decision).toMatchObject({ phase: "destination", secondsLeft: 10 });
+    hsPresentation.cameraSettling = false;
+  });
+
+  it("stamps the end of a match for the closing shot", () => {
+    pickSpot("dining.table.under");
+    command("answerEnglish", ["under"]);
+    decideHideSeek("stay");
+    expect(getHideSeek().endedAt).toBeNull();
+    setHideSeekTimeScale(20);
+    for (let i = 0; i < 4000 && getHideSeek().match!.status === "playing"; i++) {
+      if (getHideSeek().decision) decideHideSeek("stay");
+      tickHideSeek(0.5);
+    }
+    expect(getHideSeek().match!.status).not.toBe("playing");
+    expect(getHideSeek().endedAt).not.toBeNull();
   });
 });

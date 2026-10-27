@@ -1,6 +1,18 @@
 # Current State
 
 ## Status
+**2026-10-27: First-person hiding, heartbeat and the clock door are done.** Hide & Seek now
+hides in the ghost's own view (per-spot viewpoints in all 8 rooms), decides strategy in
+the overhead view, follows relocations in third person, and ends with a held first-person
+moment and a short shot of the ghost. A procedural heartbeat speeds up as the detective
+nears; detective footsteps are panned by distance. Settings → Hide & Seek toggles both
+features. The grandfather clock door now meets the cornice. Typecheck, build, 499 unit
+tests and every e2e spec pass (`firstperson.spec.ts` 4/4 + 13 Hide & Seek + 55 others,
+run in two batches). Claude reviewed rendered views of every hiding place
+(`node scripts/firstperson.mjs`, `.tmp/firstperson/sheet-*.png`), a staged Bedroom flow
+(`--part=flow`), and 1024x600 and 844x390. Not yet heard: the heartbeat and footsteps on
+real speakers (headless runs have no audible output).
+
 **2026-10-25: Hide & Seek (Ghost Mode) is done.** The stage list is now All Levels /
 Hide & Seek, and Hide & Seek unlocks with Chapter 1. Eight ghosts x eight rooms
 lead into a 3D match against the human detective, with English questions, abilities
@@ -41,6 +53,15 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
   Sound / Language / Camera (two columns on short screens). Reduced-motion supported.
 - **Doors (2026-10-19):** leaves fill the opening up to the frame head (3 mm clearance);
   heights come from the wall opening via `doorFit()` (`rooms.ts`), checked by `doors.test.ts`.
+- **First-person hiding (2026-10-27):** `hideSeek/views.ts` (pure: `hidingView(spot)`,
+  `cameraMode(...)`), `scene/HideSeekCamera.tsx` (timed blends, look input, writes
+  `hsPresentation.cameraSettling` so decision countdowns wait for the camera; `hsCam`
+  is read by furniture, ghost and hooks), `audio/heartbeat.ts` + `audio.setHeartbeat`
+  (one scheduler on its own ducked bus), heartbeat driver in `HideSeekScene.tsx`. Lids
+  and the clock door open for the detective in Hide & Seek; a peeking lid is lifted a
+  crack. Results wait `RESULTS_DELAY_MS` (2.6 s) for the closing shot. Settings
+  `firstPerson`, `heartbeat` (default on); a ⚙ button in the Hide & Seek HUD.
+  Hooks: `hsCamera()`, `hsPreview(spotId|null)` (any spot's view, for visual checks).
 - **Hide & Seek (2026-10-25):** ghost selection (all eight), room selection (all eight),
   a live 3D detective match, and friendly Escaped!/Found! results. Direct links
   `?mode=hideseek&ghost=&room=&seed=` skip the named selections. The accepted pure
@@ -110,7 +131,12 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
   `.tmp/hideseek/<size>/`, including `measurements.json` for panel/actor overlaps,
   clipping, overflow, semantic state and renderer workload. Running this script and
   final aesthetic acceptance are controller-owned; implementation does not mark it accepted.
-- **E2E:** `story.spec.ts`, `practice.spec.ts`, `chapter2.spec.ts`, `tapmove.spec.ts`, `beacon.spec.ts`, `exit.spec.ts`.
+- **First-person visual script:** `node scripts/firstperson.mjs [--part=views|flow] [--room=] [--gpu]`
+  (dev server on 5199): every spot's first-person view as per-room contact sheets, or a
+  staged Bedroom match. Output `.tmp/firstperson/`.
+- **E2E:** `firstperson.spec.ts` (camera modes through hide/Move/relocate/arrive, look
+  limits by keys and drag, First-person off, heartbeat lifecycle; shown to fail when
+  relocation stays overhead), `story.spec.ts`, `practice.spec.ts`, `chapter2.spec.ts`, `tapmove.spec.ts`, `beacon.spec.ts`, `exit.spec.ts`.
   `hideseek.spec.ts` covers selection, tile/speech English, frozen/walking detective,
   seeded stay win/loss, relocation budget, Hungry/Shadow abilities, results navigation
   and all eight room starts. `title.spec.ts` covers Hide & Seek unlock/deep links.
@@ -143,6 +169,9 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
   because `jump` skips the earlier answers.
 
 ## Next Steps
+0. On a real Chromebook: listen to the heartbeat and footsteps (loudness against the
+   detective's speech, 62/124 Hz thump on small speakers) and check first-person frame rate
+   and drag-to-look by touch. Tuning is in `audio/heartbeat.ts` and `thump()` in `audio.ts`.
 1. Play Hide & Seek with students on a real Chromebook: pacing of detective walks and the
    decision window, whether children understand the detective's announcements, and
    balance per ghost (seeded balance: stay ~19% win, sensible play 44–75%).
@@ -150,6 +179,8 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
    touch sizes, results scrolling at 390 px.
 
 ## Codex / Delegated Work
+First-person hiding/heartbeat/clock door (2026-10-27) was written by Claude directly at the
+user's request ("do yourself"); nothing delegated, nothing pending.
 Hide & Seek (2026-10-25) was written by Codex (routed) in four orders: simulation core,
 stage list/unlock, playable integration, visual corrections. Claude froze the rules
 (DESIGN_DECISIONS), reviewed each and accepted them. Nothing is pending.

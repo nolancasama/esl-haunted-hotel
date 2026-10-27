@@ -4,7 +4,24 @@ import * as THREE from "three";
 import { getHideSeek } from "../game/hideSeek/session";
 import { hasLineOfSight } from "../game/hideSeek/perception";
 import { ROOMS, FLOOR_Y } from "../game/world/rooms";
+import { WORLD } from "../game/world/world";
+import { audio } from "../audio/audio";
+import { rt } from "../game/runtime";
 import { HumanFigure, useHumanFigure } from "./HumanFigure";
+
+/** The detective's footsteps: quiet across the room, clear up close. */
+function footstep(x: number, z: number, ghost: { x: number; z: number }) {
+  const distance = Math.hypot(x - ghost.x, z - ghost.z);
+  const gain = Math.max(0.15, Math.min(1.25, 1.7 / (1 + distance * 0.6)));
+  // Pan from where the view is facing: left of the picture sounds from the left.
+  const c = rt.camera;
+  const fx = c.target.x - c.pos.x, fz = c.target.z - c.pos.z;
+  const fl = Math.hypot(fx, fz) || 1;
+  const dx = x - c.pos.x, dz = z - c.pos.z;
+  const dl = Math.hypot(dx, dz) || 1;
+  const pan = ((dx / dl) * (-fz / fl) + (dz / dl) * (fx / fl)) * 0.7;
+  audio.play("step", { gain, pan });
+}
 
 const CONE_RAYS = 25;
 const CONE_RANGE = 5;
@@ -49,6 +66,7 @@ export function Detective() {
   const cone = useRef<THREE.Group>(null);
   const coneMesh = useRef<THREE.Mesh>(null);
   const step = useRef(0);
+  const gait = useRef({ x: 0, z: 0, movedAt: -1e9, crouch: 0 });
   const coneGeo = useMemo(() => new THREE.ShapeGeometry(), []);
   const coneRefresh = useRef(0);
   useFrame((_, dt) => {
@@ -56,17 +74,28 @@ export function Detective() {
     if (!m) return;
     const d = m.detective;
     const y = FLOOR_Y[ROOMS[m.config.room].floor];
-    const moving = d.anim === "walk" && !m.english && m.status === "playing";
+    // Walking means actually covering ground: a paused match (decision, English, settings) stands still.
+    const now = performance.now();
+    const g = gait.current;
+    if (Math.hypot(d.x - g.x, d.z - g.z) > 1e-4) { g.movedAt = now; g.x = d.x; g.z = d.z; }
+    const moving = d.anim === "walk" && m.status === "playing" && now - g.movedAt < 160;
+    const before = step.current;
     if (!m.english) step.current += Math.min(dt, 0.1) * (moving ? 8 : 1.8);
     const t = step.current;
+    // A footstep each time a foot comes down (twice per stride), louder and more central when close.
+    if (moving && Math.floor(before / Math.PI) !== Math.floor(t / Math.PI)) footstep(d.x, d.z, m.ghost);
     const swing = moving ? Math.sin(t) * 0.48 : 0;
+    // Looking under something: crouch down low with the lantern forward.
+    const target = d.target ? WORLD.spotById.get(d.target) : null;
+    const wantCrouch = d.anim === "inspect" && target?.prep === "under" ? 1 : 0;
+    g.crouch += (wantCrouch - g.crouch) * Math.min(1, Math.min(dt, 0.1) * 6);
     rig.root.current?.position.set(d.x, y, d.z);
     if (rig.root.current) rig.root.current.rotation.y = d.yaw;
-    if (rig.legL.current) rig.legL.current.rotation.x = swing;
-    if (rig.legR.current) rig.legR.current.rotation.x = -swing;
+    if (rig.legL.current) rig.legL.current.rotation.x = swing - g.crouch * 1.55;
+    if (rig.legR.current) rig.legR.current.rotation.x = -swing - g.crouch * 1.55;
     if (rig.bob.current) {
-      rig.bob.current.position.y = moving ? Math.abs(Math.cos(t)) * 0.035 : d.anim === "celebrate" ? Math.abs(Math.sin(t * 3)) * 0.16 : 0;
-      rig.bob.current.rotation.x = d.anim === "inspect" ? 0.4 : 0;
+      rig.bob.current.position.y = (moving ? Math.abs(Math.cos(t)) * 0.035 : d.anim === "celebrate" ? Math.abs(Math.sin(t * 3)) * 0.16 : 0) - g.crouch * 0.12;
+      rig.bob.current.rotation.x = d.anim === "inspect" ? 0.4 + g.crouch * 0.15 : g.crouch * 0.55;
       rig.bob.current.rotation.y = d.anim === "think" ? Math.sin(t) * 0.22 : 0;
     }
     if (rig.armL.current) {

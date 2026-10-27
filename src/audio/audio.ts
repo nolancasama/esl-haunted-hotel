@@ -6,6 +6,8 @@
  * microphone listens (classroom speakers bleed into the mic).
  */
 
+import { heartbeatBpm, heartbeatGain } from "./heartbeat";
+
 type Wave = OscillatorType;
 
 const midi = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
@@ -28,6 +30,13 @@ class AudioEngine {
   private music: { name: MusicName; next: number; step: number } | null = null;
   /** Where one-shots go while `play` runs (a stereo panner for sounds placed in the room). */
   private target: AudioNode | null = null;
+  /** Hide & Seek heartbeat: one bus and one scheduler, idle unless a level is set. */
+  private heartBus!: GainNode;
+  private heartDuck!: GainNode;
+  private heartLevel = 0;
+  private heartGain = 0;
+  private heartNext = 0;
+  private heartTimer = 0;
 
   /** Must be called from a user gesture (Start button). */
   unlock() {
@@ -50,6 +59,10 @@ class AudioEngine {
       this.ambBus.connect(this.ambDuck).connect(this.master);
       this.sfxBus = ctx.createGain();
       this.sfxBus.connect(this.master);
+      this.heartDuck = ctx.createGain();
+      this.heartBus = ctx.createGain();
+      this.heartBus.gain.value = 0;
+      this.heartBus.connect(this.heartDuck).connect(this.sfxBus);
       this.noise = this.makeNoise(2.5);
       this.applyVolumes();
       document.addEventListener("visibilitychange", () => {
@@ -91,6 +104,60 @@ class AudioEngine {
     const amb = this.listening ? 0 : this.speaking ? 0.4 : 1;
     this.musicDuck.gain.setTargetAtTime(music, t, 0.08);
     this.ambDuck.gain.setTargetAtTime(amb, t, 0.08);
+    // The detective's English (and the student's answer) always comes first.
+    this.heartDuck.gain.setTargetAtTime(this.listening ? 0 : this.speaking ? 0.15 : 1, t, 0.12);
+  }
+
+  /**
+   * Heartbeat level 0..1 (0 = off). Called every frame with an already smoothed level;
+   * loudness glides on the bus, and a single look-ahead scheduler places each double beat.
+   */
+  setHeartbeat(level: number) {
+    this.heartLevel = Math.max(0, Math.min(1, level));
+    if (!this.ctx) return;
+    const gain = heartbeatGain(this.heartLevel) * 0.9;
+    if (Math.abs(gain - this.heartGain) > 0.004 || (gain === 0 && this.heartGain !== 0)) {
+      this.heartGain = gain;
+      this.heartBus.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.25);
+    }
+    if (this.heartLevel > 0 && !this.heartTimer) {
+      this.heartNext = 0;
+      this.heartTimer = window.setInterval(() => this.heartTick(), 60);
+    }
+  }
+
+  get heartbeatRunning() {
+    return this.heartTimer !== 0;
+  }
+
+  private heartTick() {
+    const ctx = this.ctx!;
+    if (this.heartLevel <= 0) {
+      // Let the last beat ring out under the fading bus, then stop doing any work at all
+      // (at once if the context is suspended: its clock has stopped).
+      if (!this.ready() || ctx.currentTime > this.heartNext + 1) {
+        window.clearInterval(this.heartTimer);
+        this.heartTimer = 0;
+      }
+      return;
+    }
+    if (!this.ready()) return;
+    const now = ctx.currentTime;
+    // First beat, or back from a suspended tab: start fresh rather than catching up.
+    if (this.heartNext < now) this.heartNext = now + 0.08;
+    while (this.heartNext < now + 0.2) {
+      this.thump(this.heartNext, this.heartLevel);
+      this.heartNext += 60 / heartbeatBpm(this.heartLevel);
+    }
+  }
+
+  /** Lub-dub: two soft, low, pitch-dropping thumps (an overtone so small speakers carry it). */
+  private thump(t: number, level: number) {
+    const gap = 0.3 - 0.11 * level;
+    for (const [offset, peak, f] of [[0, 1, 1], [gap, 0.7, 0.88]] as const) {
+      this.tone(62 * f, t + offset, { peak: 0.5 * peak, attack: 0.014, decay: 0.17, to: 44 * f, bus: this.heartBus });
+      this.tone(124 * f, t + offset, { peak: 0.12 * peak, attack: 0.012, decay: 0.09, to: 88 * f, bus: this.heartBus });
+    }
   }
 
   /** Boo is talking: duck background so the English is clear. */

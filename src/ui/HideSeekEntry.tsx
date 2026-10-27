@@ -5,7 +5,7 @@ import type { GhostId } from "../game/types";
 import { WORLD } from "../game/world/world";
 import { ROOMS } from "../game/world/rooms";
 import { abilityTargets, placePhrase, reachableSpots, type PlayRoom } from "../game/hideSeek";
-import { command, decideHideSeek, leaveHideSeek, pickSpot, setPickMode, startHideSeek, stayHere, useHideSeek } from "../game/hideSeek/session";
+import { RESULTS_DELAY_MS, command, decideHideSeek, leaveHideSeek, pickSpot, setPickMode, startHideSeek, stayHere, useHideSeek } from "../game/hideSeek/session";
 import { GhostPortrait } from "./GhostPortrait";
 import { HideSeekEnglish } from "./HideSeekEnglish";
 
@@ -113,7 +113,14 @@ export function HideSeekEntry() {
 
   const def = GHOSTS[match.config.ghost];
   const ability = HS_ABILITIES[match.config.ghost];
-  if (match.status === "won" || match.status === "lost") return (
+  // The closing shot (found, or celebrating) plays out before the results card.
+  const ended = match.status === "won" || match.status === "lost";
+  if (ended && (session.endedAt === null || performance.now() - session.endedAt < RESULTS_DELAY_MS)) return (
+    <div className="hs-container" data-testid="hideseek">
+      {session.subtitle && <div className="hs-subtitle subtitle panel" data-testid="hs-subtitle" role="status"><span>{session.subtitle}</span></div>}
+    </div>
+  );
+  if (ended) return (
     <div className="hs-results results-screen ui" data-testid="hideseek">
       <section className="panel hs-results-card" data-testid="hs-results" data-outcome={match.status}>
         <GhostPortrait ghost={def.id} size={86} face={match.status === "won" ? "giggle" : "smile"} />
@@ -148,6 +155,7 @@ export function HideSeekEntry() {
           <header className="hs-hud-header">
             <GhostPortrait ghost={def.id} size={42} face={match.detective.suspicion > 65 ? "surprised" : "happy"} />
             <div><strong>{def.name}</strong><span>{ROOMS[match.config.room].name}</span></div>
+            <button className="hs-menu-button" aria-label="Settings" data-testid="hs-settings" onClick={() => setGame({ settingsOpen: true })}>⚙</button>
             <button className="hs-menu-button" aria-label="Main Menu" onClick={menu}>⌂</button>
           </header>
           <div className="hs-current-spot" data-testid="hs-current-spot">{match.ghost.transit ? "Floating to a new hiding place…" : spot ? placePhrase(spot) : "Pick a hiding place to begin"}</div>

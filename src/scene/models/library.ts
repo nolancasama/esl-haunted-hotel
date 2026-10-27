@@ -3,6 +3,9 @@ import { KINDS } from "../../game/world/kinds";
 import { PartBuilder } from "../partBuilder";
 import { C, books, type BuilderSet } from "./common";
 
+/** Clock door span (local y): from just above the base to just under the cornice at 1.43. */
+export const CLOCK_DOOR = { bottom: 0.25, top: 1.426 };
+
 export const libraryModels: BuilderSet = {
   armchair(_obj, b) {
     const red = "#8c2f45";
@@ -67,15 +70,17 @@ export const libraryModels: BuilderSet = {
     // through it. Keep the existing crown width, height and segment count.
     b.add(new THREE.CylinderGeometry(0.16, 0.16, w + 0.06, 14, 1, false, 0, Math.PI), dark, [0, h, 0], [0, 0, Math.PI / 2], [1, 0.5, 1]);
     out.textured.push({ key: "clockface", geometry: new THREE.CircleGeometry(0.21, 24), position: [0, 1.76, d / 2 + 0.012] });
-    // the door (a frame: you can see the pendulum through it); hinged on the left
+    // the door (a frame: you can see the pendulum through it); hinged on the left.
+    // It reaches up to 4 mm under the cornice (1.43) and sits 2 mm proud of the body front.
     const door = new PartBuilder();
     const dw = w - 0.08;
-    door.box(0.05, 1.1, 0.03, 0.025, 0, 0, C.brass);
-    door.box(0.05, 1.1, 0.03, dw - 0.025, 0, 0, C.brass);
+    const dh = CLOCK_DOOR.top - CLOCK_DOOR.bottom;
+    door.box(0.05, dh, 0.03, 0.025, 0, 0, C.brass);
+    door.box(0.05, dh, 0.03, dw - 0.025, 0, 0, C.brass);
     door.box(dw, 0.05, 0.03, dw / 2, 0, 0, C.brass);
-    door.box(dw, 0.05, 0.03, dw / 2, 1.05, 0, C.brass);
-    door.sphere(0.02, dw - 0.06, 0.55, 0.03, C.brass);
-    out.parts.push({ name: "door", pivot: [-dw / 2, 0.25, d / 2 + 0.005], geometry: door.build() });
+    door.box(dw, 0.05, 0.03, dw / 2, dh - 0.05, 0, C.brass);
+    door.sphere(0.02, dw - 0.06, dh / 2, 0.03, C.brass);
+    out.parts.push({ name: "door", pivot: [-dw / 2, CLOCK_DOOR.bottom, d / 2 + 0.017], geometry: door.build() });
   },
 
   floorlamp(_obj, b, g, out) {

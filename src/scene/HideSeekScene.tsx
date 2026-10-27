@@ -1,18 +1,42 @@
 import { useEffect, useMemo, useRef } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { audio } from "../audio/audio";
+import { heartbeatLevel } from "../audio/heartbeat";
 import { abilityTargets, reachableSpots } from "../game/hideSeek";
 import { getHideSeek, pickSpot, tickHideSeek, useHideSeek } from "../game/hideSeek/session";
-import { useGame } from "../game/store";
-import { rt } from "../game/runtime";
+import { getGame, useGame } from "../game/store";
 import { FLOOR_Y, ROOMS } from "../game/world/rooms";
 import { WORLD } from "../game/world/world";
 import { Hotel } from "./Hotel";
 import { Furniture } from "./Furniture";
 import { Detective } from "./Detective";
 import { HideSeekGhost } from "./Ghosts";
-import { cameraRef } from "./CameraRig";
+import { HideSeekCamera } from "./HideSeekCamera";
 import { noteTexture } from "./textures";
+
+/**
+ * The heartbeat follows the detective's horizontal distance to the student's ghost: the same
+ * public positions the student can see, never the detective's private knowledge. It is
+ * silent while English is open, while paused, and once the match is over.
+ */
+function Heartbeat() {
+  const level = useRef(0);
+  useFrame((_, rawDt) => {
+    const m = getHideSeek().match;
+    const game = getGame();
+    const active = Boolean(m && m.status === "playing" && !m.english && game.settings.heartbeat &&
+      !game.settingsOpen && game.screen === "hideseek" && !document.hidden);
+    const want = active ? heartbeatLevel(Math.hypot(m!.detective.x - m!.ghost.x, m!.detective.z - m!.ghost.z)) : 0;
+    // Gentle on the way up, a little slower to calm down; fully stopped once faded out.
+    const rate = want > level.current ? 1.6 : 0.9;
+    level.current += (want - level.current) * (1 - Math.exp(-Math.min(rawDt, 0.1) * rate));
+    if (!active && level.current < 0.02) level.current = 0;
+    audio.setHeartbeat(level.current);
+  });
+  useEffect(() => () => audio.setHeartbeat(0), []);
+  return null;
+}
 
 const labels = new Map<string, THREE.CanvasTexture>();
 function labelTexture(text: string) {
@@ -54,48 +78,6 @@ function SpotMarkers() {
       <meshBasicMaterial color={spot.id === highlight ? "#ffe08d" : "#78eadb"} depthTest={false} side={THREE.DoubleSide} transparent opacity={0.85} />
     </mesh>
   </group>)}</group>;
-}
-
-function HideSeekCamera() {
-  const { camera, size, scene, gl } = useThree();
-  const pos = useRef(new THREE.Vector3());
-  const look = useRef(new THREE.Vector3());
-  const ready = useRef(false);
-  const vectors = useMemo(() => ({ target: new THREE.Vector3(), want: new THREE.Vector3() }), []);
-  useEffect(() => { gl.setClearColor("#130d20"); scene.fog = null; return () => { scene.fog = new THREE.Fog("#120a22", 13, 30); }; }, [scene, gl]);
-  useFrame((_, dt) => {
-    const m = getHideSeek().match;
-    if (!m) return;
-    const room = ROOMS[m.config.room];
-    rt.view.floor = room.floor;
-    const b = room.bounds;
-    const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
-    const base = FLOOR_Y[room.floor];
-    const rail = size.height < 480 ? 250 : 300;
-    const availableW = Math.max(200, size.width - rail - 24);
-    const panel = document.querySelector('[data-testid="hs-english"]');
-    const panelRect = panel?.getBoundingClientRect();
-    const coveredBottom = panelRect && panelRect.left >= rail - 20 ? Math.max(0, size.height - panelRect.top) : 0;
-    const availableH = Math.max(200, size.height - coveredBottom - 60);
-    const span = Math.max((b.x1 - b.x0) * 1.5 * size.height / availableW, (b.z1 - b.z0) * 1.5 * size.height / availableH);
-    const distance = Math.max(12.2, span / (2 * Math.tan(25 * Math.PI / 180)));
-    const direction = vectors.want.set(0.43, 0.93, 0.83).normalize();
-    vectors.target.set(cx, base + 0.4, cz);
-    vectors.want.copy(direction).multiplyScalar(distance).add(vectors.target);
-    if (!ready.current) { pos.current.copy(vectors.want).add(new THREE.Vector3(0, 1.2, 1.2)); look.current.copy(vectors.target); ready.current = true; }
-    const k = 1 - Math.exp(-Math.min(dt, 0.1) * 5);
-    pos.current.lerp(vectors.want, k); look.current.lerp(vectors.target, k);
-    camera.position.copy(pos.current); camera.lookAt(look.current);
-    const cam = camera as THREE.PerspectiveCamera;
-    // Shift the whole room into the clear area to the right of the HUD rail.
-    cam.setViewOffset(size.width, size.height, -rail / 2, coveredBottom / 2 - 12, size.width, size.height);
-    cameraRef.current = cam;
-    Object.assign(rt.camera.pos, pos.current);
-    Object.assign(rt.camera.target, look.current);
-    rt.camera.mode = "shot";
-  }, -5);
-  useEffect(() => () => { (camera as THREE.PerspectiveCamera).clearViewOffset(); }, [camera]);
-  return null;
 }
 
 function AbilityEffects() {
@@ -149,7 +131,7 @@ function AbilityEffects() {
       noteMats[i].rotation = Math.sin(s.time * 2.4 + i) * 0.22;
     }
     if (clue.current) {
-      clue.current.visible = Boolean(session.clue && session.clue.until > s.time);
+      clue.current.visible = Boolean(session.clue && session.clue.until > s.time && s.status === "playing");
       clue.current.position.set(s.detective.x, base + 1.7, s.detective.z);
     }
     if (trail.current) {
@@ -227,5 +209,6 @@ export function HideSeekScene() {
     <SpotMarkers />
     <AbilityEffects />
     <HideSeekCamera />
+    <Heartbeat />
   </>;
 }

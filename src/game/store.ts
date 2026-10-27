@@ -49,6 +49,10 @@ export interface Settings {
   cameraSensitivity: number;
   slowVoice: boolean;
   englishLevel: "beginner" | "standard" | "advanced";
+  /** Hide & Seek: hide in the ghost's own view (off = the overhead view throughout). */
+  firstPerson: boolean;
+  /** Hide & Seek: a heartbeat that speeds up as the detective comes closer. */
+  heartbeat: boolean;
 }
 
 export type MicState = "unknown" | "ready" | "blocked" | "unsupported";
@@ -160,7 +164,9 @@ export const DEFAULT_SETTINGS: Settings = {
   japanese: true,
   cameraSensitivity: 1,
   slowVoice: false,
-  englishLevel: "standard"
+  englishLevel: "standard",
+  firstPerson: true,
+  heartbeat: true
 };
 
 function loadSettings(): Settings {

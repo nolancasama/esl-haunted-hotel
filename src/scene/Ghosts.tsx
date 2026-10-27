@@ -135,9 +135,12 @@ export function HideSeekGhost({ id, decoy = false }: { id: GhostId; decoy?: bool
     const spot = spotId ? WORLD.spotById.get(spotId) : null;
     r.root.visible = Boolean(spot);
     if (!spot) { if (outline.current) outline.current.visible = false; return; }
-    const p = decoy || startingPreview ? spot.hidePos : m.ghost;
+    // Found, or celebrating: out of the box (lid open) where the closing shot can see it.
+    const popped = !decoy && !m.ghost.transit && (m.status === "lost" || m.status === "won");
+    const p = decoy || startingPreview ? spot.hidePos : popped ? spot.pos : m.ghost;
     const transit = !decoy && m.ghost.transit;
-    const frightened = !decoy && m.status === "playing" && Math.hypot(m.detective.x - p.x, m.detective.z - p.z) < 2.1;
+    // Found: a friendly "oh!" with arms up (the same face as when the detective comes close).
+    const frightened = !decoy && (m.status === "lost" || (m.status === "playing" && Math.hypot(m.detective.x - p.x, m.detective.z - p.z) < 2.1));
     const won = !decoy && m.status === "won";
     celebrationTime.current = won ? celebrationTime.current + Math.min(dt, 0.1) : 0;
     const visualTime = m.time + celebrationTime.current;
@@ -161,9 +164,13 @@ export function HideSeekGhost({ id, decoy = false }: { id: GhostId; decoy?: bool
       r.mats.face.depthTest = false;
       r.mats.acc.depthTest = false;
     }
+    // Seen from its own eyes (first person), the ghost is not drawn at all.
+    const cam = rt.camera.pos;
+    const own = !decoy && Math.hypot(cam.x - r.root.position.x, cam.y - r.root.position.y - 0.35, cam.z - r.root.position.z) < 0.9;
+    r.root.visible = !own;
     // This player-only silhouette has no relation to the perception module.
     if (outline.current) {
-      outline.current.visible = !decoy && (m.ghost.hidden || Boolean(startingPreview));
+      outline.current.visible = !own && !decoy && (m.ghost.hidden || Boolean(startingPreview));
       outline.current.position.copy(r.root.position);
       outline.current.rotation.copy(r.root.rotation);
       outline.current.scale.set(spot.scale[0] * 1.09, spot.scale[1] * 1.06, spot.scale[2] * 1.09);

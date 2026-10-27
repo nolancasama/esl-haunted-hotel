@@ -10,6 +10,7 @@ import { collidersFor, floorState, resolveCollisions } from "./world/collision";
 import { FLOOR_Y } from "./world/rooms";
 import type { Floor } from "./types";
 import { cameraRef } from "../scene/CameraRig";
+import { hsCam } from "../scene/HideSeekCamera";
 import { rendererRef } from "../scene/GameScene";
 import { audio } from "../audio/audio";
 import { beaconSpot } from "./beacon";
@@ -55,6 +56,19 @@ export function installE2eHook() {
       return hsCommand(name, ...args);
     },
     hsTimeScale: setHideSeekTimeScale,
+    /** Hide & Seek presentation: camera mode, settled flag, live pose, look offsets and the heartbeat scheduler. */
+    hsCamera() {
+      const c = rt.camera;
+      return {
+        mode: hsCam.mode, spotId: hsCam.spotId, settled: hsCam.settled, lookYaw: hsCam.lookYaw, lookPitch: hsCam.lookPitch,
+        pos: { ...c.pos }, target: { ...c.target }, fov: cameraRef.current?.fov ?? 0, near: cameraRef.current?.near ?? 0,
+        heartbeat: audio.heartbeatRunning
+      };
+    },
+    /** Show the first-person view from any hiding place (null = back to the real one). Visual checks only. */
+    hsPreview(spotId: string | null) {
+      hsCam.preview = spotId;
+    },
     state() {
       const g = getGame();
       const s = g.hunt;

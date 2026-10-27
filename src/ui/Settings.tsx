@@ -99,6 +99,15 @@ export function SettingsModal() {
               />
             </Row>
           </section>
+          <section className="settings-section">
+            <h3>Hide &amp; Seek <small lang="ja">かくれんぼ</small></h3>
+            <Row label="First-person hiding" ja="おばけの めで みる">
+              <Toggle value={s.firstPerson} onChange={(v) => set({ firstPerson: v })} testId="toggle-first-person" />
+            </Row>
+            <Row label="Heartbeat sound" ja="ドキドキの おと">
+              <Toggle value={s.heartbeat} onChange={(v) => set({ heartbeat: v })} testId="toggle-heartbeat" />
+            </Row>
+          </section>
         </div>
         <div className="modal-buttons">
           {screen === "game" && (

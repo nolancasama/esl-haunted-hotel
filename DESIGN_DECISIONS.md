@@ -1,5 +1,70 @@
 # Design Decisions
 
+## 2026-10-27 — First-person hiding, heartbeat, and the clock door
+
+The teacher's plan, with Claude's changes marked **(changed)** or **(added)**.
+
+**Camera.** Hiding is first person, strategy is overhead. The first spot, the
+Move destination picker, English panels and ability targeting use the existing
+overhead room view. A relocation is followed in third person (behind and above
+the ghost), and arrival returns to first person. The Stay/Move card appears over
+the first-person view; Stay keeps it. **(changed)** The camera mode is a pure
+function of match and session state (`cameraMode` in `hideSeek/views.ts`), not
+a second stored state machine, so it cannot drift from the match. Transitions
+are timed, eased moves (0.7 s; instant with reduced motion), and **a decision
+countdown does not run until the camera has settled** (`hsPresentation.cameraSettling`).
+The first hide is held in the room view for 0.9 s so the student sees the ghost
+in its place, and an ability fired while hidden gets a 1.6 s room view.
+Rejected: a free-roaming or pointer-locked camera.
+
+**A view per hiding place, from the spot data (`hidingView`).** Under: low
+(half the clearance, at most 0.3 m), 0.45 m back from the edge so the underside
+frames the top of the picture, looking out of whichever open side faces the
+most room (a table's long side, a bed's side). In a lidded box, basket or crate: a
+slit between the front wall and a lid lifted 10% **(added: the lid really opens a
+crack, and the detective really opens lids and the clock door when inspecting
+them; before, these parts never moved in Hide & Seek)**. In the bathtub: over the
+rim. In the clock: inside the case, framed by its sides and door. On: above the
+surface, looking down toward the middle of the room. By: turned so the object's
+near edge sits about 24° off-centre, on whichever side opens onto more room,
+so the object covers one side of the view. **(changed)** "By" first aimed at the
+room centre, which stared straight into tables in mid-room, and then offset
+from the object's centre, which still filled the view with the piano. Every
+view is checked in `views.test.ts` (inside the room, not inside other furniture,
+two metres of room ahead), and all 8 rooms were checked as rendered views
+(`node scripts/firstperson.mjs`). No furniture fades in first person (no X-ray).
+The student's own ghost is not drawn when the camera is within 0.9 m of it.
+
+**Looking.** Drag (mouse or touch) or the arrow keys, ±32–45° per spot and a
+small vertical range, smoothed. **(changed)** No mouse-hover look: the view would
+swing every time a student reaches for a button.
+
+**Heartbeat.** Procedural Web Audio lub-dub on its own bus under the effects
+volume. Level from the detective's horizontal distance (silent beyond 6.5 m,
+linear to 1 at 0.8 m), 65→130 BPM, smoothed (faster up than down). Ducked to 15%
+while English is spoken, silent while the microphone listens or an English panel
+is open, and off while paused, in the background, after the match and outside
+Hide & Seek. One scheduler, which stops itself when the level is zero or the
+audio context is suspended. Settings → Hide & Seek → Heartbeat sound.
+**(added)** a settings button in the Hide & Seek HUD. Settings were reachable
+only from the title, and opening them pauses the match.
+
+**Footsteps and search.** Detective footsteps on each footfall, louder and
+panned by distance and direction from the view. **(changed)** Walking is detected
+from actual movement, so a paused match (decision, English) no longer walks in
+place. The detective crouches to look under things.
+
+**The end.** Found: hold first person for 1.1 s (the detective at the spot,
+the lid open), a small "poof", then a third-person shot of the surprised ghost
+popped out of its hiding place, then Found!. Escaped: the ghost celebrates in
+shot. The results card waits 2.6 s for this. **First-person hiding** can be
+switched off in Settings (default on); off restores the overhead view throughout.
+
+**Grandfather clock door.** The door frame ended at 1.35 m under a cornice at
+1.43 m, leaving an 8 cm slot. It now reaches 1.426 m (4 mm clearance), and it
+sits 2 mm proud of the body instead of 1 cm inside it. Tested in `polish.test.ts`:
+no slot, no overlap when closed, and it stays under the cornice when open.
+
 ## 2026-10-25 — Hide & Seek (Ghost Mode) and the two-card stage list
 
 The teacher's plan, with Claude's changes marked **(changed)** or **(added)**.

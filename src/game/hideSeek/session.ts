@@ -27,14 +27,20 @@ interface Session {
   /** Presentation event: emitted only after a decoy was actually inspected. */
   decoyPop: { spotId: string; at: number } | null;
   lossReason: "found" | "caughtInOpen" | null;
+  /** performance.now() when the match ended: the closing camera shot plays before the results card. */
+  endedAt: number | null;
 }
 
 /** The only live match owner. Views read it; commands and the render clock drive the core. */
 export const useHideSeek = create<Session>(() => ({
-  match: null, decision: null, pendingDecision: false, revision: 0, pickMode: null, subtitle: "", message: "", clue: null, fx: null, decoyPop: null, lossReason: null
+  match: null, decision: null, pendingDecision: false, revision: 0, pickMode: null, subtitle: "", message: "", clue: null, fx: null, decoyPop: null, lossReason: null, endedAt: null
 }));
 export const getHideSeek = useHideSeek.getState;
 let timeScale = 1;
+/** Written by the camera: a decision countdown never runs while the view is still moving. */
+export const hsPresentation = { cameraSettling: false };
+/** The closing shot (held first-person view, then the ghost) before Escaped!/Found!. */
+export const RESULTS_DELAY_MS = 2600;
 let subtitleUntil = 0;
 let lastMusic = -100;
 
@@ -149,9 +155,13 @@ function drain() {
         }
         else if (event.ghost === "mischief") audio.play("pop");
         break;
-      case "won": audio.play("fanfare"); break;
+      case "won":
+        useHideSeek.setState({ endedAt: performance.now() });
+        audio.play("fanfare");
+        break;
       case "lost":
-        useHideSeek.setState({ lossReason: event.reason });
+        useHideSeek.setState({ lossReason: event.reason, endedAt: performance.now() });
+        audio.play("poof", { pitch: 1.2 });
         audio.play("giggle", { pitch: 0.85 });
         break;
     }
@@ -166,14 +176,17 @@ export function startHideSeek(ghost: GhostId, room: PlayRoom, seed = Date.now() 
   timeScale = 1;
   subtitleUntil = 0;
   lastMusic = -100;
-  useHideSeek.setState({ match, decision: null, pendingDecision: false, pickMode: "start", subtitle: "", message: "Choose a spot to hide.", clue: null, fx: null, decoyPop: null, lossReason: null, revision: getHideSeek().revision + 1 });
+  hsPresentation.cameraSettling = false;
+  useHideSeek.setState({ match, decision: null, pendingDecision: false, pickMode: "start", subtitle: "", message: "Choose a spot to hide.", clue: null, fx: null, decoyPop: null, lossReason: null, endedAt: null, revision: getHideSeek().revision + 1 });
   return { ok: true } as const;
 }
 
 export function leaveHideSeek() {
   tts.cancel();
   audio.setListening(false);
-  useHideSeek.setState({ match: null, decision: null, pendingDecision: false, pickMode: null, subtitle: "", message: "", clue: null, fx: null, decoyPop: null, lossReason: null, revision: getHideSeek().revision + 1 });
+  audio.setHeartbeat(0);
+  hsPresentation.cameraSettling = false;
+  useHideSeek.setState({ match: null, decision: null, pendingDecision: false, pickMode: null, subtitle: "", message: "", clue: null, fx: null, decoyPop: null, lossReason: null, endedAt: null, revision: getHideSeek().revision + 1 });
   timeScale = 1;
   director.toTitle();
 }
@@ -273,6 +286,7 @@ export function tickHideSeek(dt: number) {
   while (budget > 1e-8 && iterations++ < 2000) {
     const prompt = getHideSeek().decision;
     if (prompt) {
+      if (hsPresentation.cameraSettling) break;
       const spent = Math.min(budget, prompt.secondsLeft);
       budget -= spent;
       const remaining = Math.max(0, prompt.secondsLeft - spent);

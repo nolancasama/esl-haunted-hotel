@@ -81,6 +81,38 @@ describe("polished furniture has separated visible surfaces", () => {
     });
   }
 
+  for (const obj of WORLD.objects.filter((obj) => obj.kind === "clock")) {
+    it(`${obj.id}: closed door meets the cornice without touching the body`, () => {
+      const parts = inspect(obj);
+      const out: BuiltObject = { solid: new THREE.BufferGeometry(), glow: null, parts: [], textured: [], lamps: [] };
+      libraryModels.clock!(obj, new PartBuilder(), new PartBuilder(), out);
+      const door = out.parts.find((part) => part.name === "door")!;
+      door.geometry!.computeBoundingBox();
+      const bounds = door.geometry!.boundingBox!.clone().translate(new THREE.Vector3(...door.pivot));
+      const cornice = parts.filter(({ bounds: b }) => b.min.y > 1.4 && b.min.y < 1.45 && b.max.y - b.min.y < 0.07)
+        .sort((a, b) => a.bounds.min.y - b.bounds.min.y)[0];
+      expect(cornice, "cornice").toBeDefined();
+      const gap = cornice.bounds.min.y - bounds.max.y;
+      expect(gap, "no visible slot above the door").toBeLessThan(0.006);
+      expect(gap, "clearance against z-fighting").toBeGreaterThan(MM);
+      // Closed, the frame overlaps no body part (side walls, base, back, cornice).
+      for (const part of parts) {
+        const b = part.bounds;
+        const inside = Math.min(b.max.x, bounds.max.x) - Math.max(b.min.x, bounds.min.x) > EPS &&
+          Math.min(b.max.y, bounds.max.y) - Math.max(b.min.y, bounds.min.y) > EPS &&
+          Math.min(b.max.z, bounds.max.z) - Math.max(b.min.z, bounds.min.z) > EPS;
+        expect(inside, `door intersects a body part at y ${b.min.y.toFixed(2)}..${b.max.y.toFixed(2)}`).toBe(false);
+      }
+      // Swinging open, the frame stays below the cornice and in front of the body.
+      const open = new THREE.Box3().setFromObject(new THREE.Mesh(door.geometry!).rotateY(-1.9)).translate(new THREE.Vector3(...door.pivot));
+      expect(open.max.y).toBeLessThan(cornice.bounds.min.y);
+      expect(open.min.z).toBeGreaterThan(obj.spec.d / 2 - 0.02);
+      parts.forEach((part) => part.geometry.dispose());
+      out.parts.forEach((part) => part.geometry?.dispose());
+      out.textured.forEach((part) => part.geometry.dispose());
+    });
+  }
+
   it("bookshelf books clear shelf boards and neighbouring books", () => {
     const obj = WORLD.objects.find((obj) => obj.kind === "bookshelf")!;
     const parts = inspect(obj);

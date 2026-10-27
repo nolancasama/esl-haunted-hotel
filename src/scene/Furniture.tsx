@@ -13,6 +13,9 @@ import { lineFade } from "./wallFade";
 import { isCanvasTap } from "../input/tap";
 import type { RoomId } from "../game/types";
 import { getHideSeek } from "../game/hideSeek/session";
+import { hidingViewFor } from "../game/hideSeek/views";
+import type { MatchState } from "../game/hideSeek/types";
+import { hsCam } from "./HideSeekCamera";
 
 const HIGHLIGHT = new THREE.Color("#8f7bff");
 const HELP = new THREE.Color("#ffd36b");
@@ -61,6 +64,27 @@ function partOpenAmount(obj: WorldObject, part: AnimatedPart["name"]): number {
   }
 }
 
+/** Hide & Seek lid/door opening (0 closed .. 1 open) from the public match state. */
+function hideSeekOpenAmount(obj: WorldObject, part: "lid" | "door", m: MatchState): number {
+  const d = m.detective;
+  const searched = d.target ? WORLD.spotById.get(d.target) : null;
+  const own = m.ghost.spotId && !m.ghost.transit ? WORLD.spotById.get(m.ghost.spotId) : null;
+  if (searched?.objectId === obj.id && d.phase === "search") {
+    if (searched.prep !== "in") return 0;
+    // Open over half a second and look; an empty one closes again before the two-second inspection ends.
+    const t = d.elapsed;
+    const found = own?.id === searched.id;
+    return Math.min(1, t / 0.5) * (found ? 1 : Math.min(1, Math.max(0, (2 - t) / 0.45)));
+  }
+  if (own?.objectId === obj.id && own.prep === "in" && (m.status === "lost" || m.status === "won")) return 1;
+  // Lifted a crack whenever the view is at (or travelling to or from) a peeking eye inside this container.
+  const peek = hsCam.spotId ? WORLD.spotById.get(hsCam.spotId) : null;
+  if (part !== "lid" || peek?.objectId !== obj.id || peek.prep !== "in") return 0;
+  const view = hidingViewFor(peek.id);
+  const c = rt.camera.pos;
+  return view && Math.hypot(c.x - view.eye.x, c.y - view.eye.y, c.z - view.eye.z) < 0.8 ? view.lidAjar : 0;
+}
+
 function FurnitureItem({ obj, hideSeek = false }: { obj: WorldObject; hideSeek?: boolean }) {
   const built = useMemo(() => buildObject(obj), [obj]);
   const material = useMemo(() => (obj.interactive || hideSeek ? new THREE.MeshLambertMaterial({ vertexColors: true, transparent: hideSeek }) : furnitureMaterial), [obj, hideSeek]);
@@ -84,10 +108,22 @@ function FurnitureItem({ obj, hideSeek = false }: { obj: WorldObject; hideSeek?:
     r.visible = visible;
     if (!visible) return;
     if (hideSeek) {
-      // Fade tall blockers for the student's view only; the simulation never reads this.
       const match = getHideSeek().match;
+      // Lids and the clock door: the detective opens them to look inside, they stay open
+      // once the ghost is found (or pops out to celebrate), and a lid is lifted a crack
+      // while the student peeks out from under it.
+      for (const p of built.parts) {
+        const g = parts.current[p.name];
+        if (!g || (p.name !== "lid" && p.name !== "door")) continue;
+        const want = match ? hideSeekOpenAmount(obj, p.name, match) : 0;
+        const k = Math.min(1, dt * (want > (g.userData.open ?? 0) ? 9 : 6));
+        g.userData.open = (g.userData.open ?? 0) + (want - (g.userData.open ?? 0)) * k;
+        if (p.name === "lid") g.rotation.x = -g.userData.open * 1.85;
+        else g.rotation.y = -g.userData.open * 1.9;
+      }
+      // Fade tall blockers for the overhead and follow views only (never an X-ray from a hiding place).
       let blocked = false;
-      if (match && obj.spec.h > 0.9) {
+      if (match && obj.spec.h > 0.9 && hsCam.mode !== "firstPerson") {
         for (const actor of [match.ghost, { ...match.detective, y: obj.y + 0.45 }]) {
           const cy = rt.camera.pos.y;
           const top = obj.y + obj.spec.h;
