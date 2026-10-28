@@ -9,6 +9,8 @@ import { RESULTS_DELAY_MS, decideHideSeek, leaveHideSeek, pickSpot, setPickMode,
 import { GhostPortrait } from "./GhostPortrait";
 import { HideSeekEnglish } from "./HideSeekEnglish";
 import { HideSeekHud } from "./HideSeekHud";
+import { HideSeekRecords } from "./HideSeekRecords";
+import { CHALLENGE_AREAS, completionFor, collectionProgress, ghostCompleted, loadCompletionBook } from "../game/hideSeek/records";
 
 export const HS_ABILITIES: Record<GhostId, { name: string; text: string; ja: string }> = {
   sleepy: { name: "Deep Sleep", text: "Rest quietly and lower the detective’s suspicion.", ja: "しずかに休んで、気づかれにくくしよう。" },
@@ -33,6 +35,7 @@ export function HideSeekEntry() {
   const [ghost, setGhost] = useState<GhostId | null>(link?.ghost ?? null);
   const [selection, setSelection] = useState<"ghost" | "room">(link?.ghost ? "room" : "ghost");
   const [booted, setBooted] = useState(false);
+  const [recordsOpen, setRecordsOpen] = useState(false);
   const ja = settings.japanese;
 
   useEffect(() => {
@@ -51,16 +54,23 @@ export function HideSeekEntry() {
     setGame({ screen: "title", hideSeekLink: null });
     setSelection("ghost");
     setGhost(null);
+    setRecordsOpen(false);
   };
   const anotherGhost = () => {
     leaveHideSeek();
     setGame({ screen: "hideseek", hideSeekLink: null });
     setGhost(null);
     setSelection("ghost");
+    setRecordsOpen(false);
   };
   const chooseRoom = (room: PlayRoom) => {
     if (ghost) startHideSeek(ghost, room, link?.seed, settings.englishLevel);
   };
+
+  const book = loadCompletionBook();
+  const progress = collectionProgress(book);
+  if (!match && recordsOpen) return <HideSeekRecords japanese={ja} onBack={() => setRecordsOpen(false)}
+    onPlay={(id, room) => { setGhost(id); setSelection("room"); setRecordsOpen(false); startHideSeek(id, room, undefined, settings.englishLevel); }} />;
 
   if (!match) return (
     <div className="hs-selection title-screen ui" data-testid="hideseek">
@@ -70,6 +80,7 @@ export function HideSeekEntry() {
           <h1>{selection === "ghost" ? "Choose your ghost" : "Choose a room"}</h1>
           {ja && <span className="ja" lang="ja">{selection === "ghost" ? "おばけを えらぼう" : "へやを えらぼう"}</span>}
           <p>{selection === "ghost" ? "Hide from the detective. Every ghost has a special trick!" : "One room. Five searches. Can you stay hidden?"}</p>
+          <div className="hs-collection-summary" data-testid="hs-collection-summary">Collection: {progress.completed}/{progress.total} escaped · {progress.percentage}%</div>
         </header>
         {selection === "ghost" ? (
           <div className="hs-ghost-grid" data-testid="hs-ghost-select">
@@ -79,6 +90,7 @@ export function HideSeekEntry() {
                 <span className="hs-card-name">{GHOSTS[id].name}</span>
                 <strong>{HS_ABILITIES[id].name}</strong>
                 <span className="hs-ability-explanation">{HS_ABILITIES[id].text}</span>
+                <span className="hs-card-records" data-testid={`hs-ghost-progress-${id}`}>★ {ghostCompleted(book, id)} / {CHALLENGE_AREAS.length} rooms</span>
                 {ja && <span className="ja" lang="ja">{HS_ABILITIES[id].ja}</span>}
               </button>
             ))}
@@ -92,10 +104,11 @@ export function HideSeekEntry() {
                 <h2>{floor === 0 ? "Ground floor" : "Upstairs"}</h2>
                 <div className="hs-room-grid">
                   {PLAY_ROOMS.filter((room) => ROOMS[room].floor === floor).map((room) => (
-                    <button className="hs-room-card" key={room} data-testid={`hs-room-${room}`} onClick={() => chooseRoom(room)}>
+                    <button className={`hs-room-card ${ghost && completionFor(book, ghost, room) ? "hs-room-complete" : ""}`} key={room} data-testid={`hs-room-${room}`} onClick={() => chooseRoom(room)}>
                       <span className="hs-room-number" aria-hidden="true">{PLAY_ROOMS.indexOf(room) + 1}</span>
                       <strong>{ROOMS[room].name}</strong>
                       {ja && <span className="ja" lang="ja">{ROOMS[room].nameJa}</span>}
+                      {ghost && <span className="hs-room-record" data-testid={`hs-room-complete-${room}`}>{completionFor(book, ghost, room) ? "✓ Completed" : "○ Not completed"}</span>}
                     </button>
                   ))}
                 </div>
@@ -105,6 +118,7 @@ export function HideSeekEntry() {
           </div>
         )}
         <footer className="hs-selection-footer">
+          <button className="secondary" data-testid="hs-open-records" onClick={() => setRecordsOpen(true)}>★ Records ({progress.completed}/{progress.total})</button>
           {selection === "room" && <button className="secondary" data-testid="hs-back" onClick={anotherGhost}>Back{ja && <small lang="ja">もどる</small>}</button>}
           <button className="secondary" data-testid="hideseek-back" onClick={menu}>Main Menu{ja && <small lang="ja">メニュー</small>}</button>
         </footer>
@@ -129,6 +143,13 @@ export function HideSeekEntry() {
         <p>{match.status === "won" ? "Five searches, and you stayed hidden. Clever hiding!" : "The detective found your hiding place. Let’s try another clever plan!"}</p>
         {ja && <p className="ja" lang="ja">{match.status === "won" ? "うまく かくれたね！" : "見つかったね。次は どこに かくれよう？"}</p>}
         <strong>{def.name} · {ROOMS[match.config.room].name}</strong>
+        {match.status === "won" && session.recordResult && <div className="hs-victory-record" data-testid="hs-victory-record">
+          <strong>{!session.recordResult.saved ? "Record could not be saved" : session.recordResult.firstCompletion ? "★ NEW RECORD!" : "✓ COMPLETED AGAIN!"}</strong>
+          {session.recordResult.saved && <span>{session.recordResult.progress.completed} / {session.recordResult.progress.total} challenges completed</span>}
+          {session.recordResult.newAchievements.length > 0 && <small>New awards: {session.recordResult.newAchievements.map((award) => award === "masterHider" ? "Master Hider" : award === "naturalTalent" ? "Natural Talent" : award === "englishExpert" ? "English Expert" : "Escaped").join(", ")}</small>}
+          {session.recordResult.newMilestones.length > 0 && <small>Collection milestone unlocked!</small>}
+          {session.recordResult.personalBest && <small>New personal best!</small>}
+        </div>}
         <dl className="hs-stats">
           <div><dt>Searches survived</dt><dd>{Math.max(0, match.stats.completedSearches - (session.lossReason === "found" ? 1 : 0))} / 5</dd></div>
           <div><dt>Relocations used</dt><dd>{match.stats.relocations} / 2</dd></div>
@@ -138,6 +159,7 @@ export function HideSeekEntry() {
         <footer className="hs-results-actions">
           <button className="primary" data-testid="hs-play-again" onClick={() => startHideSeek(def.id, match.config.room, (match.config.seed + 1) >>> 0, settings.englishLevel)}>Play Again</button>
           <button className="secondary" data-testid="hs-choose-ghost" onClick={anotherGhost}>Choose Another Ghost</button>
+          <button className="secondary" data-testid="hs-results-records" onClick={() => { leaveHideSeek(); setGame({ screen: "hideseek", hideSeekLink: null }); setRecordsOpen(true); setSelection("ghost"); setGhost(null); }}>Records</button>
           <button className="secondary" data-testid="hs-menu" onClick={menu}>Main Menu</button>
         </footer>
       </section>

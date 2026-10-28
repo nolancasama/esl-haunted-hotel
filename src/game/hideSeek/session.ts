@@ -12,6 +12,7 @@ import {
 import type { CommandResult, EnglishLevel, MatchState, PlayRoom } from "./types";
 import { sentenceFor } from "./english";
 import { awarenessOf } from "./awareness";
+import { recordVictory, type VictoryRecordResult } from "./records";
 
 export type PickMode = "start" | "move" | "ability" | null;
 export interface TimedDecision { phase: "decision" | "destination"; secondsLeft: number; searchNumber: number }
@@ -30,11 +31,13 @@ interface Session {
   lossReason: "found" | "caughtInOpen" | null;
   /** performance.now() when the match ended: the closing camera shot plays before the results card. */
   endedAt: number | null;
+  /** Persisted once on the actual victorious match event, not during results rendering. */
+  recordResult: VictoryRecordResult | null;
 }
 
 /** The only live match owner. Views read it; commands and the render clock drive the core. */
 export const useHideSeek = create<Session>(() => ({
-  match: null, decision: null, pendingDecision: false, revision: 0, pickMode: null, subtitle: "", message: "", clue: null, fx: null, decoyPop: null, lossReason: null, endedAt: null
+  match: null, decision: null, pendingDecision: false, revision: 0, pickMode: null, subtitle: "", message: "", clue: null, fx: null, decoyPop: null, lossReason: null, endedAt: null, recordResult: null
 }));
 export const getHideSeek = useHideSeek.getState;
 let timeScale = 1;
@@ -157,7 +160,7 @@ function drain() {
         else if (event.ghost === "mischief") audio.play("pop");
         break;
       case "won":
-        useHideSeek.setState({ endedAt: performance.now() });
+        useHideSeek.setState({ endedAt: performance.now(), recordResult: recordVictory(match) });
         audio.play("fanfare");
         break;
       case "lost":
@@ -178,7 +181,7 @@ export function startHideSeek(ghost: GhostId, room: PlayRoom, seed = Date.now() 
   subtitleUntil = 0;
   lastMusic = -100;
   hsPresentation.cameraSettling = false;
-  useHideSeek.setState({ match, decision: null, pendingDecision: false, pickMode: "start", subtitle: "", message: "Choose a spot to hide.", clue: null, fx: null, decoyPop: null, lossReason: null, endedAt: null, revision: getHideSeek().revision + 1 });
+  useHideSeek.setState({ match, decision: null, pendingDecision: false, pickMode: "start", subtitle: "", message: "Choose a spot to hide.", clue: null, fx: null, decoyPop: null, lossReason: null, endedAt: null, recordResult: null, revision: getHideSeek().revision + 1 });
   return { ok: true } as const;
 }
 
@@ -187,7 +190,7 @@ export function leaveHideSeek() {
   audio.setListening(false);
   audio.setHeartbeat(0);
   hsPresentation.cameraSettling = false;
-  useHideSeek.setState({ match: null, decision: null, pendingDecision: false, pickMode: null, subtitle: "", message: "", clue: null, fx: null, decoyPop: null, lossReason: null, endedAt: null, revision: getHideSeek().revision + 1 });
+  useHideSeek.setState({ match: null, decision: null, pendingDecision: false, pickMode: null, subtitle: "", message: "", clue: null, fx: null, decoyPop: null, lossReason: null, endedAt: null, recordResult: null, revision: getHideSeek().revision + 1 });
   timeScale = 1;
   director.toTitle();
 }
