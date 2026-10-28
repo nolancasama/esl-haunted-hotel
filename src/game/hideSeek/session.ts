@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { audio, type SfxName } from "../../audio/audio";
 import { tts } from "../../audio/tts";
 import { director } from "../director";
-import { getGame } from "../store";
+import { getGame, setGame } from "../store";
 import type { GhostId } from "../types";
 import { WORLD } from "../world/world";
 import {
@@ -11,6 +11,7 @@ import {
 } from "./match";
 import type { CommandResult, EnglishLevel, MatchState, PlayRoom } from "./types";
 import { sentenceFor } from "./english";
+import { awarenessOf } from "./awareness";
 
 export type PickMode = "start" | "move" | "ability" | null;
 export interface TimedDecision { phase: "decision" | "destination"; secondsLeft: number; searchNumber: number }
@@ -191,6 +192,12 @@ export function leaveHideSeek() {
   director.toTitle();
 }
 
+/** Leave the match for the title screen (the HUD's Settings → Main Menu, or the results card). */
+export function exitHideSeek() {
+  leaveHideSeek();
+  setGame({ screen: "title", hideSeekLink: null, settingsOpen: false });
+}
+
 export function setPickMode(mode: PickMode): CommandResult {
   const match = getHideSeek().match;
   if (!match) return publish({ ok: false, reason: "not-playing" });
@@ -330,11 +337,11 @@ export function hideSeekSnapshot() {
   if (!match) return null;
   return JSON.parse(JSON.stringify({
     ...match, phase: match.detective.phase, englishOpen: Boolean(match.english),
-    suspicion: match.detective.suspicion, pickMode, decision, pendingDecision, timeScale, lossReason, decoyPopSpotId: decoyPop?.spotId ?? null,
+    suspicion: match.detective.suspicion, awareness: awarenessOf(match).state, pickMode, decision, pendingDecision, timeScale, lossReason, decoyPopSpotId: decoyPop?.spotId ?? null,
     spots: WORLD.spots.filter((spot) => spot.room === match.config.room),
     reachable: reachableSpots(match), targets: abilityTargets(match)
   })) as MatchState & {
-    phase: string; englishOpen: boolean; suspicion: number; pickMode: PickMode; decision: TimedDecision | null; pendingDecision: boolean; timeScale: number; lossReason: Session["lossReason"]; decoyPopSpotId: string | null;
+    phase: string; englishOpen: boolean; suspicion: number; awareness: ReturnType<typeof awarenessOf>["state"]; pickMode: PickMode; decision: TimedDecision | null; pendingDecision: boolean; timeScale: number; lossReason: Session["lossReason"]; decoyPopSpotId: string | null;
     spots: typeof WORLD.spots; reachable: typeof WORLD.spots; targets: typeof WORLD.spots;
   };
 }

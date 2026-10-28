@@ -48,7 +48,8 @@ export function HideSeekCamera() {
     cur: newPose(), from: newPose(), target: newPose(), ready: false,
     key: "", blendStart: 0, holdUntil: 0, lastStatus: "", lastFx: null as unknown,
     travel: new THREE.Vector3(0, 0, 1), wantYaw: 0, wantPitch: 0,
-    drag: null as { id: number; x: number; y: number } | null, keys: new Set<string>()
+    drag: null as { id: number; x: number; y: number } | null, keys: new Set<string>(),
+    offX: 0, offY: 0
   }), []);
   const tmp = useMemo(() => ({ v: new THREE.Vector3(), w: new THREE.Vector3() }), []);
   useEffect(() => { gl.setClearColor("#130d20"); scene.fog = null; return () => { scene.fog = new THREE.Fog("#120a22", 13, 30); }; }, [scene, gl]);
@@ -127,9 +128,11 @@ export function HideSeekCamera() {
 
     // ---- the wanted pose for this mode
     const t = s.target;
-    const rail = size.height < 480 ? 250 : 300;
-    let coveredBottom = 0;
     const overhead = shotKey(mode, spotId) === "overhead";
+    // The left dock (English, spot list) is open only in the room view; every other shot uses the full width.
+    const dock = overhead && (m.english || session.pickMode) ? (size.height < 480 ? 250 : 300) : 0;
+    let coveredBottom = 0;
+    let coveredTop = 0;
     const view = mode === "firstPerson" && spotId ? hidingViewFor(spotId) : null;
     if (view) {
       // Look limits are per spot; the view stays anchored to the hiding place.
@@ -189,12 +192,17 @@ export function HideSeekCamera() {
       t.near = 0.1;
     } else {
       const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
-      const availableW = Math.max(200, size.width - rail - 24);
-      const panel = document.querySelector('[data-testid="hs-english"]');
+      const availableW = Math.max(200, size.width - dock - 24);
+      const panel = dock ? document.querySelector('[data-testid="hs-english"]') : null;
       const panelRect = panel?.getBoundingClientRect();
-      coveredBottom = panelRect && panelRect.left >= rail - 20 ? Math.max(0, size.height - panelRect.top) : 0;
-      const availableH = Math.max(200, size.height - coveredBottom - 60);
-      const span = Math.max((b.x1 - b.x0) * 1.5 * size.height / availableW, (b.z1 - b.z0) * 1.5 * size.height / availableH);
+      coveredBottom = panelRect && panelRect.left >= dock - 20 ? Math.max(0, size.height - panelRect.top) : 0;
+      // The ten-second destination card sits at the top: frame the room (and its markers) below it.
+      const card = session.decision?.phase === "destination" ? document.querySelector(".hs-decision-overlay.picking .hs-decision-card") : null;
+      coveredTop = card ? Math.max(0, card.getBoundingClientRect().bottom - (size.height < 480 ? 50 : 60)) : 0;
+      // The top bar is short now; keep a little headroom for it and the toast under it.
+      const availableH = Math.max(200, size.height - coveredBottom - coveredTop - (size.height < 480 ? 64 : 76));
+      const margin = coveredTop ? 1.25 : 1.5;
+      const span = Math.max((b.x1 - b.x0) * margin * size.height / availableW, (b.z1 - b.z0) * margin * size.height / availableH);
       const distance = Math.max(12.2, span / (2 * Math.tan(25 * Math.PI / 180)));
       t.look.set(cx, base + 0.4, cz);
       t.pos.set(0.43, 0.93, 0.83).normalize().multiplyScalar(distance).add(t.look);
@@ -248,8 +256,15 @@ export function HideSeekCamera() {
       cam.near = s.cur.near;
       cam.updateProjectionMatrix();
     }
-    // Shift the whole picture into the clear area to the right of the HUD rail.
-    cam.setViewOffset(size.width, size.height, -rail / 2, coveredBottom / 2 - (overhead ? 12 : 0), size.width, size.height);
+    // Room views sit in the clear area beside the dock and under the top bar; first-person and
+    // third-person shots stay centred. The offset is eased so opening the dock slides, not jumps.
+    const want = { x: -dock / 2, y: (coveredBottom - coveredTop) / 2 - (overhead ? (size.height < 480 ? 14 : 18) : 0) };
+    const k = s.ready && duration ? 1 - Math.exp(-dt * 8) : 1;
+    s.offX += (want.x - s.offX) * k;
+    s.offY += (want.y - s.offY) * k;
+    if (Math.abs(s.offX - want.x) < 0.5) s.offX = want.x;
+    if (Math.abs(s.offY - want.y) < 0.5) s.offY = want.y;
+    cam.setViewOffset(size.width, size.height, s.offX, s.offY, size.width, size.height);
     cameraRef.current = cam;
     Object.assign(rt.camera.pos, s.cur.pos);
     Object.assign(rt.camera.target, s.cur.look);

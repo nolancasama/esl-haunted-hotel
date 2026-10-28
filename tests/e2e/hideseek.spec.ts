@@ -194,6 +194,7 @@ test("two real relocations spend the budget and a third is rejected", async ({ p
   await page.getByTestId("hs-spot-dining.window.by").click();
   await answerTiles(page);
   expect((await snapshot(page))!.relocationsLeft).toBe(1);
+  await expect(page.getByTestId("hs-relocations")).toHaveText("1/2");
   await scale(page, 1);
   await until(page, "first move completes and a search releases the next move", (s) => s.status === "playing" && !s.ghost.transit && !s.movedThisSearch && s.stats.completedSearches >= 1);
   await scale(page, 0);
@@ -201,6 +202,8 @@ test("two real relocations spend the budget and a third is rejected", async ({ p
   await page.getByTestId("hs-spot-dining.table.by").click();
   await answerTiles(page);
   expect((await snapshot(page))!.relocationsLeft).toBe(0);
+  await expect(page.getByTestId("hs-relocations")).toHaveText("0/2");
+  await expect(page.getByTestId("hs-toast")).toContainText("No moves left");
   await scale(page, 1);
   await until(page, "second relocation arrives", (s) => s.status === "playing" && !s.ghost.transit);
   await scale(page, 0);
@@ -284,14 +287,24 @@ for (const [width, height, touch] of [[1366, 768, false], [1024, 600, false], [8
         };
         const hud = box('[data-testid="hs-hud"]');
         const panel = box('[data-testid="hs-english"]');
-        const rail = box(".hs-rail");
+        const dock = box('[data-testid="hs-dock"]');
+        const ability = box('[data-testid="hs-ability-dock"]');
+        const subtitle = box('[data-testid="hs-subtitle"]');
+        const gear = box('[data-testid="hs-settings"]');
         const preview = s.status === "setup" && s.english?.starting ? s.spots.find((spot) => spot.id === s.english!.spotId)?.hidePos : null;
         const ghost = preview ?? s.ghost;
         const actors = { ghost: api.project(ghost.x, ghost.y + 0.3, ghost.z), detective: api.project(s.detective.x, 0.8, s.detective.z) };
-        const within = (r: NonNullable<typeof hud>) => r.x >= -1 && r.y >= -1 && r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1;
-        const overlap = Boolean(hud && panel && Math.min(hud.right, panel.right) > Math.max(hud.x, panel.x) + 1 && Math.min(hud.bottom, panel.bottom) > Math.max(hud.y, panel.y) + 1);
-        const actorsClear = Boolean(rail && Object.values(actors).every((p) => p && p.x > rail.right + 8 && p.x < innerWidth - 8 && p.y > 8 && p.y < innerHeight - 8));
-        return { english: needsEnglish, status: s.status, phase: s.detective.phase, hud, panel, rail, actors, overlap, actorsClear, hudWithin: Boolean(hud && within(hud)), panelWithin: Boolean(!needsEnglish || panel && within(panel)) };
+        type Box = NonNullable<typeof hud>;
+        const within = (r: Box) => r.x >= -1 && r.y >= -1 && r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1;
+        const hits = (a: Box | null, b: Box | null) => Boolean(a && b && Math.min(a.right, b.right) > Math.max(a.x, b.x) + 1 && Math.min(a.bottom, b.bottom) > Math.max(a.y, b.y) + 1);
+        const pieces = { hud, dock, ability, subtitle, gear };
+        const overlaps = Object.entries(pieces).flatMap(([a, ra], i) => Object.entries(pieces).slice(i + 1).filter(([, rb]) => hits(ra, rb)).map(([b]) => `${a}/${b}`));
+        const overlap = overlaps.length > 0;
+        const covered = (p: { x: number; y: number }) => Object.values(pieces).some((r) => r && p.x > r.x - 8 && p.x < r.right + 8 && p.y > r.y - 8 && p.y < r.bottom + 8);
+        const actorsClear = Object.values(actors).every((p) => p && p.x > 8 && p.x < innerWidth - 8 && p.y > 8 && p.y < innerHeight - 8 && !covered(p));
+        // The old full-height rail is gone; the room is framed beside the dock only while it is open.
+        const rail = document.querySelector(".hs-rail") !== null;
+        return { english: needsEnglish, status: s.status, phase: s.detective.phase, hud, panel, dock, ability, subtitle, gear, rail, actors, overlaps, overlap, actorsClear, hudWithin: Boolean(hud && within(hud)), panelWithin: Boolean(!needsEnglish || panel && within(panel)) };
       }, english);
 
       await settleCamera();
@@ -300,7 +313,8 @@ for (const [width, height, touch] of [[1366, 768, false], [1024, 600, false], [8
       expect(english.panel, "HARNESS_PRECONDITION_FAILED: English panel missing").not.toBeNull();
       expect(english.hudWithin).toBe(true);
       expect(english.panelWithin).toBe(true);
-      expect(english.overlap).toBe(false);
+      expect(english.overlaps).toEqual([]);
+      expect(english.rail).toBe(false);
       expect(english.actorsClear).toBe(true);
       await until(page, "English screenshot still has the starting question", (s) => Boolean(s.english) && s.time === initial.time);
       await page.screenshot({ path: path.join(dir, "validation-english.png"), timeout: 60_000 });
@@ -325,7 +339,12 @@ for (const [width, height, touch] of [[1366, 768, false], [1024, 600, false], [8
       const match = await measure(false);
       expect(match.phase, "HARNESS_PRECONDITION_FAILED: live match changed after the clock froze").toBe(frozen.detective.phase);
       expect(match.hudWithin).toBe(true);
-      expect(match.overlap).toBe(false);
+      expect(match.overlaps).toEqual([]);
+      expect(match.dock, "the left dock closes once English is answered").toBeNull();
+      expect(match.ability, "the ability sits in the lower right during play").not.toBeNull();
+      expect(match.ability!.right).toBeGreaterThan(width - 40);
+      expect(match.hud!.y).toBeLessThan(20);
+      expect(Math.abs((match.hud!.x + match.hud!.right) / 2 - width / 2)).toBeLessThan(2);
       expect(match.actorsClear).toBe(true);
       await page.screenshot({ path: path.join(dir, "validation-match.png"), timeout: 60_000 });
       measurements.push(match);
@@ -364,7 +383,9 @@ test("a real canvas marker selects a spot, and story keyboard movement resumes a
   await page.mouse.click(projected.x, projected.y);
   await until(page, "real canvas marker opened the selected English question", (s) => s.english?.spotId === spot.id);
   await answerTiles(page);
-  await page.getByRole("button", { name: "Main Menu", exact: true }).click();
+  // Main Menu lives in Settings during a match.
+  await page.getByTestId("hs-settings").click();
+  await page.getByTestId("hs-main-menu").click();
   await expect(page.getByTestId("start")).toBeVisible();
   expect(await snapshot(page)).toBeNull();
   await page.getByTestId("start").click();

@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { useGame, setGame } from "../game/store";
 import { director } from "../game/director";
 import { recognition } from "../audio/recognition";
+import { exitHideSeek } from "../game/hideSeek/session";
 
 function Row({ label, ja, children }: { label: string; ja: string; children: React.ReactNode }) {
   return (
@@ -113,6 +114,11 @@ export function SettingsModal() {
           {screen === "game" && (
             <button className="btn-secondary secondary" onClick={() => director.toTitle()}>
               Title <small lang="ja">タイトルへ</small>
+            </button>
+          )}
+          {screen === "hideseek" && (
+            <button className="btn-secondary secondary" onClick={exitHideSeek} data-testid="hs-main-menu">
+              Main Menu <small lang="ja">メニューへ</small>
             </button>
           )}
           <button className="btn-primary primary" onClick={() => setGame({ settingsOpen: false })} data-testid="settings-close">

@@ -131,7 +131,8 @@ test("the heartbeat runs only during a match, never twice, and stops when switch
   await page.getByTestId("settings-close").click();
   await until(page, "heartbeat back on", camera, (c) => c.heartbeat, 30_000);
   // Leaving Hide & Seek stops it for good.
-  await page.getByRole("button", { name: "Main Menu" }).click();
+  await page.getByTestId("hs-settings").click();
+  await page.getByTestId("hs-main-menu").click();
   await until(page, "heartbeat stopped after leaving", camera, (c) => !c.heartbeat, 30_000);
   expect(errors).toEqual([]);
 });

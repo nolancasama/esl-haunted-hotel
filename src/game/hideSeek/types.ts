@@ -91,6 +91,8 @@ export interface MatchState {
   abilityUsed: boolean;
   effects: Effects;
   perception: PerceptionTimers;
+  /** Time the detective last had the ghost in plain sight. Presentation only: never in DetectiveView. */
+  seenAt: number;
   stats: MatchStats;
   events: MatchEvent[];
 }

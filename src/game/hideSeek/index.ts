@@ -27,4 +27,5 @@
  */
 export * from "./types";
 export * from "./match";
+export * from "./awareness";
 export { sentenceFor, placePhrase, accept, announceLine, emptyLine, foundLine } from "./english";

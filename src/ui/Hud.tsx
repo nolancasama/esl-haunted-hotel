@@ -19,7 +19,7 @@ function SpeakerIcon() {
   );
 }
 
-function GearIcon() {
+export function GearIcon() {
   return (
     <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
       <path

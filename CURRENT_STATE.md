@@ -1,6 +1,21 @@
 # Current State
 
 ## Status
+**2026-10-28: Hide & Seek HUD redesign.** The full-height left rail is gone. In its place:
+a narrow top-centre bar (ghost, five search pips, Moves n/2, a where-am-I pin), a gear in
+the top right (Settings now holds **Main Menu** during a match, `hs-main-menu`), short
+notices under the bar (room name, hiding place, "No moves left", status lines), a
+bottom-right ability card (`hs-ability`, also key E), and detective subtitles in the lower
+centre. A left dock (`hs-dock`) appears only while English or a spot list is open, and the
+room camera frames beside it (and below the 10-second destination card); first-person and
+third-person shots are no longer shifted sideways. The numeric suspicion meter is replaced
+by a contextual stealth eye (`hs-awareness`, `data-state` hidden/suspicious/spotted):
+`hideSeek/awareness.ts` derives it from the detective's suspicion plus the new
+`MatchState.seenAt` (time the perception boundary last had the ghost in sight; never in
+`DetectiveView`), so proximity alone never shows Spotted. The heartbeat still tracks
+distance only. Numeric suspicion and `awareness` stay in the `hs()` snapshot. New
+`tests/e2e/hud.spec.ts`; `awareness.test.ts`.
+
 **2026-10-27: First-person hiding, heartbeat and the clock door are done.** Hide & Seek now
 hides in the ghost's own view (per-spot viewpoints in all 8 rooms), decides strategy in
 the overhead view, follows relocations in third person, and ends with a held first-person

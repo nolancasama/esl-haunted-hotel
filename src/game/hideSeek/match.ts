@@ -35,7 +35,7 @@ export function createMatch(config: MatchConfig): MatchState {
     },
     english: null, pendingMove: null, searchesLeft: 5, relocationsLeft: 2, movedThisSearch: false,
     abilityUsed: false, effects: { sleepySearch: null, nextMove: null, decoy: null, bubbles: [], music: null },
-    perception: initialPerceptionTimers(),
+    perception: initialPerceptionTimers(), seenAt: -100,
     stats: {
       completedSearches: 0, relocations: 0, questions: 0, acceptedAnswers: 0,
       firstTryAnswers: 0, wrongAnswers: 0, firstTryAccuracy: 0, clues: 0, elapsed: 0
@@ -270,6 +270,7 @@ function tick(s: MatchState): void {
     sleepy: s.effects.sleepySearch === s.stats.completedSearches, timers: s.perception
   }, TICK, () => random(s));
   s.perception = sensed.timers;
+  if (sensed.visible) s.seenAt = s.time;
   for (const clue of sensed.clues) addClue(s, clue);
   if (sensed.caughtInOpen) {
     s.events.push({ type: "caughtInOpen", x: s.ghost.x, z: s.ghost.z });

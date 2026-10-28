@@ -5,9 +5,10 @@ import type { GhostId } from "../game/types";
 import { WORLD } from "../game/world/world";
 import { ROOMS } from "../game/world/rooms";
 import { abilityTargets, placePhrase, reachableSpots, type PlayRoom } from "../game/hideSeek";
-import { RESULTS_DELAY_MS, command, decideHideSeek, leaveHideSeek, pickSpot, setPickMode, startHideSeek, stayHere, useHideSeek } from "../game/hideSeek/session";
+import { RESULTS_DELAY_MS, decideHideSeek, leaveHideSeek, pickSpot, setPickMode, startHideSeek, stayHere, useHideSeek } from "../game/hideSeek/session";
 import { GhostPortrait } from "./GhostPortrait";
 import { HideSeekEnglish } from "./HideSeekEnglish";
+import { HideSeekHud } from "./HideSeekHud";
 
 export const HS_ABILITIES: Record<GhostId, { name: string; text: string; ja: string }> = {
   sleepy: { name: "Deep Sleep", text: "Rest quietly and lower the detective’s suspicion.", ja: "しずかに休んで、気づかれにくくしよう。" },
@@ -117,7 +118,7 @@ export function HideSeekEntry() {
   const ended = match.status === "won" || match.status === "lost";
   if (ended && (session.endedAt === null || performance.now() - session.endedAt < RESULTS_DELAY_MS)) return (
     <div className="hs-container" data-testid="hideseek">
-      {session.subtitle && <div className="hs-subtitle subtitle panel" data-testid="hs-subtitle" role="status"><span>{session.subtitle}</span></div>}
+      {session.subtitle && <div className="hs-subtitle subtitle panel" data-testid="hs-subtitle" role="status"><span className="hs-speaker">Detective</span><span>{session.subtitle}</span></div>}
     </div>
   );
   if (ended) return (
@@ -147,33 +148,19 @@ export function HideSeekEntry() {
   const choices = session.pickMode === "ability" ? abilityTargets(match) : session.pickMode ? reachableSpots(match) : [];
   const picking = session.pickMode === "start" ? "Choose your hiding place" : session.pickMode === "ability" ? "Choose a distraction spot" : "Choose where to move";
   const decision = session.decision;
+  // The left dock exists only while English or a spot list is open; the camera frames the room beside it.
+  const dock = Boolean(match.english || session.pickMode);
   return (
     <div className="hs-container" data-testid="hideseek">
-    <div className="hs-match" data-testid="hs-match" data-phase={match.detective.phase}>
-      <aside className="hs-rail ui" aria-label="Hide and seek controls">
-        <section className="panel hs-hud" data-testid="hs-hud">
-          <header className="hs-hud-header">
-            <GhostPortrait ghost={def.id} size={42} face={match.detective.suspicion > 65 ? "surprised" : "happy"} />
-            <div><strong>{def.name}</strong><span>{ROOMS[match.config.room].name}</span></div>
-            <button className="hs-menu-button" aria-label="Settings" data-testid="hs-settings" onClick={() => setGame({ settingsOpen: true })}>⚙</button>
-            <button className="hs-menu-button" aria-label="Main Menu" onClick={menu}>⌂</button>
-          </header>
-          <div className="hs-current-spot" data-testid="hs-current-spot">{match.ghost.transit ? "Floating to a new hiding place…" : spot ? placePhrase(spot) : "Pick a hiding place to begin"}</div>
-          <div className="hs-search-row"><span>Searches left</span><span className="hs-search-pips" aria-label={`${match.searchesLeft} searches left`}>{Array.from({ length: 5 }, (_, i) => <i key={i} className={i < match.searchesLeft ? "on" : ""} />)}</span></div>
-          <div className="hs-search-row"><span>Relocations left</span><strong data-testid="hs-relocations">{match.relocationsLeft} / 2</strong></div>
-          <label className="hs-suspicion">Suspicion <meter min="0" max="100" value={match.detective.suspicion} aria-label="Detective suspicion" /><span>{Math.round(match.detective.suspicion)}%</span></label>
-          <div className="hs-ability-status"><strong>{ability.name}</strong><span data-testid="hs-ability-status">{match.abilityUsed ? "Used" : "Available · once"}</span></div>
-          <div className="hs-actions">
-            <button className="primary" data-testid="hs-ability" title={ability.text}
-              disabled={match.status !== "playing" || Boolean(match.english) || match.abilityUsed || decision?.phase === "destination"}
-              onClick={() => { if (def.id === "hungry" || def.id === "mischief") setPickMode("ability"); else command("useAbility"); }}>Ability · {ability.name}</button>
-          </div>
-          <p className="hs-action-message" role="status" data-testid="hs-message">{session.message || (match.status === "setup" ? "Choose a marker or a place below." : match.english ? "Take your time. The detective is waiting." : "Stay hidden, or choose a new place.")}</p>
-        </section>
+    <div className={`hs-match ${dock ? "has-dock" : ""}`} data-testid="hs-match" data-phase={match.detective.phase}
+      data-english={Boolean(match.english)} data-decision={decision?.phase ?? "none"}>
+      <HideSeekHud match={match} decision={decision} pickMode={session.pickMode} message={session.message} ability={ability} ja={ja} />
+      {dock && <aside className="hs-dock ui" data-testid="hs-dock" aria-label="Hide and seek choices">
         {match.english ? <HideSeekEnglish key={`${match.english.spotId}-${match.stats.questions}`} match={match} /> : session.pickMode && (
           <section className="panel hs-picker" data-testid="hs-picker">
             <h2>{picking}</h2>
             {ja && <span className="ja" lang="ja">{session.pickMode === "start" ? "かくれる場所を えらぼう" : "場所を えらぼう"}</span>}
+            {session.pickMode === "start" && <p className="hs-picker-hint">Tap a marker in the room, or choose a place below.</p>}
             <div className="hs-spot-list" role="group" aria-label={picking}>
               {choices.map((choice) => <button key={choice.id} className="hs-spot-option" data-testid={`hs-spot-${choice.id}`} onClick={() => pickSpot(choice.id)}><b>{choice.prep}</b> the {choice.noun}</button>)}
             </div>
@@ -181,8 +168,8 @@ export function HideSeekEntry() {
             {session.pickMode !== "start" && <button className="secondary hs-picker-cancel" onClick={() => setPickMode(null)}>Cancel</button>}
           </section>
         )}
-      </aside>
-      {session.subtitle && !match.english && <div className="hs-subtitle subtitle panel" data-testid="hs-subtitle" role="status"><span>{session.subtitle}</span></div>}
+      </aside>}
+      {session.subtitle && !match.english && <div className="hs-subtitle subtitle panel" data-testid="hs-subtitle" role="status"><span className="hs-speaker">Detective</span><span>{session.subtitle}</span></div>}
       {decision && !match.english && (
         <section className={`hs-decision-overlay ${decision.phase === "destination" ? "picking" : ""}`}
           data-testid="hs-decision-overlay" data-phase={decision.phase}
