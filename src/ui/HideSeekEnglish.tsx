@@ -6,7 +6,7 @@ import { useGame } from "../game/store";
 import { PREPS } from "../game/types";
 import { WORLD } from "../game/world/world";
 import { sentenceFor, type MatchState } from "../game/hideSeek";
-import { command, setPickMode, speakModel } from "../game/hideSeek/session";
+import { backFromHideSeekEnglish, command, speakModel } from "../game/hideSeek/session";
 
 /** English is a view of the core's pending question; only the core grades it. */
 export function HideSeekEnglish({ match }: { match: MatchState }) {
@@ -85,7 +85,7 @@ export function HideSeekEnglish({ match }: { match: MatchState }) {
       {level === "advanced" && <div className="hs-english-tools"><button className="secondary" onClick={() => setWords([])}>Clear</button><button className="primary" data-testid="hs-check-sentence" disabled={!words.length} onClick={() => submit([words.join(" ")])}>Check</button></div>}
       <div className="status-line hs-english-status" role="status" data-testid="hs-english-status">{hint || (listening ? "I’m listening…" : "The detective waits while you answer.")}{heard && <span className="heard">“{heard}”</span>}</div>
       {panel.attempts > 0 && <button className="secondary hs-hear-model" data-testid="hs-hear-model" onClick={() => speakModel(sentenceFor(spot))}>Hear model</button>}
-      <button className="hs-cancel-answer" data-testid="hs-cancel-answer" onClick={() => { command("cancelMove"); setPickMode(panel.starting ? "start" : null); }}>Choose another place</button>
+      <button type="button" className="secondary hs-cancel-answer" data-testid="hs-cancel-answer" onClick={backFromHideSeekEnglish}>Back</button>
     </section>
   );
 }

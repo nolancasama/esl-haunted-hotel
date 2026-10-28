@@ -69,17 +69,27 @@ async function expectQuestionBesideGhost(page: Page) {
     const card = document.querySelector<HTMLElement>("[data-testid='hs-english']");
     const stage = document.querySelector<HTMLElement>("[data-testid='hs-question-stage']");
     if (!spot || !card || !stage || !api.hsCamera().settled) return false;
+    const bounds = [-0.68 * Math.max(spot.scale[0], spot.scale[2]) - 0.07,
+      0.68 * Math.max(spot.scale[0], spot.scale[2]) + 0.07];
+    const extents = [];
+    for (const y of [0.05, Math.max(0.95 * spot.scale[1], 0.85)])
+      for (const dx of bounds) for (const dz of bounds) {
+        const p = api.project(spot.pos.x + dx, spot.pos.y + y, spot.pos.z + dz);
+        if (!p) return false;
+        extents.push(p.x);
+      }
     const ghost = api.project(spot.pos.x, spot.pos.y + Math.max(0.19, 0.45 * spot.scale[1]), spot.pos.z);
     if (!ghost) return false;
     const panel = card.getBoundingClientRect();
     const side = stage.dataset.side;
-    const gap = side === "left" ? ghost.x - panel.right : panel.left - ghost.x;
+    const silhouetteLeft = Math.min(...extents), silhouetteRight = Math.max(...extents);
+    const gap = side === "left" ? silhouetteLeft - panel.right : panel.left - silhouetteRight;
     return Boolean((side === "left" || side === "right") &&
-      gap >= 20 && gap <= 55 &&
+      gap >= 15 && gap <= 31 &&
       ghost.y >= panel.top - 20 && ghost.y <= panel.bottom + 20 &&
       panel.left >= 7 && panel.right <= innerWidth - 7 &&
       panel.top >= 7 && panel.bottom <= innerHeight - 7);
-  }), { timeout: 15_000, message: "English card should stay immediately beside the selected ghost" }).toBe(true);
+  }), { timeout: 15_000, message: "English panel must clear the full ghost outline" }).toBe(true);
 }
 
 test("initial and relocation questions show the selected ghost in a close-up without committing movement", async ({ page }) => {
@@ -96,6 +106,7 @@ test("initial and relocation questions show the selected ghost in a close-up wit
   await page.getByTestId("hs-move").click();
   await until(page, "destination picker", (s) => s.decision?.phase === "destination");
   const s = (await snapshot(page))!;
+  const timeLeftBeforeSelection = s.decision!.secondsLeft;
   const destination = s.reachable.find((spot) => spot.id !== s.ghost.spotId);
   expect(destination).toBeDefined();
   await page.getByTestId(`hs-spot-${destination!.id}`).click();
@@ -105,9 +116,22 @@ test("initial and relocation questions show the selected ghost in a close-up wit
   const question = (await snapshot(page))!;
   expect(question.ghost.spotId).toBe(s.ghost.spotId);
   expect(question.stats.relocations).toBe(s.stats.relocations);
+  await expect(page.getByTestId("hs-cancel-answer")).toHaveText("Back");
   await page.getByTestId("hs-cancel-answer").click();
-  await until(page, "cancelled relocation English", (s) => !s.english);
-  expect((await snapshot(page))!.stats.relocations).toBe(s.stats.relocations);
+  await until(page, "returned to destination picker", (snap) => !snap.english && snap.decision?.phase === "destination");
+  const returned = (await snapshot(page))!;
+  expect(returned.decision?.secondsLeft).toBeCloseTo(timeLeftBeforeSelection);
+  expect(returned.stats.relocations).toBe(s.stats.relocations);
+  await expect(page.getByTestId("hs-question-stage")).toHaveCount(0);
+});
+
+test("Back on the first English question returns to initial spot selection", async ({ page }) => {
+  await open(page);
+  await chooseStart(page);
+  await expect(page.getByTestId("hs-cancel-answer")).toHaveText("Back");
+  await page.getByTestId("hs-cancel-answer").click();
+  await until(page, "initial picker restored", (s) => s.status === "setup" && !s.english);
+  await expect(page.getByTestId("hs-picker")).toBeVisible();
   await expect(page.getByTestId("hs-question-stage")).toHaveCount(0);
 });
 

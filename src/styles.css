@@ -2289,7 +2289,7 @@ input[type="range"]::-moz-range-thumb {
 .hs-english-tools button, .hs-hear-model { min-height: 34px; font-size: 13px; padding: 5px 13px; }
 .hs-english-status { text-align: center; font-size: 12px; line-height: 1.35; min-height: 30px; }
 .hs-english-status .heard { display: block; }
-.hs-cancel-answer { border: 0; background: transparent; color: var(--lavender); padding: 5px; font-size: 12px; text-decoration: underline; }
+.hs-cancel-answer { display: block; align-self: center; width: fit-content; min-width: 124px; min-height: 43px; margin: 4px auto 0; padding: 9px 20px; font-size: 16px; font-weight: 700; text-decoration: none; cursor: pointer; }
 .hs-results { background: #120a20c9; }
 .hs-results-card { width: min(580px, 100%); max-height: 100%; overflow-y: auto; touch-action: pan-y; padding: 22px 28px; text-align: center; }
 .hs-results-card h1 { font: 700 48px/1 var(--display); color: var(--gold-light); margin: 5px 0 12px; }

@@ -4,7 +4,7 @@ vi.mock("../../audio/audio", () => ({ audio: { unlock: vi.fn(), setVolumes: vi.f
 vi.mock("../../audio/tts", () => ({ tts: { cancel: vi.fn(), setRate: vi.fn(), speak: vi.fn().mockResolvedValue(undefined) } }));
 import { audio } from "../../audio/audio";
 import { setGame } from "../store";
-import { command, decideHideSeek, getHideSeek, hideSeekSnapshot, hsPresentation, leaveHideSeek, pickSpot, setHideSeekTimeScale, setPickMode, startHideSeek, stayHere, tickHideSeek } from "./session";
+import { backFromHideSeekEnglish, command, decideHideSeek, getHideSeek, hideSeekSnapshot, hsPresentation, leaveHideSeek, pickSpot, setHideSeekTimeScale, setPickMode, startHideSeek, stayHere, tickHideSeek } from "./session";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -60,6 +60,39 @@ describe("Hide & Seek session boundary", () => {
     command("cancelMove");
     expect(getHideSeek().match!.english).toBeNull();
     expect(getHideSeek().match!.relocationsLeft).toBe(2);
+  });
+
+  it("Back returns to the original spot picker without starting the match", () => {
+    expect(pickSpot("dining.table.under")).toEqual({ ok: true });
+    expect(getHideSeek().match!.english?.starting).toBe(true);
+    expect(backFromHideSeekEnglish()).toEqual({ ok: true });
+    expect(getHideSeek().match!.english).toBeNull();
+    expect(getHideSeek().match!.status).toBe("setup");
+    expect(getHideSeek().pickMode).toBe("start");
+    expect(getHideSeek().match!.stats.questions).toBe(0);
+  });
+
+  it("Back restores the relocation picker and its paused time without spending a move", () => {
+    pickSpot("dining.table.under");
+    command("answerEnglish", ["under"]);
+    expect(decideHideSeek("move")).toEqual({ ok: true });
+    hsPresentation.cameraSettling = false;
+    tickHideSeek(0.5);
+    const remaining = getHideSeek().decision!.secondsLeft;
+    const next = hideSeekSnapshot()!.reachable[0];
+    expect(pickSpot(next.id)).toEqual({ ok: true });
+    expect(getHideSeek().decision).toBeNull();
+    expect(getHideSeek().suspendedDestination?.secondsLeft).toBeCloseTo(remaining);
+    expect(backFromHideSeekEnglish()).toEqual({ ok: true });
+    expect(getHideSeek().decision).toMatchObject({ phase: "destination", secondsLeft: remaining });
+    expect(getHideSeek().pickMode).toBe("move");
+    expect(getHideSeek().match!.english).toBeNull();
+    expect(getHideSeek().match!.relocationsLeft).toBe(2);
+    expect(getHideSeek().match!.stats.relocations).toBe(0);
+    expect(pickSpot(next.id)).toEqual({ ok: true });
+    expect(command("answerEnglish", [next.prep])).toEqual({ ok: true });
+    expect(getHideSeek().suspendedDestination).toBeNull();
+    expect(getHideSeek().match!.relocationsLeft).toBe(1);
   });
 
   it("sustains Melody's music only while simulation advances, not during a timed decision or English", () => {

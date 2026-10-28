@@ -19,6 +19,8 @@ export interface TimedDecision { phase: "decision" | "destination"; secondsLeft:
 interface Session {
   match: MatchState | null;
   decision: TimedDecision | null;
+  /** The remaining destination time while the untimed English question is open. */
+  suspendedDestination: TimedDecision | null;
   pendingDecision: boolean;
   revision: number;
   pickMode: PickMode;
@@ -37,7 +39,7 @@ interface Session {
 
 /** The only live match owner. Views read it; commands and the render clock drive the core. */
 export const useHideSeek = create<Session>(() => ({
-  match: null, decision: null, pendingDecision: false, revision: 0, pickMode: null, subtitle: "", message: "", clue: null, fx: null, decoyPop: null, lossReason: null, endedAt: null, recordResult: null
+  match: null, decision: null, suspendedDestination: null, pendingDecision: false, revision: 0, pickMode: null, subtitle: "", message: "", clue: null, fx: null, decoyPop: null, lossReason: null, endedAt: null, recordResult: null
 }));
 export const getHideSeek = useHideSeek.getState;
 let timeScale = 1;
@@ -94,7 +96,7 @@ function beginDecision(match: MatchState) {
   }
   if (match.relocationsLeft <= 0 || reachableSpots(match).length === 0) {
     useHideSeek.setState({
-      decision: null, pendingDecision: false, pickMode: null,
+      decision: null, suspendedDestination: null, pendingDecision: false, pickMode: null,
       message: "No moves left. Stay hidden and watch the detective!"
     });
     return;
@@ -181,7 +183,7 @@ export function startHideSeek(ghost: GhostId, room: PlayRoom, seed = Date.now() 
   subtitleUntil = 0;
   lastMusic = -100;
   hsPresentation.cameraSettling = false;
-  useHideSeek.setState({ match, decision: null, pendingDecision: false, pickMode: "start", subtitle: "", message: "Choose a spot to hide.", clue: null, fx: null, decoyPop: null, lossReason: null, endedAt: null, recordResult: null, revision: getHideSeek().revision + 1 });
+  useHideSeek.setState({ match, decision: null, suspendedDestination: null, pendingDecision: false, pickMode: "start", subtitle: "", message: "Choose a spot to hide.", clue: null, fx: null, decoyPop: null, lossReason: null, endedAt: null, recordResult: null, revision: getHideSeek().revision + 1 });
   return { ok: true } as const;
 }
 
@@ -228,11 +230,36 @@ export function pickSpot(spotId: string): CommandResult {
     if (!result.ok) return result;
     const englishResult = command("beginEnglish");
     if (englishResult.ok && getHideSeek().decision?.phase === "destination") {
-      useHideSeek.setState({ decision: null, pickMode: null });
+      useHideSeek.setState({ suspendedDestination: getHideSeek().decision, decision: null, pickMode: null });
     }
     return englishResult;
   }
   return publish({ ok: false, reason: "no-pending-move" });
+}
+
+/** Go back from an English question to the actual previous hiding-place picker.
+ * Relocation choices resume their paused countdown; no move or ability is spent.
+ */
+export function backFromHideSeekEnglish(): CommandResult {
+  const s = getHideSeek();
+  if (!s.match?.english) return publish({ ok: false, reason: "no-english-panel" });
+  const wasStarting = s.match.english.starting;
+  const result = cancelMove(s.match);
+  if (!result.ok) return publish(result);
+  if (wasStarting) {
+    useHideSeek.setState({ pickMode: "start", suspendedDestination: null });
+  } else if (s.suspendedDestination?.phase === "destination") {
+    useHideSeek.setState({
+      decision: s.suspendedDestination, suspendedDestination: null, pickMode: "move",
+      message: "Choose another hiding place."
+    });
+  } else {
+    // Legacy direct-command entry: no timed picker to resume.
+    useHideSeek.setState({ pickMode: null, suspendedDestination: null });
+  }
+  tts.cancel();
+  audio.setListening(false);
+  return publish(result);
 }
 
 /** Names mirror the simulation API; only presentation modes are added here. */
@@ -252,7 +279,7 @@ export function command(name: string, ...args: unknown[]): CommandResult {
       result = answerEnglish(match, alternatives);
       if (result.ok) {
         audio.play("correct");
-        useHideSeek.setState({ pickMode: null });
+        useHideSeek.setState({ pickMode: null, suspendedDestination: null });
         successMessage = answeredSpot ? sentenceFor(answeredSpot) : "";
         if (wasStarting) beginDecision(match);
       }

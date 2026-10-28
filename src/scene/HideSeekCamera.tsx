@@ -288,10 +288,26 @@ export function HideSeekCamera() {
         if (Number.isFinite(tmp.anchor.x) && Number.isFinite(tmp.anchor.y)) {
           const canvasRect = gl.domElement.getBoundingClientRect();
           const stageRect = stage.getBoundingClientRect();
-          const ghostX = canvasRect.left - stageRect.left + (tmp.anchor.x + 1) * canvasRect.width / 2;
           const ghostY = canvasRect.top - stageRect.top + (1 - tmp.anchor.y) * canvasRect.height / 2;
+          // Project a conservative envelope around the full ghost, including arms,
+          // hats and the silhouette glow. The previous centre-only gap could hide its body.
+          const sx = selected.scale[0], sy = selected.scale[1], sz = selected.scale[2];
+          const radius = 0.68 * Math.max(sx, sz) + 0.07;
+          const top = Math.max(0.95 * sy, 0.85);
+          let ghostLeft = Infinity, ghostRight = -Infinity;
+          for (const y of [0.05, top]) {
+            for (const dx of [-radius, radius]) {
+              for (const dz of [-radius, radius]) {
+                tmp.w.set(selected.pos.x + dx, selected.pos.y + y, selected.pos.z + dz).project(cam);
+                const x = canvasRect.left - stageRect.left + (tmp.w.x + 1) * canvasRect.width / 2;
+                if (Number.isFinite(x)) { ghostLeft = Math.min(ghostLeft, x); ghostRight = Math.max(ghostRight, x); }
+              }
+            }
+          }
+          if (!Number.isFinite(ghostLeft) || !Number.isFinite(ghostRight)) return;
           const at = placeQuestionPanel({
-            ghostX, ghostY, panelWidth: panel.offsetWidth, panelHeight: panel.offsetHeight,
+            ghostLeft, ghostRight, ghostY,
+            panelWidth: panel.offsetWidth, panelHeight: panel.offsetHeight,
             width: stage.clientWidth, height: stage.clientHeight
           });
           stage.style.setProperty("--hs-question-left", `${at.x.toFixed(1)}px`);
