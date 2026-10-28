@@ -89,6 +89,15 @@ describe("Hide & Seek completion book", () => {
     expect(completionFor(book, "hungry", "dining")).toBeUndefined();
   });
 
+  it("unlocks Hotel Explorer with one victory in every area, not all combinations", () => {
+    for (const area of CHALLENGE_AREAS) recordVictory(won("sleepy", area.rooms[0]));
+    const book = loadCompletionBook();
+    expect(collectionProgress(book).completed).toBe(8);
+    expect(collectionMilestones(book)).toContain("hotelExplorer");
+    expect(collectionMilestones(book)).toContain("specialist:sleepy");
+    expect(collectionMilestones(book)).not.toContain("hotelMaster");
+  });
+
   it("awards all milestones after a full collection, without changing already won awards", () => {
     for (const ghost of ["sleepy", "hungry", "sneaky", "mischief", "bouncy", "bubbles", "melody", "shadow"] as const)
       for (const area of CHALLENGE_AREAS) recordVictory(won(ghost, area.rooms[0]));

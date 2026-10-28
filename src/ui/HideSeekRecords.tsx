@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { GHOST_ORDER, GHOSTS } from "../game/ghosts";
-import { ROOMS } from "../game/world/rooms";
 import type { GhostId } from "../game/types";
 import {
   ACHIEVEMENTS, CHALLENGE_AREAS, collectionMilestones, collectionProgress,

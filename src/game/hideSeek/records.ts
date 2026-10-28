@@ -117,7 +117,8 @@ export function collectionMilestones(book: CompletionBook): string[] {
   for (const ghost of GHOST_ORDER)
     if (CHALLENGE_AREAS.length && ghostCompleted(book, ghost) === CHALLENGE_AREAS.length) found.push(`specialist:${ghost}`);
   if (GHOST_ORDER.every((ghost) => ghostCompleted(book, ghost) > 0)) found.push("ghostMaster");
-  if (CHALLENGE_AREAS.length && progress.fullAreas === CHALLENGE_AREAS.length) found.push("hotelExplorer");
+  // Exploring means visiting each area with at least one ghost, not mastering all 64 combinations.
+  if (CHALLENGE_AREAS.length && CHALLENGE_AREAS.every((area) => GHOST_ORDER.some((ghost) => Boolean(book.entries[recordKey(ghost, area.id)])))) found.push("hotelExplorer");
   if (progress.total && progress.completed === progress.total) found.push("hotelMaster");
   return found;
 }

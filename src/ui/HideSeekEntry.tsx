@@ -10,7 +10,7 @@ import { GhostPortrait } from "./GhostPortrait";
 import { HideSeekEnglish } from "./HideSeekEnglish";
 import { HideSeekHud } from "./HideSeekHud";
 import { HideSeekRecords } from "./HideSeekRecords";
-import { CHALLENGE_AREAS, completionFor, collectionProgress, ghostCompleted, loadCompletionBook } from "../game/hideSeek/records";
+import { CHALLENGE_AREAS, completionFor, collectionProgress, emptyBook, ghostCompleted, loadCompletionBook } from "../game/hideSeek/records";
 
 export const HS_ABILITIES: Record<GhostId, { name: string; text: string; ja: string }> = {
   sleepy: { name: "Deep Sleep", text: "Rest quietly and lower the detective’s suspicion.", ja: "しずかに休んで、気づかれにくくしよう。" },
@@ -25,6 +25,8 @@ export const HS_ABILITIES: Record<GhostId, { name: string; text: string; ja: str
 
 const PLAY_ROOMS: PlayRoom[] = ["bedroom", "dining", "storage", "library", "playroom", "bathroom", "music", "attic"];
 const isRoom = (room: string | undefined): room is PlayRoom => PLAY_ROOMS.includes(room as PlayRoom);
+const EMPTY_BOOK = emptyBook();
+const EMPTY_PROGRESS = collectionProgress(EMPTY_BOOK);
 
 /** Selection, match controls and results share the Hide & Seek screen. */
 export function HideSeekEntry() {
@@ -67,8 +69,9 @@ export function HideSeekEntry() {
     if (ghost) startHideSeek(ghost, room, link?.seed, settings.englishLevel);
   };
 
-  const book = loadCompletionBook();
-  const progress = collectionProgress(book);
+  // Live simulation rerenders frequently: never read localStorage on gameplay frames.
+  const book = match ? EMPTY_BOOK : loadCompletionBook();
+  const progress = match ? EMPTY_PROGRESS : collectionProgress(book);
   if (!match && recordsOpen) return <HideSeekRecords japanese={ja} onBack={() => setRecordsOpen(false)}
     onPlay={(id, room) => { setGhost(id); setSelection("room"); setRecordsOpen(false); startHideSeek(id, room, undefined, settings.englishLevel); }} />;
 
