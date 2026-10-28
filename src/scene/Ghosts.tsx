@@ -128,16 +128,16 @@ export function HideSeekGhost({ id, decoy = false }: { id: GhostId; decoy?: bool
     const m = getHideSeek().match;
     const r = rig.current;
     if (!m || !r.root || !r.squash || !r.mats) return;
-    // Starting English previews the chosen place for the student; the canonical
-    // ghost pose is committed only by answerEnglish in the simulation.
-    const startingPreview = !decoy && m.status === "setup" && m.english?.starting ? m.english.spotId : null;
-    const spotId = decoy ? m.effects.decoy?.spotId : startingPreview ?? m.ghost.spotId ?? m.ghost.destination;
+    // During any English question, the ghost poses at the *selected* hiding spot.
+    // This preview never mutates the simulation; a move is paid for only on acceptance.
+    const answerPreview = !decoy ? m.english?.spotId ?? null : null;
+    const spotId = decoy ? m.effects.decoy?.spotId : answerPreview ?? m.ghost.spotId ?? m.ghost.destination;
     const spot = spotId ? WORLD.spotById.get(spotId) : null;
     r.root.visible = Boolean(spot);
     if (!spot) { if (outline.current) outline.current.visible = false; return; }
     // Found, or celebrating: out of the box (lid open) where the closing shot can see it.
     const popped = !decoy && !m.ghost.transit && (m.status === "lost" || m.status === "won");
-    const p = decoy || startingPreview ? spot.hidePos : popped ? spot.pos : m.ghost;
+    const p = decoy ? spot.hidePos : answerPreview ? spot.pos : popped ? spot.pos : m.ghost;
     const transit = !decoy && m.ghost.transit;
     // Found: a friendly "oh!" with arms up (the same face as when the detective comes close).
     const frightened = !decoy && (m.status === "lost" || (m.status === "playing" && Math.hypot(m.detective.x - p.x, m.detective.z - p.z) < 2.1));
@@ -170,7 +170,7 @@ export function HideSeekGhost({ id, decoy = false }: { id: GhostId; decoy?: bool
     r.root.visible = !own;
     // This player-only silhouette has no relation to the perception module.
     if (outline.current) {
-      outline.current.visible = !own && !decoy && (m.ghost.hidden || Boolean(startingPreview));
+      outline.current.visible = !own && !decoy && (m.ghost.hidden || Boolean(answerPreview));
       outline.current.position.copy(r.root.position);
       outline.current.rotation.copy(r.root.rotation);
       outline.current.scale.set(spot.scale[0] * 1.09, spot.scale[1] * 1.06, spot.scale[2] * 1.09);

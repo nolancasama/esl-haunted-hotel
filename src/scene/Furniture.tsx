@@ -66,6 +66,12 @@ function partOpenAmount(obj: WorldObject, part: AnimatedPart["name"]): number {
 
 /** Hide & Seek lid/door opening (0 closed .. 1 open) from the public match state. */
 function hideSeekOpenAmount(obj: WorldObject, part: "lid" | "door", m: MatchState): number {
+  // Open the selected container for the English close-up preview.
+  // Do not change the search AI or its actual inspection timing.
+  const answerSpot = m.english?.spotId ? WORLD.spotById.get(m.english.spotId) : null;
+  if (answerSpot?.objectId === obj.id && answerSpot.prep === "in") {
+    return part === "door" ? 0.9 : 0.75;
+  }
   const d = m.detective;
   const searched = d.target ? WORLD.spotById.get(d.target) : null;
   const own = m.ghost.spotId && !m.ghost.transit ? WORLD.spotById.get(m.ghost.spotId) : null;

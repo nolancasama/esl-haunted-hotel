@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { FLOOR_Y, ROOMS, WALL_T } from "../world/rooms";
 import { WORLD } from "../world/world";
 import type { PlayRoom } from "./types";
-import { cameraMode, heartbeatBpm, heartbeatGain, heartbeatLevel, hidingView, type CameraInput } from "./views";
+import { answerCloseupView, cameraMode, heartbeatBpm, heartbeatGain, heartbeatLevel, hidingView, type CameraInput } from "./views";
 
 const PLAY_ROOMS: PlayRoom[] = ["bedroom", "dining", "storage", "library", "playroom", "bathroom", "music", "attic"];
 const ahead = (eye: { x: number; z: number }, yaw: number, d: number) => ({ x: eye.x + Math.sin(yaw) * d, z: eye.z + Math.cos(yaw) * d });
@@ -80,7 +80,8 @@ describe("hide-and-seek camera modes", () => {
   it("chooses the first spot, destinations and English in the overhead view", () => {
     expect(cameraMode({ ...base, status: "setup" })).toBe("overview");
     expect(cameraMode({ ...base, decisionPhase: "destination", pickMode: "move" })).toBe("destinationSelection");
-    expect(cameraMode({ ...base, english: true })).toBe("destinationSelection");
+    expect(cameraMode({ ...base, english: true })).toBe("answerCloseup");
+    expect(cameraMode({ ...base, status: "setup", english: true })).toBe("answerCloseup");
     expect(cameraMode({ ...base, pickMode: "ability" })).toBe("destinationSelection");
   });
   it("follows a relocation in third person and holds the room view briefly", () => {
@@ -118,4 +119,34 @@ describe("heartbeat", () => {
     expect(heartbeatBpm(heartbeatLevel(0.5))).toBeGreaterThan(125);
     expect(heartbeatBpm(heartbeatLevel(0))).toBeLessThanOrEqual(130);
   });
+});
+
+
+describe("English-answer close-ups", () => {
+  for (const room of PLAY_ROOMS) {
+    it(`${room}: keeps each English camera in clear floor space with the chosen ghost in view`, () => {
+      const bounds = ROOMS[room].bounds;
+      const floor = FLOOR_Y[ROOMS[room].floor];
+      for (const spot of WORLD.spots.filter((s) => s.room === room)) {
+        const view = answerCloseupView(spot);
+        const context = `${spot.id}: ${JSON.stringify(view)}`;
+        expect(view.eye.x, context).toBeGreaterThan(bounds.x0 + 0.3);
+        expect(view.eye.x, context).toBeLessThan(bounds.x1 - 0.3);
+        expect(view.eye.z, context).toBeGreaterThan(bounds.z0 + 0.3);
+        expect(view.eye.z, context).toBeLessThan(bounds.z1 - 0.3);
+        expect(view.eye.y, context).toBeGreaterThan(floor + 1.2);
+        expect(view.eye.y, context).toBeLessThan(floor + 2.8);
+        expect(Math.hypot(view.eye.x - view.target.x, view.eye.z - view.target.z), context).toBeGreaterThan(0.8);
+        expect(view.target.x, context).toBeCloseTo(spot.pos.x);
+        expect(view.target.z, context).toBeCloseTo(spot.pos.z);
+        expect(view.fov).toBeGreaterThanOrEqual(45);
+        for (const obj of WORLD.objects.filter((o) => o.room === room && o.spec.solid)) {
+          if (view.eye.y >= obj.y + obj.spec.h + 0.12) continue;
+          const inSolid = view.eye.x >= obj.rect.x0 - 0.17 && view.eye.x <= obj.rect.x1 + 0.17 &&
+            view.eye.z >= obj.rect.z0 - 0.17 && view.eye.z <= obj.rect.z1 + 0.17;
+          expect(inSolid, `${context} intersects ${obj.id}`).toBe(false);
+        }
+      }
+    });
+  }
 });

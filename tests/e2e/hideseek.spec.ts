@@ -55,6 +55,34 @@ async function answerTiles(page: Page) {
   await until(page, "accepted tile answer", (next) => !next.english && next.status === "playing");
 }
 
+
+test("initial and relocation questions show the selected ghost in a close-up without committing movement", async ({ page }) => {
+  await open(page);
+  await chooseStart(page);
+  const start = (await snapshot(page))!;
+  await expect(page.getByTestId("hs-question-stage")).toBeVisible();
+  await expect.poll(async () => (await hook<{ mode: string }>(page, "hsCamera")).mode).toBe("answerCloseup");
+  expect(start.status).toBe("setup");
+  expect(start.ghost.spotId).toBeNull();
+  await answerTiles(page);
+  await until(page, "initial answer accepted", (s) => s.status === "playing");
+  await page.getByTestId("hs-move").click();
+  await until(page, "destination picker", (s) => s.decision?.phase === "destination");
+  const s = (await snapshot(page))!;
+  const destination = s.reachable.find((spot) => spot.id !== s.ghost.spotId);
+  expect(destination).toBeDefined();
+  await page.getByTestId(`hs-spot-${destination!.id}`).click();
+  await until(page, "relocation English", (s) => s.english?.spotId === destination!.id);
+  await expect.poll(async () => (await hook<{ mode: string; spotId: string | null }>(page, "hsCamera")).mode).toBe("answerCloseup");
+  const question = (await snapshot(page))!;
+  expect(question.ghost.spotId).toBe(s.ghost.spotId);
+  expect(question.stats.relocations).toBe(s.stats.relocations);
+  await page.getByTestId("hs-cancel-answer").click();
+  await until(page, "cancelled relocation English", (s) => !s.english);
+  expect((await snapshot(page))!.stats.relocations).toBe(s.stats.relocations);
+  await expect(page.getByTestId("hs-question-stage")).toHaveCount(0);
+});
+
 test("formal decision pauses the detective, then opens a ten-second relocation picker", async ({ page }) => {
   const errors = await open(page);
   await chooseStart(page);
@@ -262,7 +290,7 @@ for (const [width, height, touch] of [[1366, 768, false], [1024, 600, false], [8
         let stable = 0;
         const frame = () => {
           const s = api.hs();
-          const preview = s.status === "setup" && s.english?.starting ? s.spots.find((spot) => spot.id === s.english!.spotId)?.hidePos : null;
+          const preview = s.english ? s.spots.find((spot) => spot.id === s.english!.spotId)?.pos : null;
           const ghost = preview ?? s.ghost;
           const points = [api.project(ghost.x, ghost.y + 0.3, ghost.z), api.project(s.detective.x, 0.8, s.detective.z)];
           if (points.every((point) => point !== null)) {
@@ -291,7 +319,7 @@ for (const [width, height, touch] of [[1366, 768, false], [1024, 600, false], [8
         const ability = box('[data-testid="hs-ability-dock"]');
         const subtitle = box('[data-testid="hs-subtitle"]');
         const gear = box('[data-testid="hs-settings"]');
-        const preview = s.status === "setup" && s.english?.starting ? s.spots.find((spot) => spot.id === s.english!.spotId)?.hidePos : null;
+        const preview = s.english ? s.spots.find((spot) => spot.id === s.english!.spotId)?.pos : null;
         const ghost = preview ?? s.ghost;
         const actors = { ghost: api.project(ghost.x, ghost.y + 0.3, ghost.z), detective: api.project(s.detective.x, 0.8, s.detective.z) };
         type Box = NonNullable<typeof hud>;
@@ -301,7 +329,7 @@ for (const [width, height, touch] of [[1366, 768, false], [1024, 600, false], [8
         const overlaps = Object.entries(pieces).flatMap(([a, ra], i) => Object.entries(pieces).slice(i + 1).filter(([, rb]) => hits(ra, rb)).map(([b]) => `${a}/${b}`));
         const overlap = overlaps.length > 0;
         const covered = (p: { x: number; y: number }) => Object.values(pieces).some((r) => r && p.x > r.x - 8 && p.x < r.right + 8 && p.y > r.y - 8 && p.y < r.bottom + 8);
-        const actorsClear = Object.values(actors).every((p) => p && p.x > 8 && p.x < innerWidth - 8 && p.y > 8 && p.y < innerHeight - 8 && !covered(p));
+        const actorsClear = (needsEnglish ? [actors.ghost] : Object.values(actors)).every((p) => p && p.x > 8 && p.x < innerWidth - 8 && p.y > 8 && p.y < innerHeight - 8 && !covered(p));
         // The old full-height rail is gone; the room is framed beside the dock only while it is open.
         const rail = document.querySelector(".hs-rail") !== null;
         return { english: needsEnglish, status: s.status, phase: s.detective.phase, hud, panel, dock, ability, subtitle, gear, rail, actors, overlaps, overlap, actorsClear, hudWithin: Boolean(hud && within(hud)), panelWithin: Boolean(!needsEnglish || panel && within(panel)) };
@@ -309,10 +337,11 @@ for (const [width, height, touch] of [[1366, 768, false], [1024, 600, false], [8
 
       await settleCamera();
       const english = await measure(true);
-      expect(english.hud, "HARNESS_PRECONDITION_FAILED: HUD missing").not.toBeNull();
+      expect(english.hud, "the progress HUD hides during the close-up question").toBeNull();
       expect(english.panel, "HARNESS_PRECONDITION_FAILED: English panel missing").not.toBeNull();
-      expect(english.hudWithin).toBe(true);
       expect(english.panelWithin).toBe(true);
+      await expect(page.getByTestId("hs-question-stage")).toBeVisible();
+      await expect.poll(async () => (await hook<{ mode: string; settled: boolean }>(page, "hsCamera")).mode).toBe("answerCloseup");
       expect(english.overlaps).toEqual([]);
       expect(english.rail).toBe(false);
       expect(english.actorsClear).toBe(true);

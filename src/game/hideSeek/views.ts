@@ -150,7 +150,69 @@ export function hidingViewFor(spotId: string): HidingView | null {
   return view;
 }
 
-export type HsCameraMode = "overview" | "reveal" | "firstPerson" | "destinationSelection" | "relocating" | "discovered" | "victory";
+/** A close, outside-the-furniture shot while the student answers "Where are you?".
+ * The real ghost remains at its previous position until the English answer is accepted.
+ * The camera is chosen from open floor positions so the selected ghost stays visible.
+ */
+export interface AnswerCloseupView { eye: Vec3; target: Vec3; fov: number }
+
+function onFloor(p: { x: number; z: number }, rect: { x0: number; x1: number; z0: number; z1: number }, margin = 0) {
+  return p.x >= rect.x0 + margin && p.x <= rect.x1 - margin &&
+    p.z >= rect.z0 + margin && p.z <= rect.z1 - margin;
+}
+
+export function answerCloseupView(spot: HidingSpot): AnswerCloseupView {
+  const obj = WORLD.objectById.get(spot.objectId)!;
+  const b = ROOMS[spot.room].bounds;
+  const floor = FLOOR_Y[ROOMS[spot.room].floor];
+  const target: Vec3 = {
+    x: spot.pos.x,
+    y: Math.min(floor + 2.15, Math.max(floor + 0.47, spot.pos.y + GHOST_H * spot.scale[1] * 0.57)),
+    z: spot.pos.z
+  };
+  const centre = roomCentre(spot);
+  const preferredYaw = spot.prep === "by"
+    ? Math.atan2(centre.x - target.x, centre.z - target.z)
+    : spot.prep === "under" ? hidingView(spot).yaw : frontYaw(obj);
+  let best: AnswerCloseupView | null = null;
+  let bestScore = -Infinity;
+  // Sample the room-facing side first, then other directions when the object is near a wall.
+  // Tests check that the resulting camera never occupies solid furniture or the wall.
+  for (const distance of [2.35, 2.9, 3.5, 1.85]) {
+    for (let i = 0; i < 16; i++) {
+      const angle = preferredYaw + (i <= 8 ? i : -(i - 8)) * Math.PI / 8;
+      const eye: Vec3 = {
+        x: target.x + Math.sin(angle) * distance,
+        y: Math.min(floor + WALL_H - 0.2, Math.max(floor + 1.35, target.y + 0.7)),
+        z: target.z + Math.cos(angle) * distance
+      };
+      if (!onFloor(eye, b, 0.48)) continue;
+      if (WORLD.objects.some((o) => o.room === spot.room && o.spec.solid &&
+          onFloor(eye, o.rect, -0.17) && eye.y < o.y + o.spec.h + 0.12)) continue;
+      // Other furniture should not obscure the ghost between the camera and its destination.
+      let obstruction = 0;
+      for (const other of WORLD.objects) {
+        if (other.room !== spot.room || other.id === obj.id || !other.spec.solid) continue;
+        for (const fraction of [0.25, 0.45, 0.65, 0.85]) {
+          const p = { x: eye.x + (target.x - eye.x) * fraction, z: eye.z + (target.z - eye.z) * fraction };
+          const y = eye.y + (target.y - eye.y) * fraction;
+          if (y < other.y + other.spec.h && onFloor(p, other.rect, -0.08)) { obstruction++; break; }
+        }
+      }
+      const angleDiff = Math.atan2(Math.sin(angle - preferredYaw), Math.cos(angle - preferredYaw));
+      const score = -Math.abs(angleDiff) * 1.2 - obstruction * 6 - Math.abs(distance - 2.35) * 0.35;
+      if (score > bestScore) {
+        bestScore = score;
+        best = { eye, target, fov: 50 };
+      }
+    }
+  }
+  // Extremely crowded future rooms still get a safe room-facing camera.
+  if (best) return best;
+  return { eye: { x: centre.x, y: floor + 1.7, z: centre.z }, target, fov: 50 };
+}
+
+export type HsCameraMode = "overview" | "reveal" | "answerCloseup" | "firstPerson" | "destinationSelection" | "relocating" | "discovered" | "victory";
 
 export interface CameraInput {
   enabled: boolean;
@@ -171,11 +233,12 @@ export const FOUND_HOLD = 1.1;
 
 /** One camera mode from the match/session state; strategy decisions stay in the overhead view. */
 export function cameraMode(i: CameraInput): HsCameraMode {
+  if (i.english) return "answerCloseup";
   if (i.status === "setup" || !i.enabled) return "overview";
   if (i.status === "won") return "victory";
   if (i.status === "lost") return i.lossReason === "found" && i.sinceEnd < FOUND_HOLD ? "firstPerson" : "discovered";
   if (i.transit) return "relocating";
-  if (i.english || i.pickMode || i.decisionPhase === "destination") return "destinationSelection";
+  if (i.pickMode || i.decisionPhase === "destination") return "destinationSelection";
   if (i.holding) return "reveal";
   return "firstPerson";
 }

@@ -174,14 +174,17 @@ export function HideSeekEntry() {
   const picking = session.pickMode === "start" ? "Choose your hiding place" : session.pickMode === "ability" ? "Choose a distraction spot" : "Choose where to move";
   const decision = session.decision;
   // The left dock exists only while English or a spot list is open; the camera frames the room beside it.
-  const dock = Boolean(match.english || session.pickMode);
+  const dock = Boolean(!match.english && session.pickMode);
   return (
     <div className="hs-container" data-testid="hideseek">
     <div className={`hs-match ${dock ? "has-dock" : ""}`} data-testid="hs-match" data-phase={match.detective.phase}
       data-english={Boolean(match.english)} data-decision={decision?.phase ?? "none"}>
       <HideSeekHud match={match} decision={decision} pickMode={session.pickMode} message={session.message} ability={ability} ja={ja} />
+      {match.english && <div className="hs-question-stage ui" data-testid="hs-question-stage">
+        <HideSeekEnglish key={`${match.english.spotId}-${match.stats.questions}`} match={match} />
+      </div>}
       {dock && <aside className="hs-dock ui" data-testid="hs-dock" aria-label="Hide and seek choices">
-        {match.english ? <HideSeekEnglish key={`${match.english.spotId}-${match.stats.questions}`} match={match} /> : session.pickMode && (
+        {session.pickMode && (
           <section className="panel hs-picker" data-testid="hs-picker">
             <h2>{picking}</h2>
             {ja && <span className="ja" lang="ja">{session.pickMode === "start" ? "かくれる場所を えらぼう" : "場所を えらぼう"}</span>}

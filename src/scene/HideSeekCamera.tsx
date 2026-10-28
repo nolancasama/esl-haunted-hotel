@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { getHideSeek, hsPresentation } from "../game/hideSeek/session";
-import { cameraMode, hidingViewFor, type HsCameraMode } from "../game/hideSeek/views";
+import { answerCloseupView, cameraMode, hidingViewFor, type HsCameraMode } from "../game/hideSeek/views";
 import { getGame } from "../game/store";
 import { rt } from "../game/runtime";
 import { FLOOR_Y, ROOMS } from "../game/world/rooms";
@@ -35,6 +35,7 @@ const copyPose = (a: Pose, b: Pose) => { a.pos.copy(b.pos); a.look.copy(b.look);
 /** Same picture means no travel: these modes share the overhead room view. */
 function shotKey(mode: HsCameraMode, spotId: string | null) {
   if (mode === "overview" || mode === "reveal" || mode === "destinationSelection") return "overhead";
+  if (mode === "answerCloseup") return `answer:${spotId}`;
   if (mode === "firstPerson") return `fp:${spotId}`;
   return mode;
 }
@@ -120,7 +121,7 @@ export function HideSeekCamera() {
       decisionPhase: session.decision?.phase ?? null, transit: m.ghost.transit, holding: now < s.holdUntil,
       sinceEnd: session.endedAt === null ? 0 : (now - session.endedAt) / 1000, lossReason: session.lossReason
     });
-    let spotId = m.ghost.spotId;
+    let spotId = m.english?.spotId ?? m.ghost.spotId;
     if (hsCam.preview && WORLD.spotById.has(hsCam.preview)) { mode = "firstPerson"; spotId = hsCam.preview; }
     if (spotId !== hsCam.spotId) { s.wantYaw = 0; s.wantPitch = 0; hsCam.lookYaw = 0; hsCam.lookPitch = 0; }
     hsCam.mode = mode;
@@ -130,11 +131,20 @@ export function HideSeekCamera() {
     const t = s.target;
     const overhead = shotKey(mode, spotId) === "overhead";
     // The left dock (English, spot list) is open only in the room view; every other shot uses the full width.
-    const dock = overhead && (m.english || session.pickMode) ? (size.height < 480 ? 250 : 300) : 0;
+    const dock = overhead && session.pickMode && !m.english ? (size.height < 480 ? 250 : 300) : 0;
     let coveredBottom = 0;
     let coveredTop = 0;
     const view = mode === "firstPerson" && spotId ? hidingViewFor(spotId) : null;
-    if (view) {
+    if (mode === "answerCloseup" && spotId) {
+      const selected = WORLD.spotById.get(spotId);
+      if (selected) {
+        const shot = answerCloseupView(selected);
+        t.pos.set(shot.eye.x, shot.eye.y, shot.eye.z);
+        t.look.set(shot.target.x, shot.target.y, shot.target.z);
+        t.fov = shot.fov;
+        t.near = 0.07;
+      }
+    } else if (view) {
       // Look limits are per spot; the view stays anchored to the hiding place.
       const turn = 1.4 * dt;
       if (s.keys.has("ArrowLeft")) s.wantYaw += turn;
@@ -258,7 +268,8 @@ export function HideSeekCamera() {
     }
     // Room views sit in the clear area beside the dock and under the top bar; first-person and
     // third-person shots stay centred. The offset is eased so opening the dock slides, not jumps.
-    const want = { x: -dock / 2, y: (coveredBottom - coveredTop) / 2 - (overhead ? (size.height < 480 ? 14 : 18) : 0) };
+    const answerOffset = mode === "answerCloseup" && size.width >= 650 ? size.width * 0.17 : 0;
+    const want = { x: answerOffset - dock / 2, y: (coveredBottom - coveredTop) / 2 - (overhead ? (size.height < 480 ? 14 : 18) : 0) };
     const k = s.ready && duration ? 1 - Math.exp(-dt * 8) : 1;
     s.offX += (want.x - s.offX) * k;
     s.offY += (want.y - s.offY) * k;

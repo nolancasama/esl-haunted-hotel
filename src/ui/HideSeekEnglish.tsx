@@ -25,8 +25,13 @@ export function HideSeekEnglish({ match }: { match: MatchState }) {
   const ja = settings.japanese;
 
   useEffect(() => {
-    speakModel(level === "beginner" ? `Where are you? ${sentenceFor(spot)}` : "Where are you?");
-    return () => { cancel.current?.(); audio.setListening(false); };
+    // Let the room camera approach the ghost before the detective asks.
+    // The question has no countdown; reduced-motion users hear it immediately.
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const id = window.setTimeout(() => {
+      speakModel(level === "beginner" ? `Where are you? ${sentenceFor(spot)}` : "Where are you?");
+    }, reduce ? 0 : 530);
+    return () => { window.clearTimeout(id); cancel.current?.(); audio.setListening(false); };
   }, [level, spot]);
 
   const submit = (alternatives: string[]) => {
