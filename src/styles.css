@@ -2473,7 +2473,7 @@ input[type="range"]::-moz-range-thumb {
 
 .hs-question-stage { position: absolute; inset: 0; z-index: 19; pointer-events: none; }
 .hs-question-stage .hs-english {
-  position: absolute; top: 50%; right: clamp(8px, 2vw, 28px);
+  position: absolute; top: var(--hs-question-top, 50%); left: var(--hs-question-left, 50%); right: auto;
   transform: translateY(-50%); width: min(370px, 42vw);
   max-height: calc(100% - 100px); min-height: 0; flex: none;
   overflow: auto; touch-action: pan-y; pointer-events: auto;
@@ -2492,7 +2492,7 @@ input[type="range"]::-moz-range-thumb {
   .hs-question-stage .hs-english .hs-frame { font-size: 18px; }
 }
 @media (max-height: 450px) {
-  .hs-question-stage .hs-english { right: 6px; width: min(350px, 43vw); max-height: calc(100% - 10px); padding: 6px 10px; gap: 3px; }
+  .hs-question-stage .hs-english { right: auto; width: min(350px, 43vw); max-height: calc(100% - 10px); padding: 6px 10px; gap: 3px; }
   .hs-question-stage .hs-english .question { font-size: 19px; }
   .hs-question-stage .hs-english .hs-frame { font-size: 17px; line-height: 1.25; }
 }

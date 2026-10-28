@@ -56,12 +56,39 @@ async function answerTiles(page: Page) {
 }
 
 
+/** The English card should follow the selected ghost, not stay stuck at the viewport edge. */
+async function expectQuestionBesideGhost(page: Page) {
+  await expect.poll(async () => page.evaluate(() => {
+    const api = (window as unknown as { __hh: {
+      hs(): Snapshot;
+      project(x: number, y: number, z: number): { x: number; y: number } | null;
+      hsCamera(): { mode: string; settled: boolean };
+    } }).__hh;
+    const match = api.hs();
+    const spot = match?.spots.find((item) => item.id === match.english?.spotId);
+    const card = document.querySelector<HTMLElement>("[data-testid='hs-english']");
+    const stage = document.querySelector<HTMLElement>("[data-testid='hs-question-stage']");
+    if (!spot || !card || !stage || !api.hsCamera().settled) return false;
+    const ghost = api.project(spot.pos.x, spot.pos.y + Math.max(0.19, 0.45 * spot.scale[1]), spot.pos.z);
+    if (!ghost) return false;
+    const panel = card.getBoundingClientRect();
+    const side = stage.dataset.side;
+    const gap = side === "left" ? ghost.x - panel.right : panel.left - ghost.x;
+    return Boolean((side === "left" || side === "right") &&
+      gap >= 20 && gap <= 55 &&
+      ghost.y >= panel.top - 20 && ghost.y <= panel.bottom + 20 &&
+      panel.left >= 7 && panel.right <= innerWidth - 7 &&
+      panel.top >= 7 && panel.bottom <= innerHeight - 7);
+  }), { timeout: 15_000, message: "English card should stay immediately beside the selected ghost" }).toBe(true);
+}
+
 test("initial and relocation questions show the selected ghost in a close-up without committing movement", async ({ page }) => {
   await open(page);
   await chooseStart(page);
   const start = (await snapshot(page))!;
   await expect(page.getByTestId("hs-question-stage")).toBeVisible();
   await expect.poll(async () => (await hook<{ mode: string }>(page, "hsCamera")).mode).toBe("answerCloseup");
+  await expectQuestionBesideGhost(page);
   expect(start.status).toBe("setup");
   expect(start.ghost.spotId).toBeNull();
   await answerTiles(page);
@@ -74,6 +101,7 @@ test("initial and relocation questions show the selected ghost in a close-up wit
   await page.getByTestId(`hs-spot-${destination!.id}`).click();
   await until(page, "relocation English", (s) => s.english?.spotId === destination!.id);
   await expect.poll(async () => (await hook<{ mode: string; spotId: string | null }>(page, "hsCamera")).mode).toBe("answerCloseup");
+  await expectQuestionBesideGhost(page);
   const question = (await snapshot(page))!;
   expect(question.ghost.spotId).toBe(s.ghost.spotId);
   expect(question.stats.relocations).toBe(s.stats.relocations);

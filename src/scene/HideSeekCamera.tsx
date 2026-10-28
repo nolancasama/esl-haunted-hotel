@@ -8,6 +8,7 @@ import { rt } from "../game/runtime";
 import { FLOOR_Y, ROOMS } from "../game/world/rooms";
 import { WORLD } from "../game/world/world";
 import { cameraRef } from "./CameraRig";
+import { placeQuestionPanel } from "./questionPanel";
 
 /** Live presentation state, read by the furniture, ghost, sound and test hooks (never by the simulation). */
 export const hsCam = {
@@ -52,7 +53,7 @@ export function HideSeekCamera() {
     drag: null as { id: number; x: number; y: number } | null, keys: new Set<string>(),
     offX: 0, offY: 0
   }), []);
-  const tmp = useMemo(() => ({ v: new THREE.Vector3(), w: new THREE.Vector3() }), []);
+  const tmp = useMemo(() => ({ v: new THREE.Vector3(), w: new THREE.Vector3(), anchor: new THREE.Vector3() }), []);
   useEffect(() => { gl.setClearColor("#130d20"); scene.fog = null; return () => { scene.fog = new THREE.Fog("#120a22", 13, 30); }; }, [scene, gl]);
 
   // Look around while hiding: drag (mouse or touch) or the arrow keys. No pointer lock.
@@ -276,6 +277,29 @@ export function HideSeekCamera() {
     if (Math.abs(s.offX - want.x) < 0.5) s.offX = want.x;
     if (Math.abs(s.offY - want.y) < 0.5) s.offY = want.y;
     cam.setViewOffset(size.width, size.height, s.offX, s.offY, size.width, size.height);
+    // Pin the English speech panel beside the ghost's actual projected location,
+    // rather than at the right edge. No React state is updated per frame.
+    if (mode === "answerCloseup" && m.english) {
+      const selected = WORLD.spotById.get(m.english.spotId);
+      const stage = document.querySelector<HTMLElement>(".hs-question-stage");
+      const panel = stage?.querySelector<HTMLElement>(".hs-english");
+      if (selected && stage && panel) {
+        tmp.anchor.set(selected.pos.x, selected.pos.y + Math.max(0.19, 0.45 * selected.scale[1]), selected.pos.z).project(cam);
+        if (Number.isFinite(tmp.anchor.x) && Number.isFinite(tmp.anchor.y)) {
+          const canvasRect = gl.domElement.getBoundingClientRect();
+          const stageRect = stage.getBoundingClientRect();
+          const ghostX = canvasRect.left - stageRect.left + (tmp.anchor.x + 1) * canvasRect.width / 2;
+          const ghostY = canvasRect.top - stageRect.top + (1 - tmp.anchor.y) * canvasRect.height / 2;
+          const at = placeQuestionPanel({
+            ghostX, ghostY, panelWidth: panel.offsetWidth, panelHeight: panel.offsetHeight,
+            width: stage.clientWidth, height: stage.clientHeight
+          });
+          stage.style.setProperty("--hs-question-left", `${at.x.toFixed(1)}px`);
+          stage.style.setProperty("--hs-question-top", `${at.y.toFixed(1)}px`);
+          if (stage.dataset.side !== at.side) stage.dataset.side = at.side;
+        }
+      }
+    }
     cameraRef.current = cam;
     Object.assign(rt.camera.pos, s.cur.pos);
     Object.assign(rt.camera.target, s.cur.look);
