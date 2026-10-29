@@ -1,4 +1,5 @@
 import { writeFileSync } from "node:fs";
+import { PLAY_ROOMS as PLAY_ROOM_LIST } from "./records";
 import { describe, expect, it } from "vitest";
 import { GHOST_ORDER } from "../ghosts";
 import { mulberry32 } from "../logic/rng";
@@ -11,7 +12,7 @@ import {
 } from "./match";
 import type { MatchState, PlayRoom } from "./types";
 
-const ROOMS: PlayRoom[] = ["bedroom", "dining", "storage", "library", "playroom", "bathroom", "music", "attic"];
+const ROOMS: readonly PlayRoom[] = PLAY_ROOM_LIST;
 type Policy = "stay" | "sensible";
 
 function distance(a: { x: number; z: number }, b: { x: number; z: number }) {
@@ -109,8 +110,8 @@ describe("seeded room and ghost policies", () => {
     console.table(table);
     writeFileSync(new URL("./balance-results.json", import.meta.url), JSON.stringify({
       matchesPerGhostPerPolicy: 200,
-      matchesPerRoomPerGhostPerPolicy: 25,
-      seed: "101 + matchIndex * 7919; room = rooms[matchIndex % 8]",
+      matchesPerRoomPerGhostPerPolicy: Number((200 / ROOMS.length).toFixed(1)),
+      seed: `101 + matchIndex * 7919; room = rooms[matchIndex % ${ROOMS.length}]`,
       startingSpot: "Uniform seeded choice shared by both policies",
       units: "win percent",
       table

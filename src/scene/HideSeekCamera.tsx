@@ -214,7 +214,9 @@ export function HideSeekCamera() {
       const availableH = Math.max(200, size.height - coveredBottom - coveredTop - (size.height < 480 ? 64 : 76));
       const margin = coveredTop ? 1.25 : 1.5;
       const span = Math.max((b.x1 - b.x0) * margin * size.height / availableW, (b.z1 - b.z0) * margin * size.height / availableH);
-      const distance = Math.max(12.2, span / (2 * Math.tan(25 * Math.PI / 180)));
+      // The closest the overview comes scales with the room (12.2 m suits the original 8 x 7 m rooms).
+      const nearest = 12.2 * Math.max((b.x1 - b.x0) / 8, (b.z1 - b.z0) / 7);
+      const distance = Math.max(nearest, span / (2 * Math.tan(25 * Math.PI / 180)));
       t.look.set(cx, base + 0.4, cz);
       t.pos.set(0.43, 0.93, 0.83).normalize().multiplyScalar(distance).add(t.look);
       t.fov = OVERVIEW_FOV;

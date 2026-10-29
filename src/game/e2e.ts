@@ -7,7 +7,7 @@ import { clueText } from "./logic/clues";
 import { WORLD } from "./world/world";
 import { rectCenter, rotateXZ } from "./world/geometry";
 import { collidersFor, floorState, resolveCollisions } from "./world/collision";
-import { FLOOR_Y } from "./world/rooms";
+import { FLOOR_Y, roomAt } from "./world/rooms";
 import type { Floor } from "./types";
 import { cameraRef } from "../scene/CameraRig";
 import { hsCam } from "../scene/HideSeekCamera";
@@ -135,6 +135,19 @@ export function installE2eHook() {
         replayUnlocked: g.replayUnlocked,
         ...director.debug()
       };
+    },
+    /** The Guest Wing in this playthrough: unlock, the 206 key, clues read, the clue card, the doors open. */
+    wing() {
+      const g = getGame();
+      return {
+        unlocked: g.guestWingUnlocked, key: rt.wing.key, read: [...rt.wing.read], solved: rt.wing.solved,
+        mysterySolved: g.wingMysterySolved, note: g.wingNote, room: roomAt(rt.player.x, rt.player.z, rt.player.floor),
+        doorsOpen: [...rt.doorsOpen.keys()].filter((id) => id === "guestwing" || id.startsWith("g2"))
+      };
+    },
+    /** Test setup only: as if Chapter 2 had been finished on this device (not saved). */
+    unlockWing(on = true) {
+      setGame({ guestWingUnlocked: on });
     },
     /** Test setup only; movement still runs through the normal controller. */
     beaconSetup(id: string, open = true) {

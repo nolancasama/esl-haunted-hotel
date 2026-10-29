@@ -112,12 +112,16 @@ export function Lights() {
       const k = Math.min(1, dt * 3);
       // Changing floors moves the light at once (it would sweep through the ceiling).
       const jump = Math.abs(r.lamp.y - l.position.y) > 1.5 ? 1 : k;
-      l.position.x += (r.lamp.x - l.position.x) * jump;
+      // The long Guest Wing corridor: its light walks along with the player, from lamp to lamp.
+      const lampX = id === "guesthall" ? Math.min(r.bounds.x1 - 1.5, Math.max(r.bounds.x0 + 1.5, rt.player.x)) : r.lamp.x;
+      l.position.x += (lampX - l.position.x) * jump;
       l.position.y += (r.lamp.y - l.position.y) * jump;
       l.position.z += (r.lamp.z - l.position.z) * jump;
       l.color.lerp(tmp.set(r.lamp.color), k);
       if (sun > 0) l.color.lerp(DAWN_ROOM, sun * 0.6);
-      const want = r.lamp.intensity * flicker;
+      // Room 206's old lamp flickers now and then: a soft dip, never a blackout.
+      const old = id === "g206" ? 0.82 + 0.18 * Math.max(Math.sin(rt.time * 1.3) * Math.sin(rt.time * 7.7), -0.4) : 1;
+      const want = r.lamp.intensity * flicker * old;
       l.intensity += (want - l.intensity) * (flicker < 1 ? 1 : k);
     }
   });

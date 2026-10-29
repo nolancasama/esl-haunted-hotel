@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { setGame, useGame } from "../game/store";
 import { GHOSTS } from "../game/ghosts";
-import { ROOMS } from "../game/world/rooms";
+import { GUEST_INFO, ROOMS, isGuestRoom } from "../game/world/rooms";
 import { WORLD } from "../game/world/world";
 import { awarenessOf, placePhrase, type Awareness, type MatchState } from "../game/hideSeek";
 import { command, setPickMode, type TimedDecision, type PickMode } from "../game/hideSeek/session";
@@ -56,7 +56,8 @@ export function HideSeekHud({ match, decision, pickMode, message, ability, ja }:
     if (message && message !== r.message) next = { text: message };
     if (r.match !== match) {
       const room = ROOMS[match.config.room];
-      next = { text: room.name, ja: room.nameJa };
+      const guest = isGuestRoom(room.id) ? GUEST_INFO[room.id] : null;
+      next = guest ? { text: `${room.name} · ${guest.title}`, ja: guest.titleJa } : { text: room.name, ja: room.nameJa };
       Object.assign(r, { match, hideKey, moves: match.relocationsLeft, hiddenAt: -100, eyeUntil: -100 });
     }
     // Back to hiding after Stay or Move: the hiding place, not the status line.

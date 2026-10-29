@@ -4,17 +4,21 @@ import {
   clockFaceTexture,
   floorTexture,
   glowTexture,
+  guestArtTexture,
   nightWindowTexture,
   paintingTexture,
   quiltTexture,
   rainTexture,
   rugTexture,
   runnerTexture,
+  type GuestArt,
   wallTexture,
   type FloorStyle,
   type WallStyle
 } from "./textures";
 import type { TexKey } from "./models";
+
+const GUEST_FLOOR: FloorStyle = { base: "#6a4630", seam: "#30200f", seed: 33 };
 
 export const ROOM_STYLE: Record<RoomId, { wall: WallStyle; floor: FloorStyle }> = {
   bedroom: {
@@ -56,7 +60,18 @@ export const ROOM_STYLE: Record<RoomId, { wall: WallStyle; floor: FloorStyle }> 
   attic: {
     wall: { paper: "#5e4532", pattern: "#3a2a1e", kind: "planks", wainscot: "#5e4532", trim: "#2e2118" },
     floor: { base: "#6b5138", seam: "#2f2216", seed: 23 }
-  }
+  },
+  // The Guest Wing: dark panelled corridor; the guest rooms share one wainscot and floor, with their own paper.
+  guesthall: {
+    wall: { paper: "#4f2638", pattern: "#6e3a50", kind: "damask", wainscot: "#3a2418", trim: "#1f130d" },
+    floor: { base: "#5a3826", seam: "#2a190f", seed: 31 }
+  },
+  g201: { wall: { paper: "#3d5878", pattern: "#4b6a8e", kind: "stripes", wainscot: "#45301f", trim: "#24170f" }, floor: GUEST_FLOOR },
+  g202: { wall: { paper: "#6a5232", pattern: "#7c6340", kind: "stripes", wainscot: "#45301f", trim: "#24170f" }, floor: GUEST_FLOOR },
+  g203: { wall: { paper: "#3c6658", pattern: "#e6cf88", kind: "dots", wainscot: "#45301f", trim: "#24170f" }, floor: GUEST_FLOOR },
+  g204: { wall: { paper: "#46663c", pattern: "#a6d08a", kind: "dots", wainscot: "#45301f", trim: "#24170f" }, floor: GUEST_FLOOR },
+  g205: { wall: { paper: "#5a2c3c", pattern: "#c4a35a", kind: "damask", wainscot: "#45301f", trim: "#24170f" }, floor: GUEST_FLOOR },
+  g206: { wall: { paper: "#4a4658", pattern: "#585468", kind: "stripes", wainscot: "#3c3330", trim: "#221c1a" }, floor: { base: "#5e5248", seam: "#2c2620", seed: 37 } }
 };
 
 export const EXTERIOR = "#2a2238";
@@ -74,6 +89,11 @@ export function texturedMaterial(key: TexKey): THREE.Material {
   const hit = texMats[key];
   if (hit) return hit;
   let m: THREE.Material;
+  if (key.startsWith("art:")) {
+    m = new THREE.MeshLambertMaterial({ map: guestArtTexture(key.slice(4) as GuestArt) });
+    texMats[key] = m;
+    return m;
+  }
   switch (key) {
     case "quilt": {
       const t = quiltTexture();
@@ -126,6 +146,8 @@ export function texturedMaterial(key: TexKey): THREE.Material {
     case "clockface":
       m = new THREE.MeshLambertMaterial({ map: clockFaceTexture() });
       break;
+    default:
+      m = new THREE.MeshLambertMaterial();
   }
   texMats[key] = m;
   return m;

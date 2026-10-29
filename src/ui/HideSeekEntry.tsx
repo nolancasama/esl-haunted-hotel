@@ -3,14 +3,14 @@ import { setGame, useGame } from "../game/store";
 import { GHOSTS, GHOST_ORDER } from "../game/ghosts";
 import type { GhostId } from "../game/types";
 import { WORLD } from "../game/world/world";
-import { ROOMS } from "../game/world/rooms";
+import { GUEST_INFO, GUEST_ROOMS, ROOMS, isGuestRoom } from "../game/world/rooms";
 import { abilityTargets, placePhrase, reachableSpots, type PlayRoom } from "../game/hideSeek";
 import { RESULTS_DELAY_MS, decideHideSeek, leaveHideSeek, pickSpot, setPickMode, startHideSeek, stayHere, useHideSeek } from "../game/hideSeek/session";
 import { GhostPortrait } from "./GhostPortrait";
 import { HideSeekEnglish } from "./HideSeekEnglish";
 import { HideSeekHud } from "./HideSeekHud";
 import { HideSeekRecords } from "./HideSeekRecords";
-import { CHALLENGE_AREAS, completionFor, collectionProgress, emptyBook, ghostCompleted, loadCompletionBook } from "../game/hideSeek/records";
+import { CHALLENGE_AREAS, PLAY_ROOMS, completionFor, collectionProgress, emptyBook, ghostCompleted, loadCompletionBook, loadGuestRoomWins } from "../game/hideSeek/records";
 
 export const HS_ABILITIES: Record<GhostId, { name: string; text: string; ja: string }> = {
   sleepy: { name: "Deep Sleep", text: "Rest quietly and lower the detective’s suspicion.", ja: "しずかに休んで、気づかれにくくしよう。" },
@@ -23,7 +23,8 @@ export const HS_ABILITIES: Record<GhostId, { name: string; text: string; ja: str
   shadow: { name: "Vanish", text: "Your next move is invisible, but still makes sound.", ja: "次の移動は見えないよ。でも音には気をつけて。" }
 };
 
-const PLAY_ROOMS: PlayRoom[] = ["bedroom", "dining", "storage", "library", "playroom", "bathroom", "music", "attic"];
+/** The eight original rooms, by floor; the Guest Wing's six rooms have their own picker. */
+const HOTEL_ROOMS = PLAY_ROOMS.filter((room) => !isGuestRoom(room));
 const isRoom = (room: string | undefined): room is PlayRoom => PLAY_ROOMS.includes(room as PlayRoom);
 const EMPTY_BOOK = emptyBook();
 const EMPTY_PROGRESS = collectionProgress(EMPTY_BOOK);
@@ -35,7 +36,7 @@ export function HideSeekEntry() {
   const link = useGame((s) => s.hideSeekLink);
   const session = useHideSeek();
   const [ghost, setGhost] = useState<GhostId | null>(link?.ghost ?? null);
-  const [selection, setSelection] = useState<"ghost" | "room">(link?.ghost ? "room" : "ghost");
+  const [selection, setSelection] = useState<"ghost" | "room" | "guest">(link?.ghost ? "room" : "ghost");
   const [booted, setBooted] = useState(false);
   const [recordsOpen, setRecordsOpen] = useState(false);
   const ja = settings.japanese;
@@ -72,6 +73,7 @@ export function HideSeekEntry() {
   // Live simulation rerenders frequently: never read localStorage on gameplay frames.
   const book = match ? EMPTY_BOOK : loadCompletionBook();
   const progress = match ? EMPTY_PROGRESS : collectionProgress(book);
+  const guestWins = match || selection !== "guest" ? [] : loadGuestRoomWins();
   if (!match && recordsOpen) return <HideSeekRecords japanese={ja} onBack={() => setRecordsOpen(false)}
     onPlay={(id, room) => { setGhost(id); setSelection("room"); setRecordsOpen(false); startHideSeek(id, room, undefined, settings.englishLevel); }} />;
 
@@ -80,9 +82,9 @@ export function HideSeekEntry() {
       <div className="panel hs-selection-card">
         <header className="hs-selection-heading">
           <span className="hs-eyebrow">Haunted Hotel · Hide &amp; Seek</span>
-          <h1>{selection === "ghost" ? "Choose your ghost" : "Choose a room"}</h1>
-          {ja && <span className="ja" lang="ja">{selection === "ghost" ? "おばけを えらぼう" : "へやを えらぼう"}</span>}
-          <p>{selection === "ghost" ? "Hide from the detective. Every ghost has a special trick!" : "One room. Five searches. Can you stay hidden?"}</p>
+          <h1>{selection === "ghost" ? "Choose your ghost" : selection === "guest" ? "The Guest Wing" : "Choose a room"}</h1>
+          {ja && <span className="ja" lang="ja">{selection === "ghost" ? "おばけを えらぼう" : selection === "guest" ? "きゃくしつを えらぼう" : "へやを えらぼう"}</span>}
+          <p>{selection === "ghost" ? "Hide from the detective. Every ghost has a special trick!" : selection === "guest" ? "Six guest rooms. A win in any of them completes the Guest Wing." : "One room. Five searches. Can you stay hidden?"}</p>
           <div className="hs-collection-summary" data-testid="hs-collection-summary">Collection: {progress.completed}/{progress.total} escaped · {progress.percentage}%</div>
         </header>
         {selection === "ghost" ? (
@@ -98,6 +100,23 @@ export function HideSeekEntry() {
               </button>
             ))}
           </div>
+        ) : selection === "guest" ? (
+          <div data-testid="hs-guest-select">
+            {ghost && <div className="hs-chosen-ghost" style={{ "--ghost-color": GHOSTS[ghost].color } as CSSProperties}><GhostPortrait ghost={ghost} size={38} /><strong>{GHOSTS[ghost].name}</strong><span>{HS_ABILITIES[ghost].name}</span></div>}
+            <div className="hs-guest-grid">
+              {GUEST_ROOMS.map((room) => {
+                const won = guestWins.includes(room);
+                return (
+                  <button className={`hs-room-card hs-guest-card ${won ? "hs-room-complete" : ""}`} key={room} data-testid={`hs-room-${room}`} onClick={() => chooseRoom(room)}>
+                    <span className="hs-guest-number">{GUEST_INFO[room].number}</span>
+                    <strong>{GUEST_INFO[room].title}</strong>
+                    {ja && <span className="ja" lang="ja">{GUEST_INFO[room].titleJa}</span>}
+                    {won && <span className="hs-room-record">★ Escaped here</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         ) : (
           <div data-testid="hs-room-select">
           {ghost && <div className="hs-chosen-ghost" style={{ "--ghost-color": GHOSTS[ghost].color } as CSSProperties}><GhostPortrait ghost={ghost} size={38} /><strong>{GHOSTS[ghost].name}</strong><span>{HS_ABILITIES[ghost].name}</span></div>}
@@ -106,9 +125,9 @@ export function HideSeekEntry() {
               <section className="hs-floor" key={floor} aria-label={floor === 0 ? "Ground floor" : "Upstairs"}>
                 <h2>{floor === 0 ? "Ground floor" : "Upstairs"}</h2>
                 <div className="hs-room-grid">
-                  {PLAY_ROOMS.filter((room) => ROOMS[room].floor === floor).map((room) => (
+                  {HOTEL_ROOMS.filter((room) => ROOMS[room].floor === floor).map((room) => (
                     <button className={`hs-room-card ${ghost && completionFor(book, ghost, room) ? "hs-room-complete" : ""}`} key={room} data-testid={`hs-room-${room}`} onClick={() => chooseRoom(room)}>
-                      <span className="hs-room-number" aria-hidden="true">{PLAY_ROOMS.indexOf(room) + 1}</span>
+                      <span className="hs-room-number" aria-hidden="true">{HOTEL_ROOMS.indexOf(room) + 1}</span>
                       <strong>{ROOMS[room].name}</strong>
                       {ja && <span className="ja" lang="ja">{ROOMS[room].nameJa}</span>}
                       {ghost && <span className="hs-room-record" data-testid={`hs-room-complete-${room}`}>{completionFor(book, ghost, room) ? "✓ Completed" : "○ Not completed"}</span>}
@@ -117,12 +136,22 @@ export function HideSeekEntry() {
                 </div>
               </section>
             ))}
+            <section className="hs-floor hs-wing-floor" aria-label="Guest Wing">
+              <button className={`hs-room-card hs-wing-card ${ghost && completionFor(book, ghost, "guestwing") ? "hs-room-complete" : ""}`} data-testid="hs-area-guestwing" onClick={() => setSelection("guest")}>
+                <span className="hs-room-number" aria-hidden="true">9</span>
+                <strong>Guest Wing</strong>
+                <span className="hs-wing-sub">Rooms 201–206</span>
+                {ja && <span className="ja" lang="ja">きゃくしつ（6へや）</span>}
+                {ghost && <span className="hs-room-record" data-testid="hs-room-complete-guestwing">{completionFor(book, ghost, "guestwing") ? "✓ Completed" : "○ Not completed"}</span>}
+              </button>
+            </section>
           </div>
           </div>
         )}
         <footer className="hs-selection-footer">
           <button className="secondary" data-testid="hs-open-records" onClick={() => setRecordsOpen(true)}>★ Records ({progress.completed}/{progress.total})</button>
           {selection === "room" && <button className="secondary" data-testid="hs-back" onClick={anotherGhost}>Back{ja && <small lang="ja">もどる</small>}</button>}
+          {selection === "guest" && <button className="secondary" data-testid="hs-back" onClick={() => setSelection("room")}>Back{ja && <small lang="ja">もどる</small>}</button>}
           <button className="secondary" data-testid="hideseek-back" onClick={menu}>Main Menu{ja && <small lang="ja">メニュー</small>}</button>
         </footer>
       </div>

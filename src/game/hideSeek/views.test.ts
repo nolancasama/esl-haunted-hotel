@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { PLAY_ROOMS as PLAY_ROOM_LIST } from "./records";
 import { FLOOR_Y, ROOMS, WALL_T } from "../world/rooms";
 import { WORLD } from "../world/world";
 import type { PlayRoom } from "./types";
 import { answerCloseupView, cameraMode, heartbeatBpm, heartbeatGain, heartbeatLevel, hidingView, type CameraInput } from "./views";
 
-const PLAY_ROOMS: PlayRoom[] = ["bedroom", "dining", "storage", "library", "playroom", "bathroom", "music", "attic"];
+const PLAY_ROOMS: readonly PlayRoom[] = PLAY_ROOM_LIST;
 const ahead = (eye: { x: number; z: number }, yaw: number, d: number) => ({ x: eye.x + Math.sin(yaw) * d, z: eye.z + Math.cos(yaw) * d });
 
 /** Within an object's footprint (with a margin). */

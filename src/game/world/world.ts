@@ -2,7 +2,7 @@ import type { Floor, Prep, Rect, RoomId, Vec3 } from "../types";
 import { footprint, localToWorld } from "./geometry";
 import { GHOST_H, GHOST_R, KINDS, type KindSpec } from "./kinds";
 import { PLACEMENTS, type Placement, type SpotRule } from "./furniture";
-import { DOORS, FLOOR_Y, ROOMS, STAIRS, WALL_LINES, WALL_T, wallPieces, type DoorId, type WallPiece } from "./rooms";
+import { DOORS, FLOOR_Y, ROOMS, STAIRS, WALL_LINES, WALL_T, isGuestRoom, wallPieces, type DoorId, type WallPiece } from "./rooms";
 
 export interface WorldObject extends Placement {
   spec: KindSpec;
@@ -12,7 +12,11 @@ export interface WorldObject extends Placement {
   /** Floor footprint in world space. */
   rect: Rect;
   searchable: boolean;
-  /** Can be walked up to and used with E / a tap: hiding places and switches. */
+  /**
+   * Can be walked up to and used with E / a tap in the story: hiding places, switches and clues.
+   * Guest-room furniture is a Hide & Seek hiding place only; in the story the Guest Wing is
+   * explored for its clues, so a stray search there cannot disturb the ghost hunt.
+   */
   interactive: boolean;
   /** Wall lines a wall-mounted object hangs on (it fades with them in the cutaway view). */
   wallLines: string[];
@@ -67,7 +71,7 @@ function objectFrom(p: Placement): WorldObject {
     y: FLOOR_Y[floor],
     rect,
     searchable,
-    interactive: searchable || Boolean(p.action),
+    interactive: (searchable && !isGuestRoom(p.room)) || Boolean(p.action),
     wallLines: wallLinesFor(p, spec, floor)
   };
 }

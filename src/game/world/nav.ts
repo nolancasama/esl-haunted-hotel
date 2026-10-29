@@ -2,7 +2,7 @@ import type { Floor, RoomId } from "../types";
 import { collidersFor, floorState, nearestSearchable } from "./collision";
 import { INTERACT_RANGE, PLAYER_R } from "./constants";
 import { localToWorld, rectCenter, rectDistance } from "./geometry";
-import { DOORS, roomAt } from "./rooms";
+import { DOORS, WING, WING_RECT, roomAt } from "./rooms";
 import { WORLD } from "./world";
 
 export interface NavPoint {
@@ -14,8 +14,9 @@ export interface NavPoint {
 // A small steering allowance keeps the follower away from collision boundaries.
 const RADIUS = PLAYER_R + 0.04;
 const CELL = 0.25;
-const MIN_X = -10.5;
-const NX = 75;
+// West far enough for the Guest Wing (x from -23); east to the hotel's east wall (x = 8).
+const MIN_X = WING.x0 - 0.5;
+const NX = Math.round((8 - MIN_X) / CELL) + 1;
 const NZ = 89;
 const SAMPLE = 0.05;
 const doorBits = new Map(DOORS.map((door, i) => [door.id as string, 1 << i]));
@@ -24,6 +25,10 @@ interface Node extends NavPoint { doors: number; edges: Edge[] }
 interface Grid { nodes: Node[]; cells: Int32Array; mask: number; components: Int32Array }
 let grid: Grid | undefined;
 
+function insideWing(x: number, z: number): boolean {
+  return x > WING_RECT.x0 && z > WING_RECT.z0 && z < WING_RECT.z1;
+}
+
 function cellIndex(ix: number, iz: number, floor: Floor): number {
   return (floor * NZ + iz) * NX + ix;
 }
@@ -31,8 +36,9 @@ function cellIndex(ix: number, iz: number, floor: Floor): number {
 /** Static walls/furniture and the same floor-dependent collider set as moveBody. */
 function pointDoors(x: number, z: number, floor: Floor, radius = RADIUS): number {
   if (x <= MIN_X || x >= 8 || z <= -11 || z >= 11) return -1;
-  // The short entrance path also lets the completed game be exited by a tap.
-  if (x <= -8 && (floor !== 0 || Math.abs(z) > 0.75)) return -1;
+  // West of the old outer wall: downstairs only the short entrance path (so the completed game can be
+  // exited by a tap); upstairs, the Guest Wing.
+  if (x <= -8 && (floor === 0 ? Math.abs(z) > 0.75 : !insideWing(x, z))) return -1;
   const state = floorState(x, z, floor);
   if (state.floor !== floor) return -1;
   let doors = 0;
@@ -181,7 +187,9 @@ export function findPath(
   if (objectId && !object?.interactive) return null;
   const targetRoom = object?.room ?? roomAt(destination.x, destination.z, destination.floor);
   const targetFloor = object?.floor ?? destination.floor;
-  const wallTarget = !targetRoom && destination.x >= -8 && destination.x <= 8 && destination.z >= -11 && destination.z <= 11;
+  const inHotel = (destination.x >= -8 && destination.x <= 8 && destination.z >= -11 && destination.z <= 11) ||
+    (destination.floor === 1 && destination.x >= WING_RECT.x0 && destination.x <= WING_RECT.x1 && destination.z >= WING_RECT.z0 && destination.z <= WING_RECT.z1);
+  const wallTarget = !targetRoom && inHotel;
   const centre = object ? rectCenter(object.rect) : destination;
   const ideal = object
     ? localToWorld(object, object.rot, { x: 0, y: 0, z: object.spec.d / 2 + 0.65 })

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PLAY_ROOMS as PLAY_ROOM_LIST } from "./records";
 import { writeFileSync } from "node:fs";
 import { ROOMS } from "../world/rooms";
 import { WORLD } from "../world/world";
@@ -7,7 +8,7 @@ import {
 } from "./navigation";
 import type { PlayRoom, Point } from "./types";
 
-const rooms: PlayRoom[] = ["bedroom", "dining", "storage", "library", "playroom", "bathroom", "music", "attic"];
+const rooms: readonly PlayRoom[] = PLAY_ROOM_LIST;
 
 describe("Hide & Seek room navigation", () => {
   for (const room of rooms) {

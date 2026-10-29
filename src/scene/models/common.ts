@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { KindId } from "../../game/world/kinds";
 import type { WorldObject } from "../../game/world/world";
 import { PartBuilder } from "../partBuilder";
+import type { GuestArt } from "../textures";
 
 /**
  * Low-poly furniture built from primitives, using the exact dimensions in
@@ -24,7 +25,9 @@ export type TexKey =
   | "rain"
   | "clockface"
   | "paintingA"
-  | "paintingB";
+  | "paintingB"
+  /** Guest Wing pictures, photographs, the note and the key board (textures.ts guestArtTexture). */
+  | `art:${GuestArt}`;
 
 export interface AnimatedPart {
   /** fan: spins while switched on; lever: the fan switch's toggle. */

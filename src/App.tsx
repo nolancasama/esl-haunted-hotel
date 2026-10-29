@@ -5,6 +5,7 @@ import { TouchControls } from "./ui/TouchControls";
 import { SettingsModal } from "./ui/Settings";
 import { ResultsScreen, TitleScreen } from "./ui/Screens";
 import { HideSeekEntry } from "./ui/HideSeekEntry";
+import { WingNote } from "./ui/WingNote";
 import { installKeyboard } from "./input/keyboard";
 import { director } from "./game/director";
 import { getGame, setGame, useGame } from "./game/store";
@@ -98,6 +99,7 @@ export function App() {
       <GameScene />
       <div className="vignette" />
       <Hud />
+      <WingNote />
       <TouchControls />
       <TitleScreen />
       <HideSeekEntry />

@@ -307,9 +307,9 @@ test("Hungry targets a spot without English and its ability can be used only onc
 });
 
 test("every room boots a playable match without browser errors", async ({ page }) => {
-  test.setTimeout(300_000);
+  test.setTimeout(600_000);
   const errors = await open(page);
-  for (const room of ["bedroom", "dining", "storage", "library", "playroom", "bathroom", "music", "attic"]) {
+  for (const room of ["bedroom", "dining", "storage", "library", "playroom", "bathroom", "music", "attic", "g201", "g202", "g203", "g204", "g205", "g206"]) {
     expect(await command(page, "start", "sleepy", room, 4, "standard")).toMatchObject({ ok: true });
     await scale(page, 0);
     await until(page, `${room} setup`, (s) => s.config.room === room && s.status === "setup" && s.reachable.length >= 11);
@@ -491,6 +491,52 @@ test("a real canvas marker selects a spot, and story keyboard movement resumes a
     }, { timeout: 30_000, message: "story keyboard movement should resume after Hide & Seek" }).toBeGreaterThan(0.15);
   } finally {
     await page.keyboard.up("KeyD");
+  }
+  expect(errors).toEqual([]);
+});
+
+test("the Guest Wing is one area with six rooms, and Back returns to the room list", async ({ page }) => {
+  const errors = await open(page, "");
+  await page.getByTestId("hs-ghost-shadow").click();
+  await expect(page.getByTestId("hs-room-select")).toBeVisible();
+  await expect(page.getByTestId("hs-collection-summary")).toContainText("/72");
+  await page.getByTestId("hs-area-guestwing").click();
+  await expect(page.getByTestId("hs-guest-select")).toBeVisible();
+  for (const room of ["g201", "g202", "g203", "g204", "g205", "g206"]) await expect(page.getByTestId(`hs-room-${room}`)).toBeEnabled();
+  await expect(page.getByTestId("hs-room-g206")).toContainText("The Forgotten Room");
+  await page.getByTestId("hs-back").click();
+  await expect(page.getByTestId("hs-room-select")).toBeVisible();
+  await expect(page.getByTestId("hs-guest-select")).toHaveCount(0);
+  await page.getByTestId("hs-area-guestwing").click();
+  await page.getByTestId("hs-room-g204").click();
+  await until(page, "Guest Wing match in Room 204", (s) => s.config.room === "g204" && s.status === "setup");
+  await expect(page.getByTestId("hs-toast")).toContainText("The Garden Room");
+  expect(errors).toEqual([]);
+});
+
+test("in every guest room the close-up question stays beside the ghost, then hiding goes first person", async ({ page }) => {
+  test.setTimeout(600_000);
+  const errors = await open(page, "&ghost=bubbles&room=g201&seed=7");
+  const dir = path.join(process.cwd(), ".tmp", "wing", "hideseek");
+  await mkdir(dir, { recursive: true });
+  for (const room of ["g201", "g202", "g203", "g204", "g205", "g206"]) {
+    expect(await command(page, "start", "bubbles", room, 7, "standard")).toMatchObject({ ok: true });
+    await scale(page, 0);
+    await until(page, `${room} setup`, (s) => s.config.room === room && s.status === "setup");
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: path.join(dir, `${room}-overview.png`) });
+    const snap = (await snapshot(page))!;
+    // A bed's "under" spot: the trickiest close-up (low, squashed ghost).
+    const spot = snap.reachable.find((item) => item.prep === "under" && item.objectId.endsWith("bed")) ?? snap.reachable[0];
+    await chooseStart(page, spot.id);
+    await expectQuestionBesideGhost(page);
+    await page.screenshot({ path: path.join(dir, `${room}-question.png`) });
+    await answerTiles(page);
+    await expect.poll(async () => (await hook<{ mode: string }>(page, "hsCamera")).mode, { timeout: 20_000 }).not.toBe("answerCloseup");
+    await page.getByTestId("hs-stay").click().catch(() => {});
+    await expect.poll(async () => (await hook<{ mode: string }>(page, "hsCamera")).mode, { timeout: 30_000 }).toBe("firstPerson");
+    await page.waitForTimeout(2500);
+    await page.screenshot({ path: path.join(dir, `${room}-hiding.png`) });
   }
   expect(errors).toEqual([]);
 });

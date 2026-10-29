@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PLACEMENTS } from "./furniture";
-import { ROUND_GLASS, WALL_LINES, WINDOW_GLASS } from "./rooms";
+import { ROOMS, ROUND_GLASS, WALL_LINES, WINDOW_GLASS } from "./rooms";
 import { buildWorld } from "./world";
 
 const windows = PLACEMENTS.filter((p) => p.kind === "window" || p.kind === "roundwindow");
@@ -11,7 +11,7 @@ describe("real windows", () => {
     expect(windows.length).toBeGreaterThan(0);
     expect(holes.length).toBe(windows.length);
     for (const w of windows) {
-      const floor = w.room === "playroom" || w.room === "bathroom" || w.room === "music" || w.room === "attic" || w.room === "landing" ? 1 : 0;
+      const floor = ROOMS[w.room].floor;
       const match = holes.find(({ line, o }) => {
         const across = line.axis === "x" ? w.z : w.x;
         const along = line.axis === "x" ? w.x : w.z;

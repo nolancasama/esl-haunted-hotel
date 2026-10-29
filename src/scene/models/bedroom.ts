@@ -5,7 +5,8 @@ import { C, plane, underShadow, type BuilderSet, type TexKey } from "./common";
 
 /** Shared pieces (desk, box, window, chair, rug) and the bedroom. */
 export const bedroomModels: BuilderSet = {
-  bed(_obj, b, _g, out) {
+  bed(obj, b, _g, out) {
+    const v = obj.variant ?? "";
     const k = KINDS.bed;
     const clear = k.under.clearance; // 0.38: rail bottom
     // Dark floor patch so "under the bed" reads as a space.
@@ -25,13 +26,37 @@ export const bedroomModels: BuilderSet = {
     b.box(1.56, 0.72, 0.07, 0, 0.42, -1.06, C.wood);
     b.box(1.3, 0.12, 0.08, 0, 1.0, -1.06, C.woodLight);
     b.box(1.56, 0.34, 0.06, 0, 0.5, 1.06, C.wood);
-    b.sphere(0.34, 0, 0.7, -0.72, "#fbf6ec", [1, 0.26, 0.55]);
-    // teddy bear on the pillow side, away from the "on" spot
-    b.sphere(0.12, -0.5, 0.78, -0.62, "#a8784f", [1, 1.05, 0.9]);
-    b.sphere(0.09, -0.5, 0.95, -0.64, "#b8885d");
-    b.sphere(0.035, -0.57, 1.03, -0.64, "#8a5e3c");
-    b.sphere(0.035, -0.43, 1.03, -0.64, "#8a5e3c");
-    b.sphere(0.022, -0.5, 0.94, -0.56, C.ink);
+    b.sphere(0.34, 0, 0.7, -0.72, v === "floral" ? "#f6d6e2" : "#fbf6ec", [1, 0.26, 0.55]);
+    // Guest Wing variants keep the free "on" area (z -0.55..1.05) clear: details sit at the head and foot.
+    if (v === "antique") {
+      // tall carved posts and a dark headboard crest
+      for (const x of [-0.82, 0.82]) {
+        b.box(0.1, 0.75, 0.1, x, 1.25, -1.06, C.woodDark);
+        b.sphere(0.07, x, 2.04, -1.06, C.brass);
+      }
+      b.box(1.56, 0.3, 0.06, 0, 1.3, -1.06, C.woodRed);
+      b.cyl(0.2, 0.2, 0.05, 0, 1.55, -1.07, C.brass, 12);
+    } else if (v === "floral") {
+      for (let i = 0; i < 5; i++) b.sphere(0.045, -0.6 + i * 0.3, 1.02 + (i % 2) * 0.04, -1.06, i % 2 ? "#e86a8a" : "#f2c94c");
+    } else if (v === "rumpled") {
+      // the duvet pushed down into a heap at the foot, a pillow knocked askew
+      b.sphere(0.36, 0.1, 0.72, 0.92, "#d8c8a8", [1.9, 0.32, 0.5], 10);
+      b.sphere(0.22, 0.45, 0.72, -0.5, "#fbf6ec", [1, 0.3, 0.6]);
+    } else if (v === "dusty") {
+      // an old grey dust sheet over the whole bed (it hangs to just above the "under" clearance)
+      b.box(1.66, 0.012, 2.16, 0, 0.687, 0, "#b8b0a4");
+      for (const sx of [-1, 1]) b.box(0.012, 0.28, 2.16, sx * 0.83, 0.41, 0, "#aaa298");
+      b.box(1.66, 0.28, 0.012, 0, 0.41, 1.08, "#aaa298");
+      return;
+    }
+    if (!v) {
+      // teddy bear on the pillow side, away from the "on" spot
+      b.sphere(0.12, -0.5, 0.78, -0.62, "#a8784f", [1, 1.05, 0.9]);
+      b.sphere(0.09, -0.5, 0.95, -0.64, "#b8885d");
+      b.sphere(0.035, -0.57, 1.03, -0.64, "#8a5e3c");
+      b.sphere(0.035, -0.43, 1.03, -0.64, "#8a5e3c");
+      b.sphere(0.022, -0.5, 0.94, -0.56, C.ink);
+    }
     out.parts.push({
       name: "blanket",
       pivot: [0, 0.66, -0.39],
@@ -41,8 +66,9 @@ export const bedroomModels: BuilderSet = {
 
   desk(obj, b, g, out) {
     const top = KINDS.desk.h; // 0.76
-    const reading = obj.variant === "reading";
-    const attic = obj.variant === "attic";
+    // Guest Wing: a writing desk dresses like the reading desk, a dusty one like the attic table.
+    const reading = obj.variant === "reading" || obj.variant === "writing";
+    const attic = obj.variant === "attic" || obj.variant === "dusty";
     const dark = reading || attic;
     b.box(1.3, 0.05, 0.72, 0, top - 0.05, 0, attic ? "#4a3a30" : dark ? C.woodDark : C.woodLight);
     for (const [x, z] of [
@@ -107,7 +133,12 @@ export const bedroomModels: BuilderSet = {
       abc: ["#d8403a", "#f2c94c", "#3a6ad0"],
       music: ["#5a2030", C.brass, "#4a1828"],
       attic: ["#c49a62", "#a87a44", "#c49a62"],
-      books: ["#9a6b45", C.woodDark, C.woodLight]
+      books: ["#9a6b45", C.woodDark, C.woodLight],
+      // Guest Wing: suitcases and trunks (same size and lid as the box, so "in" fits the same way)
+      suitcase: ["#7a4a2c", "#4a2c18", "#84502e"],
+      suitcasegreen: ["#3e6a4a", "#24402c", "#467a54"],
+      trunk: ["#3e3a5a", C.brass, "#4a4468"],
+      oldtrunk: ["#5a4a40", "#8a7a60", "#62524a"]
     };
     const [body, trim, lidColor] = PAINT[v] ?? PAINT.books;
     const { w, d } = k;
@@ -152,6 +183,13 @@ export const bedroomModels: BuilderSet = {
         front(new THREE.PlaneGeometry(0.018, 0.16), C.brass, x + 0.05, y + 0.08, 0, [1, 1, 1], 0.008);
       }
       front(new THREE.PlaneGeometry(0.34, 0.02), C.brass, -0.04, 0.42, 0, [1, 1, 1], 0.012);
+    } else if (v === "suitcase" || v === "suitcasegreen") {
+      // leather straps over the front, a travel label
+      for (const x of [-0.22, 0.22]) front(new THREE.PlaneGeometry(0.06, h - 0.08), "#3a2414", x, 0.3);
+      front(new THREE.PlaneGeometry(0.14, 0.09), "#f2ead2", 0, 0.24, 0.1);
+    } else if (v === "trunk" || v === "oldtrunk") {
+      // wooden ribs and a brass lock plate
+      for (const x of [-0.3, 0, 0.3]) front(new THREE.PlaneGeometry(0.035, h - 0.08), trim, x, 0.3);
     } else if (v === "attic") {
       // a cardboard box: tape and a red label
       front(new THREE.PlaneGeometry(0.06, h - 0.1), "#e0c48a", 0, 0.3);
@@ -219,9 +257,12 @@ export const bedroomModels: BuilderSet = {
     out.lamps.push([0, 0.9, 0]);
   },
 
-  wardrobe(_obj, b) {
+  wardrobe(obj, b) {
     const { w, h, d } = KINDS.wardrobe;
-    b.box(w, h - 0.1, d, 0, 0.1, 0, C.woodRed);
+    const body = obj.variant === "light" ? "#b08458" : obj.variant === "dusty" ? "#6a5a52" : C.woodRed;
+    b.box(w, h - 0.1, d, 0, 0.1, 0, body);
+    // a dust sheet thrown over the top of the forgotten room's wardrobe
+    if (obj.variant === "dusty") b.box(w + 0.04, 0.5, d + 0.04, 0, h - 0.48, 0, "#b8b0a4");
     b.box(w + 0.08, 0.1, d + 0.06, 0, h - 0.02, 0, C.woodDark);
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(0.08, 0.1, 0.08, sx * (w / 2 - 0.08), 0, sz * (d / 2 - 0.08), C.woodDark);
     b.box(0.02, h - 0.3, 0.02, 0, 0.2, d / 2 + 0.005, C.woodDark);
@@ -258,7 +299,10 @@ export const bedroomModels: BuilderSet = {
 
   rug(obj, _b, _g, out) {
     const { w, d } = KINDS.rug;
-    const keys: Record<string, TexKey> = { library: "rugLibrary", music: "rugMusic", attic: "rugAttic" };
+    const keys: Record<string, TexKey> = {
+      library: "rugLibrary", music: "rugMusic", attic: "rugAttic",
+      guest: "rugDining", travel: "rugLibrary", garden: "rugPlay", antique: "rugMusic"
+    };
     out.textured.push({
       key: keys[obj.variant ?? ""] ?? "rugBedroom",
       geometry: plane(w, d),

@@ -8,7 +8,8 @@ describe("doors fit their openings", () => {
   const hinged = DOORS.filter((d) => d.style !== "gate");
 
   it("every hinged door sits in a wall opening of the same width and height", () => {
-    expect(hinged.length).toBe(9);
+    // Nine original doors, the Guest Wing's double doors and its six guest-room doors.
+    expect(hinged.length).toBe(16);
     for (const d of hinged) {
       const hole = opening(d.id);
       expect(hole, d.id).toBeDefined();

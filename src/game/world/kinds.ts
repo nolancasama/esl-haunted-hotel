@@ -301,9 +301,30 @@ export const KINDS = {
     by: BY_FLOOR
   },
 
+  // ---- Guest Wing searchable kinds -------------------------------------------
+  /** A child's bed (the Family Room has two): same rail height as the big bed, so "under" fits the same way. */
+  smallbed: {
+    w: 1.0,
+    h: 1.0,
+    d: 1.9,
+    solid: true,
+    on: { y: 0.6, at: { x: 0, z: 0.25 }, area: { x0: -0.48, x1: 0.48, z0: -0.5, z1: 0.9 }, scale: 0.85 },
+    under: { clearance: 0.38, area: { x0: -0.42, x1: 0.42, z0: -0.85, z1: 0.85 }, scale: [0.8, 0.42, 0.8] },
+    by: BY_FLOOR
+  },
+  /** Seat cushion top 0.54, between the arms (inner faces at ±0.255). */
+  rockingchair: {
+    w: 0.7,
+    h: 1.15,
+    d: 0.95,
+    solid: true,
+    on: { y: 0.54, at: { x: 0, z: 0.05 }, area: { x0: -0.255, x1: 0.255, z0: -0.22, z1: 0.29 }, scale: 0.72 },
+    by: BY_FLOOR
+  },
+
   // ---- decor -------------------------------------------------------------
   nightstand: { w: 0.5, h: 0.55, d: 0.45, solid: true },
-  wardrobe: { w: 1.2, h: 2.1, d: 0.6, solid: true },
+  wardrobe: { w: 1.2, h: 2.1, d: 0.6, solid: true, by: BY_FLOOR },
   chair: { w: 0.5, h: 1.0, d: 0.5, solid: true },
   rug: { w: 3, h: 0.02, d: 2, solid: false, flat: true },
   floorlamp: { w: 0.4, h: 1.7, d: 0.4, solid: true },
@@ -352,10 +373,24 @@ export const KINDS = {
   musicstand: { w: 0.5, h: 1.3, d: 0.4, solid: false },
   cello: { w: 0.55, h: 1.5, d: 0.4, solid: true },
   guitar: { w: 0.45, h: 1.1, d: 0.35, solid: false },
-  rockingchair: { w: 0.7, h: 1.15, d: 0.95, solid: true },
   coveredchair: { w: 0.8, h: 1.4, d: 0.7, solid: true },
   boxstack: { w: 0.9, h: 1.0, d: 0.7, solid: true },
   oldpaintings: { w: 1.0, h: 1.0, d: 0.3, solid: true },
+  // ---- Guest Wing decor ---------------------------------------------------
+  /** A brass wall lamp (high up: never what a ghost is "by"). */
+  walllamp: { w: 0.3, h: 2.2, d: 0.2, solid: false, wallMounted: true, flat: true },
+  /**
+   * A small framed picture, note, photograph or key board on a wall (variants). Its footprint reaches
+   * 0.35 into the room so a student standing at the furniture below can still reach a clue on it.
+   */
+  frame: { w: 0.7, h: 1.9, d: 0.35, solid: false, wallMounted: true, flat: true },
+  /** The guest register on its lectern, in the corridor. */
+  register: { w: 0.7, h: 1.15, d: 0.5, solid: true },
+  coatrack: { w: 0.5, h: 1.8, d: 0.5, solid: true },
+  /** An open suitcase with clothes spilling out (Room 202): a clue, not a hiding place. */
+  opencase: { w: 0.9, h: 0.55, d: 0.75, solid: true },
+  /** A small potted plant. */
+  pot: { w: 0.4, h: 0.9, d: 0.4, solid: true },
   /** Roof rafters along an attic wall (fade with it). */
   rafters: { w: 6.8, h: 2.8, d: 0.3, solid: false, wallMounted: true, flat: true }
 } satisfies Record<string, KindSpec>;

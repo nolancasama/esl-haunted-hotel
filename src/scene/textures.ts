@@ -896,3 +896,192 @@ export function clockFaceTexture(): THREE.Texture {
     return finish("clockface", c);
   });
 }
+
+// ---------------------------------------------------------------- guest wing
+
+/** A brass room-number plaque ("201"). */
+export function plaqueTexture(text: string): THREE.Texture {
+  const key = `plaque:${text}`;
+  return cached(key, () => {
+    const [c, ctx] = canvas(192, 96);
+    const g = ctx.createLinearGradient(0, 0, 0, 96);
+    g.addColorStop(0, "#f2d488");
+    g.addColorStop(0.5, "#c9a24a");
+    g.addColorStop(1, "#8a6a2a");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(96, 48, 92, 44, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#5a4218";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.ellipse(96, 48, 82, 36, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#3a2410";
+    ctx.font = "bold 50px serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, 96, 51);
+    return finish(key, c);
+  });
+}
+
+/** A painted signboard (dark wood, gold letters), e.g. GUEST ROOMS over the wing's doors. */
+export function signboardTexture(text: string): THREE.Texture {
+  const key = `sign:${text}`;
+  return cached(key, () => {
+    const [c, ctx] = canvas(512, 112);
+    ctx.fillStyle = "#3a2418";
+    ctx.fillRect(0, 0, 512, 112);
+    ctx.strokeStyle = "#c9a24a";
+    ctx.lineWidth = 6;
+    ctx.strokeRect(8, 8, 496, 96);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(18, 18, 476, 76);
+    ctx.fillStyle = "#ffd36b";
+    ctx.font = "bold 50px serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, 256, 60);
+    return finish(key, c);
+  });
+}
+
+export type GuestArt =
+  | "landscape" | "map" | "family" | "drawing" | "botanical" | "keys" | "painting206" | "mirror" | "faded" | "photo206" | "note";
+
+function smallGhost(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, col = "#f4f1ff") {
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.arc(x, y, 14 * s, Math.PI, 0);
+  ctx.lineTo(x + 14 * s, y + 20 * s);
+  for (let i = 0; i < 4; i++) ctx.lineTo(x + 14 * s - (i + 0.5) * 7 * s, y + (i % 2 ? 20 : 15) * s);
+  ctx.lineTo(x - 14 * s, y + 20 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#231a33";
+  ctx.beginPath();
+  ctx.arc(x - 5 * s, y - 1 * s, 2.2 * s, 0, Math.PI * 2);
+  ctx.arc(x + 5 * s, y - 1 * s, 2.2 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#231a33";
+  ctx.lineWidth = 1.6 * s;
+  ctx.beginPath();
+  ctx.arc(x, y + 4 * s, 4 * s, 0.25, Math.PI - 0.25);
+  ctx.stroke();
+}
+
+/** Pictures, photographs, a note and a key board in the guest rooms (all drawn here, nothing downloaded). */
+export function guestArtTexture(kind: GuestArt): THREE.Texture {
+  const key = `guestart:${kind}`;
+  return cached(key, () => {
+    const [c, ctx] = canvas(128, 160);
+    const sky = (a: string, b: string) => {
+      const g = ctx.createLinearGradient(0, 0, 0, 160);
+      g.addColorStop(0, a);
+      g.addColorStop(1, b);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 128, 160);
+    };
+    switch (kind) {
+      case "landscape":
+        sky("#9cc4e8", "#e8d9b0");
+        ctx.fillStyle = "#5f8a4a";
+        ctx.beginPath(); ctx.moveTo(0, 110); ctx.quadraticCurveTo(50, 70, 128, 104); ctx.lineTo(128, 160); ctx.lineTo(0, 160); ctx.fill();
+        ctx.fillStyle = "#3f6a38";
+        ctx.beginPath(); ctx.moveTo(0, 130); ctx.quadraticCurveTo(80, 100, 128, 132); ctx.lineTo(128, 160); ctx.lineTo(0, 160); ctx.fill();
+        ctx.fillStyle = "#fff6d8";
+        ctx.beginPath(); ctx.arc(94, 40, 12, 0, Math.PI * 2); ctx.fill();
+        break;
+      case "map":
+        sky("#e8d8b0", "#d8c290");
+        ctx.strokeStyle = "#8a6a3a"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(20, 30); ctx.bezierCurveTo(50, 60, 30, 90, 70, 110); ctx.bezierCurveTo(90, 120, 100, 100, 108, 132); ctx.stroke();
+        ctx.setLineDash([4, 4]); ctx.strokeStyle = "#b03a2a";
+        ctx.beginPath(); ctx.moveTo(30, 120); ctx.lineTo(60, 70); ctx.lineTo(100, 50); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = "#b03a2a"; ctx.font = "bold 22px serif"; ctx.fillText("X", 92, 58);
+        break;
+      case "family":
+        // An old photo of the hotel; a little white ghost waves from an upstairs window.
+        sky("#c8b89a", "#8a7a62");
+        ctx.fillStyle = "#4a3e30"; ctx.fillRect(18, 60, 92, 80);
+        ctx.beginPath(); ctx.moveTo(12, 62); ctx.lineTo(64, 28); ctx.lineTo(116, 62); ctx.fill();
+        ctx.fillStyle = "#d8cba8";
+        for (const [x, y] of [[30, 76], [56, 76], [82, 76], [30, 106], [82, 106]]) ctx.fillRect(x, y, 14, 16);
+        smallGhost(ctx, 89, 82, 0.42);
+        ctx.fillStyle = "#3a2e22"; ctx.fillRect(56, 112, 16, 28);
+        break;
+      case "drawing":
+        sky("#fbf6ea", "#f2ead8");
+        ctx.fillStyle = "#f2c94c"; ctx.beginPath(); ctx.arc(100, 30, 14, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#3a6ad0"; ctx.lineWidth = 4;
+        ctx.strokeRect(30, 80, 60, 50);
+        ctx.strokeStyle = "#d8403a"; ctx.beginPath(); ctx.moveTo(24, 82); ctx.lineTo(60, 50); ctx.lineTo(96, 82); ctx.stroke();
+        smallGhost(ctx, 60, 108, 0.5, "#ffffff");
+        break;
+      case "botanical":
+        sky("#f2ead2", "#e6dcc0");
+        ctx.strokeStyle = "#3f7a4a"; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(64, 150); ctx.quadraticCurveTo(60, 90, 66, 40); ctx.stroke();
+        ctx.fillStyle = "#5c9a5a";
+        for (const [x, y, r] of [[52, 110, -0.6], [78, 96, 0.6], [50, 76, -0.5], [80, 62, 0.5]] as const) {
+          ctx.save(); ctx.translate(x, y); ctx.rotate(r); ctx.beginPath(); ctx.ellipse(0, 0, 16, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        }
+        ctx.fillStyle = "#d86a8a";
+        for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.ellipse(66 + Math.cos(i) * 9, 34 + Math.sin(i) * 9, 7, 5, i, 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = "#f2c94c"; ctx.beginPath(); ctx.arc(66, 34, 5, 0, Math.PI * 2); ctx.fill();
+        break;
+      case "keys":
+        // A little key board: one hook still holds a key tagged 206.
+        sky("#6a4630", "#4a3020");
+        ctx.fillStyle = "#c9a24a";
+        for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(26 + i * 25, 46, 4, 0, Math.PI * 2); ctx.fill(); }
+        ctx.strokeStyle = "#e8c66a"; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(101, 66, 9, 0, Math.PI * 2); ctx.moveTo(101, 75); ctx.lineTo(101, 108); ctx.moveTo(101, 96); ctx.lineTo(110, 96); ctx.moveTo(101, 104); ctx.lineTo(108, 104); ctx.stroke();
+        ctx.fillStyle = "#f2ead8"; ctx.fillRect(84, 112, 34, 20);
+        ctx.fillStyle = "#3a2410"; ctx.font = "bold 15px serif"; ctx.textAlign = "center"; ctx.fillText("206", 101, 127);
+        ctx.fillStyle = "#f2ead8"; ctx.font = "bold 14px serif"; ctx.fillText("KEYS", 64, 26);
+        break;
+      case "painting206":
+        // A door marked 206, open a crack; a soft glow and a smiling face inside.
+        sky("#2a2448", "#4a3a6a");
+        ctx.fillStyle = "#6b3d2a"; ctx.fillRect(34, 40, 60, 110);
+        ctx.fillStyle = "#ffe6a0"; ctx.fillRect(84, 44, 8, 102);
+        smallGhost(ctx, 82, 86, 0.36, "#fff8e0");
+        ctx.fillStyle = "#c9a24a"; ctx.font = "bold 14px serif"; ctx.textAlign = "center"; ctx.fillText("206", 60, 64);
+        break;
+      case "mirror": {
+        const g = ctx.createLinearGradient(0, 0, 128, 160);
+        g.addColorStop(0, "#c8d4e8"); g.addColorStop(0.5, "#8a98b8"); g.addColorStop(1, "#5a6688");
+        ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 160);
+        ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.beginPath(); ctx.moveTo(18, 140); ctx.lineTo(60, 20); ctx.lineTo(74, 20); ctx.lineTo(32, 140); ctx.fill();
+        break;
+      }
+      case "faded":
+        // A portrait faded almost to nothing: a kind face, a hat.
+        sky("#9a8e86", "#7a6e68");
+        ctx.fillStyle = "rgba(240,232,220,0.55)";
+        ctx.beginPath(); ctx.arc(64, 70, 26, 0, Math.PI * 2); ctx.fill();
+        ctx.fillRect(34, 96, 60, 64);
+        ctx.fillStyle = "rgba(60,50,48,0.35)"; ctx.fillRect(40, 38, 48, 8); ctx.fillRect(50, 18, 28, 22);
+        break;
+      case "photo206":
+        // The key clue: Pip the friendly ghost waving from the window of Room 206.
+        sky("#e8dcc0", "#c8b898");
+        ctx.fillStyle = "#4a3a6a"; ctx.fillRect(22, 26, 84, 84);
+        ctx.fillStyle = "#e8c66a"; ctx.fillRect(22, 66, 84, 4); ctx.fillRect(62, 26, 4, 84);
+        smallGhost(ctx, 64, 74, 1.15);
+        ctx.fillStyle = "#3a2410"; ctx.font = "bold 16px serif"; ctx.textAlign = "center"; ctx.fillText("Pip · 206", 64, 136);
+        break;
+      case "note":
+        sky("#f6efd8", "#ece2c4");
+        ctx.fillStyle = "#b03a2a"; ctx.beginPath(); ctx.arc(64, 14, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#3a2c20"; ctx.font = "bold 20px serif"; ctx.textAlign = "center";
+        ctx.fillText("Shh!", 64, 52);
+        ctx.font = "15px serif";
+        ctx.fillText("Our friend", 64, 82); ctx.fillText("in 206", 64, 102); ctx.fillText("sleeps all day.", 64, 122);
+        break;
+    }
+    return finish(key, c);
+  });
+}

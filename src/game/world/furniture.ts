@@ -1,5 +1,6 @@
 import type { Prep, RoomId, Rot } from "../types";
 import type { KindId } from "./kinds";
+import { GUEST_INFO, WING, guestBounds, type GuestRoomId } from "./rooms";
 
 export type Side = "left" | "right" | "front";
 
@@ -21,9 +22,14 @@ export interface Placement {
   spots?: SpotRule[];
   /** Builder variant (colour/style). */
   variant?: string;
-  /** Not a hiding place but something to switch on (the bathroom fan). */
-  action?: "fan";
+  /** Not a hiding place but something to use: the bathroom fan, or a Guest Wing clue to read. */
+  action?: "fan" | "note";
+  /** Which Guest Wing clue (action "note"). */
+  note?: WingNoteId;
 }
+
+/** The optional Guest Wing mystery's clues ("Who stayed in Room 206?"). */
+export type WingNoteId = "register" | "note201" | "suitcase202" | "photo203" | "key204" | "painting205" | "photo206";
 
 const ON: SpotRule = { prep: "on" };
 const UNDER: SpotRule = { prep: "under" };
@@ -35,6 +41,132 @@ const by = (side: Side): SpotRule => ({ prep: "by", side });
  * preposition (not just its noun) decides where to look. Positions are
  * checked by spots.test.ts (geometry, nearest object, reachability).
  */
+// ------------------------------------------------------------- guest wing
+
+/** A guest-room placement in the "north" frame: u from the room's west wall line, z as in a north room. */
+type GuestItem = Omit<Placement, "id" | "room" | "x" | "z"> & { key: string; u: number; z: number };
+const ROT_MIRROR: Record<Rot, Rot> = { 0: 180, 90: 90, 180: 0, 270: 270 };
+const SIDE_MIRROR: Record<Side, Side> = { left: "right", right: "left", front: "front" };
+
+/**
+ * Each room is laid out once as if it were north of the corridor (door wall at z = -1.3, window
+ * wall at z = -6.3). South rooms (202, 204, 206) are the mirror image: z flips, a front facing
+ * +z faces -z, and a "by" ghost keeps to the same world side by swapping left and right.
+ */
+function guestRoom(id: GuestRoomId, items: GuestItem[]): Placement[] {
+  const b = guestBounds(id);
+  const north = GUEST_INFO[id].north;
+  return items.map(({ key, u, z, ...item }) => ({
+    ...item,
+    id: `${id}.${key}`,
+    room: id,
+    x: b.x0 + u,
+    z: north ? z : -z,
+    rot: north ? item.rot : ROT_MIRROR[item.rot],
+    spots: north ? item.spots : item.spots?.map((rule) => (rule.side ? { ...rule, side: SIDE_MIRROR[rule.side] } : rule))
+  }));
+}
+
+// Shared pieces of the guest-room plan (north frame; 5 x 5 m rooms, door centred on the corridor wall).
+const WINDOW_AT = { u: 2.5, z: -6.2 };
+const g = {
+  window: (): GuestItem => ({ key: "window", kind: "window", ...WINDOW_AT, rot: 0, noun: "window", spots: [by("right"), UNDER] }),
+  /** Headboard against the west wall, by the window wall. */
+  bed: (variant: string): GuestItem => ({ key: "bed", kind: "bed", u: 1.2, z: -4.6, rot: 90, noun: "bed", variant, spots: [ON, UNDER, by("left")] }),
+  desk: (variant: string): GuestItem => ({ key: "desk", kind: "desk", u: 4.54, z: -4.0, rot: 270, noun: "desk", variant, spots: [ON, UNDER, by("left")] }),
+  /** In the corner beside the door (the door swings the other way). */
+  corner: (key: string, noun: string, variant: string): GuestItem => ({ key, kind: "box", u: 4.59, z: -1.95, rot: 270, noun, variant, spots: [IN, ON, by("front")] }),
+  wardrobe: (variant?: string): GuestItem => ({ key: "wardrobe", kind: "wardrobe", u: 0.4, z: -2.2, rot: 90, variant }),
+  lamp: (): GuestItem => ({ key: "lamp", kind: "walllamp", u: 4.9, z: -5.3, rot: 270 }),
+  frame: (key: string, variant: string, u: number, z: number, rot: Rot, note?: WingNoteId): GuestItem =>
+    ({ key, kind: "frame", u, z, rot, variant, ...(note ? { action: "note" as const, note } : {}) })
+};
+
+const GUEST_PLACEMENTS: Placement[] = [
+  // 201 - The Tidy Room: everything in its place.
+  ...guestRoom("g201", [
+    g.window(), g.bed("tidy"), g.desk("tidy"), g.corner("suitcase", "suitcase", "suitcase"), g.wardrobe(),
+    { key: "nightstand", kind: "nightstand", u: 0.4, z: -5.85, rot: 90 },
+    { key: "rug", kind: "rug", u: 2.7, z: -3.9, rot: 0, variant: "guest" },
+    g.frame("landscape", "landscape", 0.1, -4.6, 90),
+    g.frame("note", "note", 4.9, -4.0, 270, "note201"),
+    g.lamp()
+  ]),
+  // 202 - The Traveler's Room: someone left in a hurry.
+  ...guestRoom("g202", [
+    g.window(), g.bed("rumpled"), g.desk("writing"),
+    { key: "trunk", kind: "box", u: 2.71, z: -3.6, rot: 90, noun: "trunk", variant: "trunk", spots: [IN, ON, by("front")] },
+    { key: "coats", kind: "coatrack", u: 0.4, z: -2.0, rot: 90 },
+    { key: "case", kind: "opencase", u: 4.45, z: -2.0, rot: 270, action: "note", note: "suitcase202" },
+    { key: "rug", kind: "rug", u: 2.4, z: -3.2, rot: 0, variant: "travel" },
+    g.frame("map", "map", 0.1, -4.6, 90),
+    g.lamp()
+  ]),
+  // 203 - The Family Room: two small beds, toys, a colourful rug.
+  ...guestRoom("g203", [
+    g.window(),
+    { key: "redbed", kind: "smallbed", u: 1.05, z: -5.05, rot: 90, noun: "red bed", variant: "red", spots: [ON, UNDER] },
+    { key: "bluebed", kind: "smallbed", u: 1.05, z: -3.3, rot: 90, noun: "blue bed", variant: "blue", spots: [ON, UNDER, by("front")] },
+    { key: "toybox", kind: "box", u: 4.59, z: -4.6, rot: 270, noun: "toy box", variant: "abc", spots: [IN, ON, by("front")] },
+    { key: "desk", kind: "desk", u: 4.54, z: -2.7, rot: 270, noun: "desk", variant: "kids", spots: [ON, UNDER] },
+    { key: "teddy", kind: "teddy", u: 0.5, z: -1.85, rot: 90 },
+    { key: "books", kind: "bookpile", u: 3.6, z: -1.75, rot: 0 },
+    { key: "rug", kind: "playrug", u: 2.7, z: -3.9, rot: 0 },
+    g.frame("photo", "family", 4.9, -3.65, 270, "photo203"),
+    g.frame("drawing", "drawing", 0.1, -4.2, 90),
+    g.lamp()
+  ]),
+  // 204 - The Garden Room: flowers, plants and moonlight.
+  ...guestRoom("g204", [
+    g.window(), g.bed("floral"),
+    { key: "table", kind: "kidtable", u: 3.7, z: -4.4, rot: 0, noun: "table", variant: "garden", spots: [ON, UNDER, by("front")] },
+    g.corner("suitcase", "suitcase", "suitcasegreen"), g.wardrobe("light"),
+    { key: "plant1", kind: "pot", u: 0.4, z: -5.95, rot: 0, variant: "fern" },
+    { key: "plant2", kind: "pot", u: 4.6, z: -5.95, rot: 0, variant: "flowers" },
+    { key: "rug", kind: "rug", u: 2.6, z: -3.9, rot: 0, variant: "garden" },
+    g.frame("botanical1", "botanical", 0.1, -4.6, 90),
+    g.frame("key", "keys", 4.9, -3.2, 270, "key204"),
+    g.lamp()
+  ]),
+  // 205 - The Old-Fashioned Room: antique bed, rocking chair, a tall clock.
+  ...guestRoom("g205", [
+    g.window(), g.bed("antique"), g.desk("writing"),
+    { key: "clock", kind: "clock", u: 4.65, z: -1.85, rot: 270, noun: "clock", spots: [IN, by("front")] },
+    { key: "rocker", kind: "rockingchair", u: 0.6, z: -2.1, rot: 90, noun: "rocking chair", spots: [ON, by("right")] },
+    { key: "rug", kind: "rug", u: 2.6, z: -3.9, rot: 0, variant: "antique" },
+    g.frame("painting", "painting206", 0.1, -4.6, 90, "painting205"),
+    g.frame("mirror", "mirror", 4.9, -5.3, 270),
+    { key: "lamp", kind: "walllamp", u: 4.9, z: -3.2, rot: 270 }
+  ]),
+  // 206 - The Forgotten Room: dust sheets, a faded portrait and a lamp that flickers.
+  ...guestRoom("g206", [
+    g.window(), g.bed("dusty"), g.desk("dusty"), g.corner("trunk", "trunk", "oldtrunk"), g.wardrobe("dusty"),
+    { key: "lamp", kind: "floorlamp", u: 0.35, z: -5.95, rot: 0 },
+    g.frame("portrait", "faded", 0.1, -4.6, 90),
+    g.frame("photo", "photo206", 4.9, -4.0, 270, "photo206")
+  ])
+];
+
+/** The corridor: runner, wall lamps, paintings, a clock, the guest register and a window at the end. */
+const HALL_PLACEMENTS: Placement[] = [
+  { id: "guesthall.runner1", kind: "runner", room: "guesthall", x: -11.6, z: 0, rot: 0, variant: "guest" },
+  { id: "guesthall.runner2", kind: "runner", room: "guesthall", x: -18.2, z: 0, rot: 0, variant: "guest" },
+  // Midway between the 201 and 203 doors, so E at a door opens the door rather than the book.
+  { id: "guesthall.register", kind: "register", room: "guesthall", x: -13.0, z: -0.95, rot: 0, action: "note", note: "register" },
+  { id: "guesthall.clock", kind: "clock", room: "guesthall", x: -18.0, z: 0.95, rot: 180 },
+  { id: "guesthall.table2", kind: "sidetable", room: "guesthall", x: -13.0, z: 0.95, rot: 180 },
+  { id: "guesthall.painting1", kind: "painting", room: "guesthall", x: -13.0, z: -1.2, rot: 0, variant: "b" },
+  { id: "guesthall.painting2", kind: "painting", room: "guesthall", x: -13.0, z: 1.2, rot: 180, variant: "a" },
+  { id: "guesthall.painting3", kind: "painting", room: "guesthall", x: -18.0, z: -1.2, rot: 0, variant: "b" },
+  { id: "guesthall.window", kind: "window", room: "guesthall", x: WING.x0 + 0.1, z: 0, rot: 90 },
+  { id: "guesthall.plant1", kind: "pot", room: "guesthall", x: -22.65, z: -0.95, rot: 0, variant: "fern" },
+  { id: "guesthall.plant2", kind: "pot", room: "guesthall", x: -22.65, z: 0.95, rot: 0, variant: "fern" },
+  ...[-12.3, -17.7, -21.9].flatMap((x, i): Placement[] => [
+    { id: `guesthall.lampN${i}`, kind: "walllamp", room: "guesthall", x, z: WING.hall.z0 + 0.1, rot: 0 },
+    { id: `guesthall.lampS${i}`, kind: "walllamp", room: "guesthall", x, z: WING.hall.z1 - 0.1, rot: 180 }
+  ])
+];
+
 export const PLACEMENTS: Placement[] = [
   // ---------------------------------------------------------------- bedroom
   { id: "bedroom.bed", kind: "bed", room: "bedroom", x: -6.0, z: -9.75, rot: 0, noun: "bed", spots: [ON, UNDER, by("right")] },
@@ -168,7 +300,8 @@ export const PLACEMENTS: Placement[] = [
   // ---------------------------------------------------------------- landing
   { id: "landing.balustrade", kind: "balustrade", room: "landing", x: 5.0, z: 0, rot: 0 },
   { id: "landing.runner", kind: "runner", room: "landing", x: -3.4, z: 0, rot: 0 },
-  { id: "landing.window", kind: "window", room: "landing", x: -7.9, z: 0, rot: 90 },
+  // Moved from the west wall (now the Guest Wing doors) to the east wall, facing the top of the stairs.
+  { id: "landing.window", kind: "window", room: "landing", x: 7.9, z: 0, rot: 270 },
   { id: "landing.bench", kind: "bench", room: "landing", x: -0.6, z: -3.6, rot: 0 },
   { id: "landing.side", kind: "sidetable", room: "landing", x: -0.6, z: 3.55, rot: 180 },
   { id: "landing.plant1", kind: "plant", room: "landing", x: -7.35, z: -3.35, rot: 0 },
@@ -177,5 +310,8 @@ export const PLACEMENTS: Placement[] = [
   { id: "landing.plant4", kind: "plant", room: "landing", x: 7.35, z: 3.35, rot: 0 },
   { id: "landing.painting1", kind: "painting", room: "landing", x: -6.2, z: -3.9, rot: 0, variant: "b" },
   { id: "landing.painting2", kind: "painting", room: "landing", x: -1.9, z: 3.9, rot: 180, variant: "a" },
-  { id: "landing.chandelier", kind: "chandelier", room: "landing", x: -3.4, z: 0, rot: 0, variant: "small" }
+  { id: "landing.chandelier", kind: "chandelier", room: "landing", x: -3.4, z: 0, rot: 0, variant: "small" },
+  // ============================================================ guest wing
+  ...HALL_PLACEMENTS,
+  ...GUEST_PLACEMENTS
 ];

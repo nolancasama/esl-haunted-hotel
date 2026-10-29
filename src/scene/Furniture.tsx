@@ -16,6 +16,8 @@ import { getHideSeek } from "../game/hideSeek/session";
 import { hidingViewFor } from "../game/hideSeek/views";
 import type { MatchState } from "../game/hideSeek/types";
 import { hsCam } from "./HideSeekCamera";
+import { inGuestWing } from "../game/world/rooms";
+import { nearGuestWing } from "./wallFade";
 
 const HIGHLIGHT = new THREE.Color("#8f7bff");
 const HELP = new THREE.Color("#ffd36b");
@@ -102,6 +104,7 @@ function FurnitureItem({ obj, hideSeek = false }: { obj: WorldObject; hideSeek?:
   const glow = useRef(0);
   const fanSpin = useRef(0);
   const wobble = WOBBLE[obj.kind] ?? "shake";
+  const wing = inGuestWing(obj.room);
   const pivotY = PIVOT_Y[obj.kind] ?? 0;
 
   useFrame((_, dt) => {
@@ -109,6 +112,9 @@ function FurnitureItem({ obj, hideSeek = false }: { obj: WorldObject; hideSeek?:
     if (!r) return;
     // Only the floor you are on is drawn (the staircase belongs to both).
     let visible = obj.floor === rt.view.floor || Boolean(obj.spec.bothFloors);
+    // The Guest Wing is only drawn from the west half of the landing or inside it (Chromebook budget).
+    // Down the corridor, only what is within 11 m (the far end is deep in the fog by then).
+    if (visible && wing && !hideSeek) visible = nearGuestWing() && Math.abs(obj.x - rt.player.x) < 11;
     // Things hanging on a wall disappear with it in the cutaway view.
     if (visible && obj.wallLines.length) visible = Math.min(...obj.wallLines.map((id) => lineFade.get(id) ?? 1)) > 0.4;
     r.visible = visible;

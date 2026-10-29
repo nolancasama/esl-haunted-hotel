@@ -206,8 +206,11 @@ function HintBar() {
   let h: { en: string; ja: string } | null = null;
   if (toast === "micBlocked") h = HINT.micBlocked;
   else if (toast === "locked") h = HINT.locked;
+  else if (toast === "wingLocked") h = HINT.wingLocked;
+  else if (toast === "needKey") h = HINT.needKey;
   else if (toast === "fan") h = HINT.fan;
   else if (phase === "explore" && hint === "exit") h = HINT.exit;
+  else if (phase === "explore" && focus && usable === "note") h = touch ? HINT.readTouch : HINT.readKeys;
   else if (phase === "explore" && focus && usable) h = touch ? HINT.fanTouch : HINT.fanKeys;
   else if (phase === "explore" && focus) h = touch ? HINT.searchTouch : HINT.searchKeys;
   else if (phase === "explore" && hint === "goDoor") h = HINT.goDoor;

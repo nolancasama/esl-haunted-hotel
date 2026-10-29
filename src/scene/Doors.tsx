@@ -1,17 +1,18 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { FLOOR_Y, ROOMS, WALL_LINES, WALL_T, doorFit, type DoorDef } from "../game/world/rooms";
+import { FLOOR_Y, GUEST_INFO, ROOMS, WALL_LINES, WALL_T, doorFit, isGuestRoom, type DoorDef } from "../game/world/rooms";
+import { doorAccess } from "../game/guestWing";
 import { BEACON_RADIUS, beaconSpot, hallSide } from "../game/beacon";
 import { rt } from "../game/runtime";
 import { PartBuilder } from "./partBuilder";
-import { iconTexture } from "./textures";
+import { iconTexture, plaqueTexture, signboardTexture } from "./textures";
 import { lineFade } from "./wallFade";
 import { director } from "../game/director";
 import { isCanvasTap } from "../input/tap";
 import { getGame } from "../game/store";
 
-type Style = "plain" | "entrance" | "attic" | "gate";
+type Style = "plain" | "entrance" | "attic" | "gate" | "guest" | "wing";
 
 function panelGeometry(width: number, height: number, mirror: boolean, style: Style): THREE.BufferGeometry {
   const b = new PartBuilder(0.2);
@@ -34,9 +35,21 @@ function panelGeometry(width: number, height: number, mirror: boolean, style: St
     b.torus(0.12, 0.018, [cx, height * 0.5, 0], [0, 0, 0], "#c9a24a");
     return b.build();
   }
-  const wood = style === "entrance" ? "#4f2a1c" : style === "attic" ? "#5a4636" : "#6b3d2a";
-  const panel = style === "entrance" ? "#64372a" : style === "attic" ? "#6e5844" : "#7e4a33";
+  const wood = style === "entrance" ? "#4f2a1c" : style === "attic" ? "#5a4636" : style === "guest" ? "#5a3222" : style === "wing" ? "#43241a" : "#6b3d2a";
+  const panel = style === "entrance" ? "#64372a" : style === "attic" ? "#6e5844" : style === "guest" ? "#6e4030" : style === "wing" ? "#5a3224" : "#7e4a33";
   b.box(width, height, 0.07, cx, 0, 0, wood);
+  if (style === "wing") {
+    // Tall glazed doors with brass rails: frosted panes above, a wooden panel below.
+    for (const z of [0.04, -0.04]) {
+      b.box(width - 0.22, height * 0.46, 0.012, cx, height * 0.44, z, "#a9b6d6");
+      b.box(width - 0.22, 0.03, 0.02, cx, height * 0.66, z, "#d4ad55");
+      b.box(0.03, height * 0.46, 0.02, cx, height * 0.44, z, "#d4ad55");
+      b.box(width - 0.26, height * 0.26, 0.02, cx, 0.14, z, panel);
+    }
+    b.box(0.03, 0.5, 0.03, mirror ? -width + 0.1 : width - 0.1, 0.8, 0.07, "#d4ad55");
+    b.box(0.03, 0.5, 0.03, mirror ? -width + 0.1 : width - 0.1, 0.8, -0.07, "#d4ad55");
+    return b.build();
+  }
   if (style === "attic") {
     // weathered vertical planks, iron straps, a little round window
     for (let i = 1; i < 4; i++) b.box(0.015, height, 0.075, x0 + (i * width) / 4, 0, 0, "#3e3024");
@@ -47,6 +60,12 @@ function panelGeometry(width: number, height: number, mirror: boolean, style: St
     for (const y of [0.25, height * 0.55]) {
       b.box(width - 0.3, height * 0.36, 0.02, cx, y, 0.04, panel);
       b.box(width - 0.3, height * 0.36, 0.02, cx, y, -0.04, panel);
+    }
+    if (style === "guest") {
+      // brass kick plates and a little peephole
+      b.box(width - 0.1, 0.16, 0.012, cx, 0.02, 0.042, "#b8923f");
+      b.box(width - 0.1, 0.16, 0.012, cx, 0.02, -0.042, "#b8923f");
+      b.cyl(0.018, 0.018, 0.09, cx, 1.55, 0, "#d4ad55", 8);
     }
   }
   b.sphere(0.05, knobX, 1.0, 0.07, style === "attic" ? "#8a8494" : "#d4ad55");
@@ -69,7 +88,7 @@ function frameGeometry(width: number, height: number, style: Style): THREE.Buffe
     return b.build();
   }
   const t = WALL_T + 0.08;
-  const col = style === "attic" ? "#7a6450" : "#c9b28c";
+  const col = style === "attic" ? "#7a6450" : style === "guest" || style === "wing" ? "#3e2418" : "#c9b28c";
   b.box(0.12, height + 0.1, t, -0.04, 0, 0, col);
   b.box(0.12, height + 0.1, t, width + 0.04, 0, 0, col);
   b.box(width + 0.2, 0.12, t, width / 2, height, 0, col);
@@ -99,6 +118,14 @@ export function Door({ door }: { door: DoorDef }) {
     []
   );
   const lineId = useMemo(() => WALL_LINES.find((l) => l.openings?.some((o) => o.door === door.id))?.id ?? "", [door.id]);
+  // Guest rooms: a brass number on the corridor side, above the door. The wing: GUEST ROOMS on the landing side.
+  const label = useMemo(() => {
+    if (style === "guest" && isGuestRoom(door.id)) {
+      return new THREE.MeshBasicMaterial({ map: plaqueTexture(String(GUEST_INFO[door.id].number)), transparent: true, toneMapped: false });
+    }
+    if (style === "wing") return new THREE.MeshBasicMaterial({ map: signboardTexture("GUEST ROOMS"), transparent: true, toneMapped: false });
+    return null;
+  }, [style, door.id]);
   const rotY = door.axis === "x" ? 0 : -Math.PI / 2;
   const base = FLOOR_Y[door.floor];
   const origin: [number, number, number] = door.axis === "x" ? [door.from, base, door.at] : [door.at, base, door.from];
@@ -125,13 +152,15 @@ export function Door({ door }: { door: DoorDef }) {
     const o = onFloor ? (lineId ? lineFade.get(lineId) ?? 1 : 1) : 0;
     mat.opacity = o;
     mat.depthWrite = o > 0.98;
+    if (label) label.opacity = o;
     if (root.current) root.current.visible = o > 0.02;
     if (lock.current) {
       // Sprites face the camera: keep the whole billboard proud of the visible
       // door face, including when the entrance is viewed from outside.
       const cameraSide = door.axis === "x" ? rt.camera.pos.z - door.at : door.at - rt.camera.pos.x;
       lock.current.position.z = (Math.sign(cameraSide) || Math.sign(lockLocalZ)) * 0.38;
-      const locked = !open && angle.current < 0.02;
+      // Doors the student opens by hand only show the padlock while they are really locked.
+      const locked = !open && angle.current < 0.02 && doorAccess(door.id) !== "open";
       lock.current.visible = locked;
       lockMat.opacity = o * (0.75 + Math.sin(rt.time * 3) * 0.2);
     }
@@ -151,6 +180,18 @@ export function Door({ door }: { door: DoorDef }) {
         <group ref={(g) => void (hinges.current[1] = g)} position={[width, 0, 0]}>
           <mesh geometry={leaves[1]} material={mat} />
         </group>
+      )}
+      {label && style === "guest" && (
+        // Local +z is world +z (axis-x doors): the corridor is on the far side from the room.
+        <mesh material={label} position={[width / 2, head + 0.24, -roomSide * (WALL_T / 2 + 0.05)]} rotation={[0, roomSide > 0 ? Math.PI : 0, 0]}>
+          <planeGeometry args={[0.42, 0.21]} />
+        </mesh>
+      )}
+      {label && style === "wing" && (
+        // Axis-z door: local -z is world +x, the landing side.
+        <mesh material={label} position={[width / 2, head + 0.33, -(WALL_T / 2 + 0.05)]} rotation={[0, Math.PI, 0]}>
+          <planeGeometry args={[1.9, 0.42]} />
+        </mesh>
       )}
       <sprite
         ref={lock}

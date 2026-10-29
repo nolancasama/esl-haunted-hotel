@@ -6,6 +6,7 @@
 
 /** Japanese for Boo's story and encouragement lines, keyed by the English. */
 export const LINE_JA: Record<string, string> = {
+  "Look! A friendly ghost lived here!": "みて！ やさしい おばけが ここに すんでいたんだ！",
   "Find the ghost!": "おばけを みつけよう！",
   "Oh no! Four ghosts are hiding!": "たいへん！ おばけが 4ひき かくれているよ！",
   "Find the four ghosts!": "4ひきの おばけを みつけよう！",
@@ -58,6 +59,10 @@ export const HINT = {
   fanKeys: { en: "E: turn on the fan", ja: "E キーで かんきせんを つける" },
   fanTouch: { en: "Tap 🔍 to turn on the fan", ja: "🔍 を タップして かんきせんを つける" },
   locked: { en: "Locked!", ja: "まだ あかないよ" },
+  wingLocked: { en: "Locked! Finish Chapter 2 to open the Guest Wing.", ja: "2しょうを クリアすると あくよ" },
+  needKey: { en: "Room 206 is locked. Find the key!", ja: "206ごうしつは しまっている。かぎを さがそう！" },
+  readKeys: { en: "E: look closely", ja: "E キーで よく みる" },
+  readTouch: { en: "Tap 🔍 to look closely", ja: "🔍 を タップして よく みる" },
   cantGo: { en: "Can't go there.", ja: "そこには いけないよ" },
   exit: { en: "Walk out of the door!", ja: "ドアから そとへ でよう！" },
   replay: { en: "Listen again", ja: "もういちど きく" }

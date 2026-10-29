@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { PREPS, type Floor, type RoomId, type Rot, type Vec3 } from "../types";
 import { circleHitsRect, rectContains, rectDistance, rotateXZ } from "./geometry";
 import { GHOST_H, GHOST_R, HAT_FLAT_TOP } from "./kinds";
-import { FLOOR_Y, ROOMS, STAIRS, WALL_T, roomAt } from "./rooms";
+import { FLOOR_Y, GUEST_ROOMS, ROOMS, STAIRS, WALL_T, WING, roomAt } from "./rooms";
 import { WORLD, type HidingSpot, type WorldObject } from "./world";
 import { INTERACT_RANGE, PLAYER_R, PRACTICE_START, STORY_START, UPSTAIRS_START } from "./constants";
 import { collidersFor, floorState, moveBody } from "./collision";
 
 const EPS = 1e-6;
-const GHOST_ROOMS: RoomId[] = ["bedroom", "dining", "storage", "library", "playroom", "bathroom", "music", "attic"];
+const GHOST_ROOMS: RoomId[] = ["bedroom", "dining", "storage", "library", "playroom", "bathroom", "music", "attic", ...GUEST_ROOMS];
 
 function toLocal(obj: WorldObject, p: Vec3): Vec3 {
   const back = ((360 - obj.rot) % 360) as Rot;
@@ -184,8 +184,8 @@ describe("clues are unambiguous", () => {
     }
   });
 
-  it("the lobby and the landing have nothing to search (ghosts hide only in the eight rooms)", () => {
-    expect(WORLD.spots.some((s) => s.room === "lobby" || s.room === "landing")).toBe(false);
+  it("the lobby, the landing and the guest corridor have nothing to search (ghosts hide only in rooms)", () => {
+    expect(WORLD.spots.some((s) => s.room === "lobby" || s.room === "landing" || s.room === "guesthall")).toBe(false);
   });
 
   it("the fan switch is something to use, not a hiding place", () => {
@@ -207,7 +207,8 @@ interface Cell {
  * the top and bottom of the stairs. Returns reachable cell centres.
  */
 function reachable(start: { x: number; z: number }, openDoors: (id: string) => boolean, startFloor: Floor = 0): Cell[] {
-  const b = { x0: -8, x1: 8, z0: -11, z1: 11 };
+  // The whole hotel, including the Guest Wing west of the landing.
+  const b = { x0: WING.x0, x1: 8, z0: -11, z1: 11 };
   const step = 0.1;
   const nx = Math.round((b.x1 - b.x0) / step);
   const nz = Math.round((b.z1 - b.z0) / step);

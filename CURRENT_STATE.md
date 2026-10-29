@@ -1,6 +1,23 @@
 # Current State
 
 ## Status
+**2026-10-29: The Forgotten Guest Wing.** A real upstairs extension west of the landing:
+the landing's west window became the **GUEST ROOMS** double doors (the window moved to the
+east wall, facing the top of the stairs), a 2.6 m corridor runs west to x = -23, and six
+5 x 5 m guest rooms sit three a side (201/203/205 north, 202/204/206 south). The wing
+stands on stone piers over the front path, which is now a dry covered entrance
+(porte-cochère) with the rain kept out. Each room has its own identity (Tidy, Traveler's,
+Family, Garden, Old-Fashioned, Forgotten) and 11–12 hiding spots covering in/on/under/by.
+In the story the wing opens once Chapter 2 is finished; its doors open by hand (tap, E or
+walking into them), and the optional mystery "Who stayed in Room 206?" (register, note,
+suitcase, photo, painting, the 206 key, then a short scene with Pip's photograph) can be
+solved every playthrough. In Hide & Seek, **Guest Wing** is one challenge area with a picker
+for Rooms 201–206; the collection is now 72 (8 ghosts x 9 areas) and old records are kept.
+Typecheck, build, 777 unit tests and every e2e spec pass (see the run below). Claude
+reviewed `.tmp/wing/` (story rooms, corridor, register, mystery, exterior, porch, pickers at
+1024x600 and 844x390) and `.tmp/wing/hideseek/` (all six rooms: overview, close-up question,
+first-person hiding).
+
 **2026-10-28: Hide & Seek HUD redesign.** The full-height left rail is gone. In its place:
 a narrow top-centre bar (ghost, five search pips, Moves n/2, a where-am-I pin), a gear in
 the top right (Settings now holds **Main Menu** during a match, `hs-main-menu`), short
@@ -56,6 +73,40 @@ results) and the door-gap fix. Checked in `node scripts/ui.mjs` screenshots at a
 sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`.tmp/doors`).
 
 ## What Exists
+- **Guest Wing (2026-10-29):** plan in `rooms.ts` (`WING`, `GUEST_ROOMS`, `guestBounds()`,
+  `GUEST_INFO`, generated `wingWalls()` and guest doors, `OPENABLE_DOORS`); room ids
+  `guesthall`, `g201`–`g206` (floor 1). Furniture in `furniture.ts` is laid out once per room
+  in a "north" frame and mirrored for the south rooms (`guestRoom()`); new kinds `smallbed`,
+  `walllamp`, `frame` (pictures, photos, note, key board; flat), `register`, `coatrack`,
+  `opencase`, `pot`; the rocking chair gained an "on" seat; suitcases and trunks are `box`
+  variants (same cavity, so "in" fits the same way). Guest-room furniture is a Hide & Seek
+  hiding place only (`interactive` is false in the story), so nothing in the wing disturbs
+  the hunt. Story logic in `game/guestWing.ts` (`doorAccess`, `WING_NOTES`) and the
+  director (`openByHand`, `tryDoor`, `openWayInto`, `readWingNote`, `wingFinale`,
+  `wingAmbience`: corridor clock tick, floor creaks, camera turns down the corridor);
+  `rt.wing` holds the per-playthrough key/clues; `hh.guestwing.v1` (set when Chapter 2 is
+  finished; older saves with a finished story but no `hh.finish.v2` mark also open it) and
+  `hh.guestwing.mystery.v1` (reward). Clue card `ui/WingNote.tsx`. Doors: brass number
+  plaques on the corridor side, the glazed wing doors with their sign, padlocks only on
+  doors that are really locked. Room 206's lamp flickers softly; the corridor's light follows
+  the player. Exterior: piers, beams and ceiling in `Outside.tsx` (`coveredEntrance`), trees
+  moved out, rain masks and drip-line splashes in `Rain.tsx`.
+- **Rendering budget (2026-10-29):** wall pieces are merged per wall line (one mesh, three
+  material groups; `lineView()` in `Hotel.tsx`), which cut draw calls in the original areas
+  (landing east 170→106, bathroom 135→84, playroom 132→87). The wing is drawn only from
+  the landing's west half or inside it, and wing furniture only within 11 m along the
+  corridor; busiest view (corridor) ~270 calls, a guest room ~180.
+- **Hide & Seek in the wing:** `PLAY_ROOMS` / `CHALLENGE_AREAS` in `records.ts` (Guest Wing =
+  one area, `rooms: GUEST_ROOMS`; informational per-room wins in `hh.hideseek.guestrooms.v1`,
+  outside the total). Selection: `hs-area-guestwing` → `hs-guest-select` (Back returns to the
+  room list). The overview camera's nearest distance scales with the room; in Hide & Seek
+  any wall between the camera and the room's middle is cut away. Navigation blockers are
+  limited to colliders near the room. Balance holds over 14 rooms (sensible 47–80%).
+- **Wing tests:** `tests/e2e/wing.spec.ts` (locked before Chapter 2; doors open by hand;
+  every room entered by keyboard; 206 needs the key; register, key and the mystery scene),
+  Guest Wing selection + per-room close-up/first-person checks in `hideseek.spec.ts`, records
+  (72, one record for six rooms, an old 64-entry book intact), spot/geometry/reachability
+  tests over all 14 rooms. Hooks: `wing()`, `unlockWing()`.
 - **UI design system (2026-10-19):** tokens and shared classes at the top of `src/styles.css`
   (`.panel`, `.btn-primary`/`.btn-secondary` aliased to `primary`/`secondary`, `.icon-btn`,
   `.ghost-medallion`, word tiles, switches, sliders). System serif display font only.
@@ -168,6 +219,11 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
   the old entrance shot that faded the player out during the reaction.
 
 ## Known Issues
+- Guest Wing: software rendering (SwiftShader) shows the mystery scene's camera mid-blend in
+  screenshots because frames are slow; on real hardware it settles in under a second. Not
+  yet heard on speakers: the corridor clock tick and floor creaks. Old saves that finished
+  only Chapter 1 before this update find the wing open too (they cannot be told apart).
+- At 844x390 the Hide & Seek room list scrolls to reach the Guest Wing card.
 - `beacon.spec.ts` "backwards input cancels…" failed once in a full e2e run (2026-10-19:
   the player ended 0.2 m deeper than the ~1 m entry allows, W held under SwiftShader
   load) and passed the other three times, alone and in a full run. A timing flake in
@@ -184,6 +240,8 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
   because `jump` skips the earlier answers.
 
 ## Next Steps
+00. On a real Chromebook: walk the Guest Wing (frame rate in the corridor, the camera in the
+   narrow corridor and rooms, door taps by touch) and solve the 206 mystery with a student.
 0. On a real Chromebook: listen to the heartbeat and footsteps (loudness against the
    detective's speech, 62/124 Hz thump on small speakers) and check first-person frame rate
    and drag-to-look by touch. Tuning is in `audio/heartbeat.ts` and `thump()` in `audio.ts`.

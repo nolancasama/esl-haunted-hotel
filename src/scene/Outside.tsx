@@ -6,6 +6,7 @@ import { PartBuilder } from "./partBuilder";
 import { glowPartMaterial, glowSpriteMaterial } from "./materials";
 import { beamTexture, glowTexture } from "./textures";
 import { Rain } from "./Rain";
+import { WALL_T, WING_RECT } from "../game/world/rooms";
 import { director } from "../game/director";
 import { isCanvasTap } from "../input/tap";
 
@@ -57,8 +58,9 @@ function porchGeometry(): THREE.BufferGeometry {
     b.sphere(s, x, s * 0.7, z, "#2f5a34", [1.3, 1, 1.3], 10);
   }
   for (const [x, z] of [
-    [-14.5, -4.5],
-    [-15.5, 4.2],
+    // (clear of the covered entrance under the Guest Wing)
+    [-14.5, -9.2],
+    [-16.5, 8.8],
     [-2.0, -16.0],
     [4.8, -15.4],
     [-5.5, 15.6],
@@ -72,7 +74,43 @@ function porchGeometry(): THREE.BufferGeometry {
   }
   // sign above the entrance (outside face)
   b.box(0.08, 0.5, 2.6, -8.16, 2.25, 0, "#3a2418");
+  coveredEntrance(b);
   return b.build();
+}
+
+/**
+ * The Guest Wing stands on stone piers over the front path: a covered entrance (porte-cochère).
+ * Piers at the outer corners and between the rooms, beams along the edges, and a panelled
+ * ceiling just under the wing's floor. The ground floor gains no rooms.
+ */
+function coveredEntrance(b: PartBuilder) {
+  const w = WING_RECT;
+  const t = WALL_T / 2;
+  const x0 = w.x0 - t;
+  const x1 = w.x1 - t;
+  const stone = "#544c62";
+  const cap = "#6a6278";
+  const beam = "#3a2a2e";
+  const top = 2.62;
+  for (const x of [w.x0 + 0.15, -18, -13, w.x1 - 0.35]) {
+    for (const z of [w.z0 + 0.15, w.z1 - 0.15]) {
+      b.box(0.5, 0.12, 0.5, x, 0, z, cap);
+      b.box(0.42, top - 0.3, 0.42, x, 0.12, z, stone);
+      b.box(0.52, 0.18, 0.52, x, top - 0.18, z, cap);
+    }
+  }
+  // A pair of piers framing the end of the path at the far end.
+  for (const z of [-1.7, 1.7]) {
+    b.box(0.5, 0.12, 0.5, w.x0 + 0.15, 0, z, cap);
+    b.box(0.42, top - 0.3, 0.42, w.x0 + 0.15, 0.12, z, stone);
+    b.box(0.52, 0.18, 0.52, w.x0 + 0.15, top - 0.18, z, cap);
+  }
+  // Beams along the three open sides, and the ceiling (its top just under the wing's floor).
+  b.box(x1 - x0, 0.2, 0.34, (x0 + x1) / 2, top - 0.02, w.z0 + 0.12, beam);
+  b.box(x1 - x0, 0.2, 0.34, (x0 + x1) / 2, top - 0.02, w.z1 - 0.12, beam);
+  b.box(0.34, 0.2, w.z1 - w.z0, w.x0 + 0.12, top - 0.02, 0, beam);
+  b.box(x1 - x0, 0.03, w.z1 - w.z0 + 2 * t, (x0 + x1) / 2, 2.765, 0, "#2e2230");
+  for (let x = w.x0 + 1.5; x < w.x1 - 0.5; x += 1.5) b.box(0.08, 0.06, w.z1 - w.z0, x, 2.705, 0, beam);
 }
 
 function lampGlowGeometry(): THREE.BufferGeometry {

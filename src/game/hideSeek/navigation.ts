@@ -46,7 +46,9 @@ function gridFor(room: PlayRoom): Grid {
   const { bounds, floor } = ROOMS[room];
   const grid: Grid = {
     bounds,
-    blockers: WORLD.colliders.filter(c => c.floor === floor || c.floor === "all").map(c => c.rect),
+    // Only what can touch this room (its walls, door and furniture): the floor holds other rooms too.
+    blockers: WORLD.colliders.filter(c => (c.floor === floor || c.floor === "all") &&
+      c.rect.x1 > bounds.x0 - 1 && c.rect.x0 < bounds.x1 + 1 && c.rect.z1 > bounds.z0 - 1 && c.rect.z0 < bounds.z1 + 1).map(c => c.rect),
     nodes: []
   };
   const cells = new Map<string, number>();

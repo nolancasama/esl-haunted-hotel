@@ -1,5 +1,5 @@
 import { GHOST_ORDER } from "../ghosts";
-import { ROOMS } from "../world/rooms";
+import { GUEST_ROOMS, ROOMS } from "../world/rooms";
 import type { GhostId } from "../types";
 import type { MatchState, PlayRoom } from "./types";
 
@@ -13,8 +13,13 @@ export const CHALLENGE_AREAS: readonly ChallengeArea[] = [
   { id: "playroom", name: ROOMS.playroom.name, rooms: ["playroom"] },
   { id: "bathroom", name: ROOMS.bathroom.name, rooms: ["bathroom"] },
   { id: "music", name: ROOMS.music.name, rooms: ["music"] },
-  { id: "attic", name: ROOMS.attic.name, rooms: ["attic"] }
+  { id: "attic", name: ROOMS.attic.name, rooms: ["attic"] },
+  // Six similar bedrooms count as one area: a win in any of Rooms 201-206 completes it for that ghost.
+  { id: "guestwing", name: "Guest Wing", rooms: GUEST_ROOMS }
 ] as const;
+
+/** Every room a match can be played in, in menu order. */
+export const PLAY_ROOMS: readonly PlayRoom[] = CHALLENGE_AREAS.flatMap((area) => area.rooms);
 
 export const RECORDS_STORAGE_KEY = "hh.hideseek.records.v1";
 export const ACHIEVEMENTS = {
@@ -117,7 +122,7 @@ export function collectionMilestones(book: CompletionBook): string[] {
   for (const ghost of GHOST_ORDER)
     if (CHALLENGE_AREAS.length && ghostCompleted(book, ghost) === CHALLENGE_AREAS.length) found.push(`specialist:${ghost}`);
   if (GHOST_ORDER.every((ghost) => ghostCompleted(book, ghost) > 0)) found.push("ghostMaster");
-  // Exploring means visiting each area with at least one ghost, not mastering all 64 combinations.
+  // Exploring means visiting each area with at least one ghost, not mastering every combination.
   if (CHALLENGE_AREAS.length && CHALLENGE_AREAS.every((area) => GHOST_ORDER.some((ghost) => Boolean(book.entries[recordKey(ghost, area.id)])))) found.push("hotelExplorer");
   if (progress.total && progress.completed === progress.total) found.push("hotelMaster");
   return found;
@@ -152,16 +157,38 @@ export function recordVictory(match: MatchState): VictoryRecordResult | null {
   const newMilestones = collectionMilestones(book).filter((id) => !book.milestones.includes(id));
   book.milestones.push(...newMilestones);
   const saved = writeBook(book);
+  noteGuestRoomWin(match.config.room);
   const result = { saved, firstCompletion, newAchievements, newMilestones, personalBest,
     progress: collectionProgress(book) };
   processed.set(match, result);
   return result;
 }
 
+/**
+ * Which guest rooms have been won in, for information only: kept apart from the completion book
+ * so it never changes the collection total.
+ */
+export const GUEST_WINS_KEY = "hh.hideseek.guestrooms.v1";
+export function loadGuestRoomWins(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(globalThis.localStorage.getItem(GUEST_WINS_KEY) ?? "[]");
+    return Array.isArray(parsed) ? GUEST_ROOMS.filter((room) => parsed.includes(room)) : [];
+  } catch { return []; }
+}
+function noteGuestRoomWin(room: PlayRoom) {
+  if (!(GUEST_ROOMS as readonly string[]).includes(room)) return;
+  try {
+    const wins = new Set(loadGuestRoomWins());
+    wins.add(room);
+    globalThis.localStorage.setItem(GUEST_WINS_KEY, JSON.stringify(GUEST_ROOMS.filter((r) => wins.has(r))));
+  } catch { /* information only */ }
+}
+
 /** Clears only Hide & Seek records. Story unlocks and settings are untouched. */
 export function resetCompletionBook(): boolean {
   try {
     globalThis.localStorage.removeItem(RECORDS_STORAGE_KEY);
+    globalThis.localStorage.removeItem(GUEST_WINS_KEY);
     return true;
   } catch { return false; }
 }

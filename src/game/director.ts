@@ -5,7 +5,9 @@ import {
   EMPTY_ANSWER,
   getGame,
   saveCh2Unlocked,
+  saveGuestWingUnlocked,
   saveReplayUnlocked,
+  saveWingMysterySolved,
   saveSettings,
   setGame,
   type AnswerUi,
@@ -25,7 +27,8 @@ import { turnDelta } from "./logic/startle";
 import { WORLD, type HidingSpot, type WorldObject } from "./world/world";
 import { INTERACT_RANGE, OUTSIDE, PRACTICE_START, STAIRS_FOOT, STORY_START, UPSTAIRS_START } from "./world/constants";
 import { rectCenter, rectDistance } from "./world/geometry";
-import { DOORS, FLOOR_Y, ROOMS, ROOM_DOOR, STAIRS, roomAt } from "./world/rooms";
+import { DOORS, FLOOR_Y, ROOMS, ROOM_DOOR, STAIRS, inGuestWing, isGuestRoom, roomAt } from "./world/rooms";
+import { doorAccess } from "./guestWing";
 import { CHAPTER_GHOSTS, GHOSTS } from "./ghosts";
 import { PREPS, type Floor, type GhostId, type Prep, type RoomId } from "./types";
 import { LINE_JA } from "../ui/i18n";
@@ -124,13 +127,155 @@ function lockedFeedback() {
   toast("locked", 1800);
 }
 
-function walkTo(destination: NavPoint, objectId: string | null = null) {
+// ------------------------------------------------------------ guest wing
+
+/** A Guest Wing door the student opens by hand: it swings open with a creak. */
+function openByHand(id: string): boolean {
+  if (rt.doorsOpen.has(id) || doorAccess(id) !== "open") return false;
+  rt.doorsOpen.set(id, rt.time);
+  audio.play("creak");
+  touchActivity();
+  return true;
+}
+
+/** A Guest Wing door that will not open yet: the whole wing (before Chapter 2 is done), or Room 206 (no key). */
+function wingLockedFeedback(id: string) {
+  lastLockedBump = performance.now();
+  audio.play("locked");
+  toast(id === "g206" && getGame().guestWingUnlocked ? "needKey" : "wingLocked", 2600);
+}
+
+/** Tap, E or a bump on a door: open it by hand, say why it is locked, or the story's own locked feedback. */
+function tryDoor(id: string) {
+  const access = doorAccess(id);
+  if (access === "open") openByHand(id);
+  else if (access === "locked") wingLockedFeedback(id);
+  else lockedFeedback();
+}
+
+/** Open the doors between the player and a Guest Wing room. */
+function openWayInto(room: RoomId): "opened" | "locked" | "none" {
+  let opened = false;
+  const doors = [...(inGuestWing(playerRoom()) ? [] : ["guestwing"]), ...(isGuestRoom(room) && playerRoom() !== room ? [room] : [])];
+  for (const id of doors) {
+    if (isOpen(id)) continue;
+    if (doorAccess(id) !== "open") {
+      wingLockedFeedback(id);
+      return "locked";
+    }
+    opened = openByHand(id) || opened;
+  }
+  return opened ? "opened" : "none";
+}
+
+/** The closed Guest Wing door within reach of the player, if any. */
+function nearestHandDoor(): { id: string; distance: number } | null {
+  let best: { id: string; distance: number } | null = null;
+  for (const d of DOORS) {
+    if (d.floor !== rt.player.floor || isOpen(d.id) || doorAccess(d.id) === "story") continue;
+    const r = d.axis === "x" ? { x0: d.from, x1: d.to, z0: d.at - 0.1, z1: d.at + 0.1 } : { x0: d.at - 0.1, x1: d.at + 0.1, z0: d.from, z1: d.to };
+    const distance = rectDistance(r, rt.player.x, rt.player.z);
+    if (distance < 1.0 && (!best || distance < best.distance)) best = { id: d.id, distance };
+  }
+  return best;
+}
+
+let noteClosed: (() => void) | null = null;
+let lastRoom: RoomId | null = null;
+let nextWingSound = 0;
+
+/** Into the corridor from the landing the camera looks down its length; a clock ticks there, old boards creak in the rooms. */
+function wingAmbience(room: RoomId | null) {
+  if (room !== lastRoom) {
+    if (room === "guesthall" && lastRoom === "landing" && !busy) {
+      rt.camera.inputLock = rt.camera.yaw;
+      rt.camera.yawTarget = Math.PI / 2;
+    }
+    lastRoom = room;
+  }
+  if (!inGuestWing(room) || rt.time < nextWingSound) return;
+  if (room === "guesthall") {
+    const at = placeSound(WORLD.objectById.get("guesthall.clock")!);
+    audio.play("tick", { pan: at.pan, gain: at.gain * 0.3 });
+    nextWingSound = rt.time + 1;
+  } else {
+    audio.play("creak", { pan: (rng() - 0.5) * 1.2, gain: 0.18, pitch: 0.8 + rng() * 0.3 });
+    nextWingSound = rt.time + 10 + rng() * 8;
+  }
+}
+
+/** A Guest Wing clue: a short card to read (the key also unlocks Room 206; the photo in 206 ends the mystery). */
+function readWingNote(obj: WorldObject) {
+  const id = obj.note;
+  if (!id) return;
+  const c = rectCenter(obj.rect);
+  rt.player.yaw = Math.atan2(c.x - rt.player.x, c.z - rt.player.z);
+  rt.player.walkTo = null;
+  rt.wing.read.add(id);
+  if (id === "photo206") {
+    run(() => wingFinale(obj));
+    return;
+  }
+  if (id === "key204" && !rt.wing.key) {
+    rt.wing.key = true;
+    audio.play("unlock");
+  } else audio.play("tick");
+  rt.player.frozen = true;
+  setGame({ wingNote: id });
+  touchActivity();
+}
+
+/** The mystery's end: a close look at the photograph in Room 206, Boo, and a small reward. */
+async function wingFinale(obj: WorldObject) {
+  busy = true;
+  const p = rt.player;
+  p.frozen = true;
+  p.walkTo = null;
+  try {
+    const photo = { x: obj.x + Math.sin((obj.rot * Math.PI) / 180) * 0.05, y: obj.y + 1.5, z: obj.z + Math.cos((obj.rot * Math.PI) / 180) * 0.05 };
+    const back = { x: photo.x - p.x, z: photo.z - p.z };
+    const len = Math.hypot(back.x, back.z) || 1;
+    rt.camera.mode = "shot";
+    rt.camera.shot = {
+      pos: { x: photo.x - (back.x / len) * 1.6, y: photo.y + 0.1, z: photo.z - (back.z / len) * 1.6 },
+      target: photo
+    };
+    audio.play("sparkle");
+    sparkle(photo, "#fff2b0", 18, { speed: 0.8, up: 0.6, swirl: 3, life: 1.2 });
+    await sleep(1100);
+    rt.boo.visible = true;
+    rt.boo.appearT0 = rt.time;
+    rt.boo.target = { x: photo.x - (back.x / len) * 0.9 + (back.z / len) * 0.5, y: photo.y + 0.05, z: photo.z - (back.z / len) * 0.9 - (back.x / len) * 0.5 };
+    await say("Look! A friendly ghost lived here!");
+    rt.wing.solved = true;
+    if (!getGame().wingMysterySolved) saveWingMysterySolved();
+    audio.play("fanfare");
+    setGame({ wingNote: "photo206" });
+    await new Promise<void>((resolve) => (noteClosed = resolve));
+  } finally {
+    noteClosed = null;
+    rt.boo.target = null;
+    busy = false;
+  }
+  enterExplore();
+}
+
+function walkTo(destination: NavPoint, objectId: string | null = null, retry = true) {
   const p = rt.player;
   p.walkTo = null;
   rt.destination.visible = false;
   const path = findPath(p, destination, isOpen, objectId);
   if (!path?.length) {
     const room = roomAt(destination.x, destination.z, destination.floor);
+    // Guest Wing doors open for the student: a tap beyond one opens it, then the walk starts.
+    if (retry && room && inGuestWing(room)) {
+      const opened = openWayInto(room);
+      if (opened === "locked") return;
+      if (opened === "opened") {
+        walkTo(destination, objectId, false);
+        return;
+      }
+    }
     const door = room && ROOM_DOOR[room];
     if ((door && !isOpen(door)) || (p.floor !== destination.floor && !isOpen("stairs"))) lockedFeedback();
     else toast("cantGo", 1800);
@@ -539,6 +684,10 @@ function enterSearch(objectId: string) {
   if (!obj) return;
   if (obj.action === "fan") {
     useFan();
+    return;
+  }
+  if (obj.action === "note") {
+    readWingNote(obj);
     return;
   }
   if (!obj.searchable) return;
@@ -1202,6 +1351,8 @@ async function finishGame() {
       saveCh2Unlocked();
       setGame({ ch2Unlocked: true });
     }
+    // Chapter 2 is done (alone or in the full adventure): the Guest Wing upstairs opens.
+    if (g.scope !== "ch1") saveGuestWingUnlocked();
   }
   if (getGame().finishedAt === null) setGame({ finishedAt: performance.now() });
   setGame({ fade: 1 });
@@ -1231,6 +1382,7 @@ function tick() {
   }
 
   if (g.phase !== "explore" && g.phase !== "search") return;
+  wingAmbience(room);
 
   if (awaitingEntry && !busy) {
     const enc = currentEncounter(g.hunt);
@@ -1252,7 +1404,7 @@ function tick() {
       const r =
         d.axis === "x" ? { x0: d.from, x1: d.to, z0: d.at - 0.1, z1: d.at + 0.1 } : { x0: d.at - 0.1, x1: d.at + 0.1, z0: d.from, z1: d.to };
       if (rectDistance(r, rt.player.x, rt.player.z) < 0.42) {
-        lockedFeedback();
+        tryDoor(d.id);
         break;
       }
     }
@@ -1431,6 +1583,9 @@ function stopStory() {
   audio.stopMusic();
   audio.stopRain(1);
   window.clearInterval(tickTimer);
+  noteClosed = null;
+  lastRoom = null;
+  setGame({ wingNote: null });
   resetRuntime();
 }
 
@@ -1606,8 +1761,24 @@ export const director = {
   interact() {
     const g = getGame();
     if (g.settingsOpen) return;
-    if (g.phase === "explore" && g.focusId) enterSearch(g.focusId);
+    if (g.wingNote) {
+      director.closeWingNote();
+      return;
+    }
+    // E beside a closed Guest Wing door opens it, unless something to use is nearer.
+    const door = g.phase === "explore" && !busy && !rt.player.frozen ? nearestHandDoor() : null;
+    const focus = g.focusId ? WORLD.objectById.get(g.focusId) : undefined;
+    if (door && (!focus || door.distance < rectDistance(focus.rect, rt.player.x, rt.player.z))) tryDoor(door.id);
+    else if (g.phase === "explore" && g.focusId) enterSearch(g.focusId);
     else if (g.phase === "search" && g.selectedSpot) run(() => doSearch(g.selectedSpot!));
+  },
+
+  /** Close the Guest Wing clue card. */
+  closeWingNote() {
+    if (!getGame().wingNote) return;
+    setGame({ wingNote: null });
+    if (noteClosed) noteClosed();
+    else if (!busy) rt.player.frozen = false;
   },
 
   /** A searchable object (or the fan switch) was tapped/clicked in 3D. */
@@ -1699,7 +1870,7 @@ export const director = {
     rt.player.walkTo = null;
     rt.destination.visible = false;
     if (!isOpen(id)) {
-      lockedFeedback();
+      tryDoor(id);
       return;
     }
     if (id === "stairs") {

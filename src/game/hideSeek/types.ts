@@ -2,7 +2,8 @@ import type { GhostId, RoomId, Vec3 } from "../types";
 import type { HidingSpot } from "../world/world";
 import type { PerceptionTimers } from "./perception";
 
-export type PlayRoom = Exclude<RoomId, "lobby" | "landing">;
+/** Rooms a Hide & Seek match can be played in: never the lobby, the landing or the guest corridor. */
+export type PlayRoom = Exclude<RoomId, "lobby" | "landing" | "guesthall">;
 export type EnglishLevel = "beginner" | "standard" | "advanced";
 export interface Point { x: number; z: number }
 export interface MatchConfig { ghost: GhostId; room: PlayRoom; seed: number; level: EnglishLevel }

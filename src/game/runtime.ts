@@ -151,6 +151,8 @@ export const rt = {
   /** Bathroom steam: level eases towards target; the fan clears it until fanUntil. */
   steam: { level: 0, target: 0, fanOnT0: -100, fanUntil: -100, silhouetteT0: -100 },
   notes: [] as Note[],
+  /** The Guest Wing mystery in this playthrough: the 206 key, the clues read, the ending seen. */
+  wing: { key: false, read: new Set<string>(), solved: false },
   timeScale: 1
 };
 
@@ -195,4 +197,5 @@ export function resetRuntime() {
   rt.rattles = [];
   rt.notes = [];
   rt.steam = { level: 0, target: 0, fanOnT0: -100, fanUntil: -100, silhouetteT0: -100 };
+  rt.wing = { key: false, read: new Set<string>(), solved: false };
 }

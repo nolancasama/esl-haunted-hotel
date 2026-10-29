@@ -8,10 +8,11 @@ import { storageModels } from "./storage";
 import { libraryModels } from "./library";
 import { lobbyModels } from "./lobby";
 import { upstairsModels } from "./upstairs";
+import { guestModels } from "./guest";
 
 export type { AnimatedPart, BuiltObject, TexKey } from "./common";
 
-const BUILDERS: BuilderSet = { ...bedroomModels, ...diningModels, ...storageModels, ...libraryModels, ...lobbyModels, ...upstairsModels };
+const BUILDERS: BuilderSet = { ...bedroomModels, ...diningModels, ...storageModels, ...libraryModels, ...lobbyModels, ...upstairsModels, ...guestModels };
 
 export function buildObject(obj: WorldObject): BuiltObject {
   const b = new PartBuilder();

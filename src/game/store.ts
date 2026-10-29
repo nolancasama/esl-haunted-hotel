@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { WingNoteId } from "./world/furniture";
 import type { GhostId, Prep, RoomId } from "./types";
 import type { HuntState } from "./logic/hunt";
 import type { Scope } from "./logic/plans";
@@ -19,7 +20,8 @@ function loadHideSeekLink(): HideSeekLink | null {
   const params = new URLSearchParams(location.search);
   if (params.get("mode") !== "hideseek") return null;
   const ghosts: Record<GhostId, true> = { sleepy: true, hungry: true, sneaky: true, mischief: true, bouncy: true, bubbles: true, melody: true, shadow: true };
-  const rooms: Record<RoomId, true> = { lobby: true, bedroom: true, dining: true, storage: true, library: true, landing: true, playroom: true, bathroom: true, music: true, attic: true };
+  const rooms: Record<RoomId, true> = { lobby: true, bedroom: true, dining: true, storage: true, library: true, landing: true, playroom: true, bathroom: true, music: true, attic: true,
+    guesthall: true, g201: true, g202: true, g203: true, g204: true, g205: true, g206: true };
   const ghost = params.get("ghost");
   const room = params.get("room");
   const seed = params.get("seed");
@@ -101,7 +103,9 @@ export type HintId =
   | "micBlocked"
   | "exit"
   | "goStairs"
-  | "fan";
+  | "fan"
+  | "wingLocked"
+  | "needKey";
 
 /** The full-screen chapter title ("CHAPTER 2 — UPSTAIRS"). */
 export interface ChapterCard {
@@ -147,6 +151,12 @@ export interface GameState {
   /** Chapter 2 on its own is offered once Chapter 1 has been finished on this device. */
   ch2Unlocked: boolean;
   hideSeekUnlocked: boolean;
+  /** The Guest Wing's doors open in the story once Chapter 2 has been finished on this device. */
+  guestWingUnlocked: boolean;
+  /** The Guest Wing clue card being read, if any. */
+  wingNote: WingNoteId | null;
+  /** "Who stayed in Room 206?" has been solved on this device (a small, replayable reward). */
+  wingMysterySolved: boolean;
   hideSeekLink: HideSeekLink | null;
   chapterCard: ChapterCard | null;
   /** performance.now() when the hunt started and when the last ghost was caught. */
@@ -181,6 +191,10 @@ function loadSettings(): Settings {
 
 const CH2_KEY = "hh.ch2.v1";
 const HIDE_SEEK_KEY = "hh.hideseek.v1";
+const GUEST_WING_KEY = "hh.guestwing.v1";
+const WING_MYSTERY_KEY = "hh.guestwing.mystery.v1";
+/** Written at every story finish from this version on, so an older save can be told apart. */
+const FINISH_MARK_KEY = "hh.finish.v2";
 
 function loadFlag(key: string): boolean {
   try {
@@ -215,6 +229,26 @@ export function saveSettings(s: Settings) {
 
 export function saveReplayUnlocked() {
   saveFlag(REPLAY_KEY);
+  saveFlag(FINISH_MARK_KEY);
+}
+
+/** Chapter 2 (alone or in the full adventure) has been finished: the Guest Wing opens. */
+export function saveGuestWingUnlocked() {
+  saveFlag(GUEST_WING_KEY);
+  setGame({ guestWingUnlocked: true });
+}
+
+export function saveWingMysterySolved() {
+  saveFlag(WING_MYSTERY_KEY);
+  setGame({ wingMysterySolved: true });
+}
+
+/**
+ * Saves from before the Guest Wing existed only record "a story was finished", not which part.
+ * Those players keep their progress and find the wing open; from now on it opens with Chapter 2.
+ */
+function loadGuestWingUnlocked(): boolean {
+  return loadFlag(GUEST_WING_KEY) || (loadFlag(REPLAY_KEY) && !loadFlag(FINISH_MARK_KEY));
 }
 
 export const EMPTY_ANSWER: AnswerUi = {
@@ -258,6 +292,9 @@ export const useGame = create<GameState>(() => ({
   chapter: 1,
   ch2Unlocked: loadFlag(CH2_KEY),
   hideSeekUnlocked: loadFlag(HIDE_SEEK_KEY) || loadFlag(CH2_KEY),
+  guestWingUnlocked: loadGuestWingUnlocked(),
+  wingNote: null,
+  wingMysterySolved: loadFlag(WING_MYSTERY_KEY),
   hideSeekLink: HIDE_SEEK_LINK,
   chapterCard: null,
   startedAt: null,

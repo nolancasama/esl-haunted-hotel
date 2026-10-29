@@ -1,57 +1,57 @@
 {
   "matchesPerGhostPerPolicy": 200,
-  "matchesPerRoomPerGhostPerPolicy": 25,
-  "seed": "101 + matchIndex * 7919; room = rooms[matchIndex % 8]",
+  "matchesPerRoomPerGhostPerPolicy": 14.3,
+  "seed": "101 + matchIndex * 7919; room = rooms[matchIndex % 14]",
   "startingSpot": "Uniform seeded choice shared by both policies",
   "units": "win percent",
   "table": [
     {
       "ghost": "sleepy",
       "matches": 200,
-      "stay": 19,
-      "sensible": 56
+      "stay": 16,
+      "sensible": 56.5
     },
     {
       "ghost": "hungry",
       "matches": 200,
-      "stay": 19,
+      "stay": 16,
       "sensible": 47.5
     },
     {
       "ghost": "sneaky",
       "matches": 200,
-      "stay": 19,
-      "sensible": 52
+      "stay": 16,
+      "sensible": 50.5
     },
     {
       "ghost": "mischief",
       "matches": 200,
-      "stay": 19,
-      "sensible": 49
+      "stay": 16,
+      "sensible": 48.5
     },
     {
       "ghost": "bouncy",
       "matches": 200,
-      "stay": 19,
-      "sensible": 57
+      "stay": 16,
+      "sensible": 61.5
     },
     {
       "ghost": "bubbles",
       "matches": 200,
-      "stay": 19,
-      "sensible": 64
+      "stay": 16,
+      "sensible": 65.5
     },
     {
       "ghost": "melody",
       "matches": 200,
-      "stay": 19,
-      "sensible": 44.5
+      "stay": 16,
+      "sensible": 46
     },
     {
       "ghost": "shadow",
       "matches": 200,
-      "stay": 19,
-      "sensible": 74.5
+      "stay": 16,
+      "sensible": 79.5
     }
   ]
 }

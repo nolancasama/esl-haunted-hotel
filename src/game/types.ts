@@ -14,7 +14,15 @@ export type RoomId =
   | "playroom"
   | "bathroom"
   | "music"
-  | "attic";
+  | "attic"
+  // The Forgotten Guest Wing (upstairs, west of the landing): its corridor and six guest rooms.
+  | "guesthall"
+  | "g201"
+  | "g202"
+  | "g203"
+  | "g204"
+  | "g205"
+  | "g206";
 export type GhostId = "sleepy" | "hungry" | "sneaky" | "mischief" | "bouncy" | "bubbles" | "melody" | "shadow";
 
 export interface Vec3 {

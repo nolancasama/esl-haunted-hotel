@@ -6,10 +6,11 @@ import { WORLD } from "../game/world/world";
 import { rt } from "../game/runtime";
 import { EXTERIOR, floorMaterial, wallMaterial, WALL_CAP } from "./materials";
 import { PartBuilder } from "./partBuilder";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Beacon, Door } from "./Doors";
 import { GhostBoard } from "./GhostBoard";
 import { Outside } from "./Outside";
-import { lineFade } from "./wallFade";
+import { lineFade, nearGuestWing } from "./wallFade";
 import type { Rect, RoomId } from "../game/types";
 import { director } from "../game/director";
 import { isCanvasTap } from "../input/tap";
@@ -50,10 +51,47 @@ function wallGeometry(piece: WallPiece): THREE.BoxGeometry {
 }
 
 interface WallView {
-  piece: WallPiece;
-  geo: THREE.BoxGeometry;
+  line: WallLine;
+  geo: THREE.BufferGeometry;
   mats: THREE.MeshLambertMaterial[];
-  pos: [number, number, number];
+}
+
+type FaceClass = "cap" | "pos" | "neg";
+
+/** Copy vertices [start, start + count) of a non-indexed geometry. */
+function sliceVertices(g: THREE.BufferGeometry, start: number, count: number): THREE.BufferGeometry {
+  const out = new THREE.BufferGeometry();
+  for (const name of ["position", "normal", "uv"]) {
+    const a = g.getAttribute(name) as THREE.BufferAttribute;
+    out.setAttribute(name, new THREE.BufferAttribute(a.array.slice(start * a.itemSize, (start + count) * a.itemSize), a.itemSize));
+  }
+  return out;
+}
+
+/**
+ * One wall line as a single mesh: its pieces (between doors and windows, lintels, sills) merged,
+ * with three material groups (end/top caps, the face towards +axis, the face towards -axis).
+ * A line fades as a whole in the cutaway view, so this draws the same picture in 3 draw calls
+ * instead of up to 6 per piece.
+ */
+function lineView(line: WallLine, pieces: WallPiece[], cap: THREE.MeshLambertMaterial): WallView {
+  const along = line.axis === "x";
+  // BoxGeometry groups: px, nx, py, ny, pz, nz
+  const classes: FaceClass[] = along ? ["cap", "cap", "cap", "cap", "pos", "neg"] : ["pos", "neg", "cap", "cap", "cap", "cap"];
+  const parts: Record<FaceClass, THREE.BufferGeometry[]> = { cap: [], pos: [], neg: [] };
+  for (const piece of pieces) {
+    const r = piece.rect;
+    const box = wallGeometry(piece);
+    box.translate((r.x0 + r.x1) / 2, (piece.y0 + piece.y1) / 2, (r.z0 + r.z1) / 2);
+    const flat = box.toNonIndexed();
+    flat.groups.forEach((group, i) => parts[classes[i]].push(sliceVertices(flat, group.start, group.count)));
+    box.dispose();
+    flat.dispose();
+  }
+  const order = (["cap", "pos", "neg"] as const).filter((c) => parts[c].length);
+  const materials: Record<FaceClass, THREE.MeshLambertMaterial> = { cap, pos: wallMaterial(line.pos), neg: wallMaterial(line.neg) };
+  const geo = mergeGeometries(order.map((c) => mergeGeometries(parts[c], false)), true);
+  return { line, geo, mats: order.map((c) => materials[c]) };
 }
 
 /**
@@ -83,8 +121,11 @@ function lineOccludes(line: WallLine, cam: THREE.Vector3Like, points: THREE.Vect
  * upstairs the ground floor is under your feet; its outside is drawn by
  * <GroundShell> (one draw call instead of every wall piece).
  */
-function lineShown(line: WallLine, floor: 0 | 1): "fade" | "hidden" {
-  return line.floor === floor ? "fade" : "hidden";
+function lineShown(line: WallLine, floor: 0 | 1, roomId?: RoomId): "fade" | "hidden" {
+  if (line.floor !== floor) return "hidden";
+  // The Guest Wing's own walls ("w-...") are skipped from the far side of the hotel (Chromebook budget).
+  if (!roomId && line.id.startsWith("w-") && !nearGuestWing()) return "hidden";
+  return "fade";
 }
 
 /** The ground floor's outer walls seen from upstairs, so the hotel does not float. */
@@ -114,35 +155,26 @@ function GroundShell() {
 
 function Walls({ roomId }: { roomId?: RoomId }) {
   const views = useMemo<WallView[]>(() => {
-    const cap = () => new THREE.MeshLambertMaterial({ color: WALL_CAP, transparent: true });
     const room = roomId ? ROOMS[roomId] : null;
-    return WORLD.walls.filter((piece) => {
-      if (!room) return true;
-      const r = piece.rect;
-      const b = room.bounds;
-      return piece.line.floor === room.floor && r.x1 >= b.x0 && r.x0 <= b.x1 && r.z1 >= b.z0 && r.z0 <= b.z1;
-    }).map((original) => {
+    const byLine = new Map<WallLine, WallPiece[]>();
+    for (const original of WORLD.walls) {
+      if (room) {
+        const r = original.rect;
+        const b = room.bounds;
+        if (original.line.floor !== room.floor || r.x1 < b.x0 || r.x0 > b.x1 || r.z1 < b.z0 || r.z0 > b.z1) continue;
+      }
+      // Hide & Seek draws one room: its walls are clipped to it.
       const piece = room ? { ...original, rect: {
         x0: Math.max(original.rect.x0, room.bounds.x0 - WALL_T / 2),
         x1: Math.min(original.rect.x1, room.bounds.x1 + WALL_T / 2),
         z0: Math.max(original.rect.z0, room.bounds.z0 - WALL_T / 2),
         z1: Math.min(original.rect.z1, room.bounds.z1 + WALL_T / 2)
       } } : original;
-      const along = piece.line.axis === "x";
-      const neg = wallMaterial(piece.line.neg);
-      const posM = wallMaterial(piece.line.pos);
-      const end = cap();
-      const top = cap();
-      // BoxGeometry material order: px, nx, py, ny, pz, nz
-      const mats = along ? [end, end, top, top, posM, neg] : [posM, neg, top, top, end, end];
-      const r = piece.rect;
-      return {
-        piece,
-        geo: wallGeometry(piece),
-        mats,
-        pos: [(r.x0 + r.x1) / 2, (piece.y0 + piece.y1) / 2, (r.z0 + r.z1) / 2]
-      };
-    });
+      const list = byLine.get(original.line) ?? [];
+      list.push(piece);
+      byLine.set(original.line, list);
+    }
+    return [...byLine].map(([line, pieces]) => lineView(line, pieces, new THREE.MeshLambertMaterial({ color: WALL_CAP, transparent: true })));
   }, [roomId]);
   const meshes = useRef<Array<THREE.Mesh | null>>([]);
 
@@ -166,19 +198,24 @@ function Walls({ roomId }: { roomId?: RoomId }) {
       if (match) points.push([match.ghost.x, match.ghost.y + 0.2, match.ghost.z], [match.detective.x, floorY + 0.6, match.detective.z]);
     }
     const k = Math.min(1, dt * 7);
+    const b = roomId ? ROOMS[roomId].bounds : null;
+    const centre = b ? { x: (b.x0 + b.x1) / 2, z: (b.z0 + b.z1) / 2 } : null;
     for (const line of WALL_LINES) {
-      if (lineShown(line, rt.view.floor) === "hidden") {
+      if (lineShown(line, rt.view.floor, roomId) === "hidden") {
         lineFade.set(line.id, 0);
         continue;
       }
-      const target = lineOccludes(line, cam, points) ? 0 : 1;
+      // Hide & Seek shows one room: any of its walls between the camera and the room's middle is cut away,
+      // even when a high overview camera looks over it (in a small room it would still hide the floor by it).
+      const across = centre !== null && (line.axis === "x" ? (cam.z - line.at) * (centre.z - line.at) : (cam.x - line.at) * (centre.x - line.at)) < 0;
+      const target = across || lineOccludes(line, cam, points) ? 0 : 1;
       let o = lineFade.get(line.id) ?? 1;
       o += (target - o) * k;
       if (Math.abs(o - target) < 0.01) o = target;
       lineFade.set(line.id, o);
     }
     views.forEach((v, i) => {
-      const o = lineFade.get(v.piece.line.id) ?? 1;
+      const o = lineFade.get(v.line.id) ?? 1;
       const mesh = meshes.current[i];
       if (!mesh) return;
       mesh.visible = o > 0.02;
@@ -193,13 +230,12 @@ function Walls({ roomId }: { roomId?: RoomId }) {
     <group>
       {views.map((v, i) => (
         <mesh
-          key={v.piece.id}
+          key={v.line.id}
           ref={(m) => {
             meshes.current[i] = m;
           }}
           geometry={v.geo}
           material={v.mats}
-          position={v.pos}
         />
       ))}
     </group>
