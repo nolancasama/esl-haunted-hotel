@@ -123,8 +123,9 @@ function lineOccludes(line: WallLine, cam: THREE.Vector3Like, points: THREE.Vect
  */
 function lineShown(line: WallLine, floor: 0 | 1, roomId?: RoomId): "fade" | "hidden" {
   if (line.floor !== floor) return "hidden";
-  // The Guest Wing's own walls ("w-...") are skipped from the far side of the hotel (Chromebook budget).
-  if (!roomId && line.id.startsWith("w-") && !nearGuestWing()) return "hidden";
+  // The Guest Wing's own walls ("gw-...") are skipped from the far side of the hotel (Chromebook budget).
+  // (The hotel's west walls are "w-bed", "w-lob", "w-lib": they must never match.)
+  if (!roomId && line.id.startsWith("gw-") && !nearGuestWing()) return "hidden";
   return "fade";
 }
 

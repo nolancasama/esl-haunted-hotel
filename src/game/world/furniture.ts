@@ -147,21 +147,30 @@ const GUEST_PLACEMENTS: Placement[] = [
   ])
 ];
 
-/** The corridor: runner, wall lamps, paintings, a clock, the guest register and a window at the end. */
+/** The hallway from the landing: a window each side, a runner, a bench and wall lamps. */
+const PASSAGE_PLACEMENTS: Placement[] = [
+  { id: "wingpassage.runner", kind: "runner", room: "wingpassage", x: 10, z: 0, rot: 0, variant: "guest" },
+  { id: "wingpassage.windowN", kind: "window", room: "wingpassage", x: 10, z: WING.hall.z0 + 0.1, rot: 0 },
+  { id: "wingpassage.windowS", kind: "window", room: "wingpassage", x: 10, z: WING.hall.z1 - 0.1, rot: 180 },
+  { id: "wingpassage.lampN", kind: "walllamp", room: "wingpassage", x: 11.4, z: WING.hall.z0 + 0.1, rot: 0 },
+  { id: "wingpassage.lampS", kind: "walllamp", room: "wingpassage", x: 11.4, z: WING.hall.z1 - 0.1, rot: 180 }
+];
+
+/** The corridor: runner, wall lamps, paintings, a clock, the guest register and a window at the far end. */
 const HALL_PLACEMENTS: Placement[] = [
-  { id: "guesthall.runner1", kind: "runner", room: "guesthall", x: -11.6, z: 0, rot: 0, variant: "guest" },
-  { id: "guesthall.runner2", kind: "runner", room: "guesthall", x: -18.2, z: 0, rot: 0, variant: "guest" },
+  { id: "guesthall.runner1", kind: "runner", room: "guesthall", x: 15.6, z: 0, rot: 0, variant: "guest" },
+  { id: "guesthall.runner2", kind: "runner", room: "guesthall", x: 22.2, z: 0, rot: 0, variant: "guest" },
   // Midway between the 201 and 203 doors, so E at a door opens the door rather than the book.
-  { id: "guesthall.register", kind: "register", room: "guesthall", x: -13.0, z: -0.95, rot: 0, action: "note", note: "register" },
-  { id: "guesthall.clock", kind: "clock", room: "guesthall", x: -18.0, z: 0.95, rot: 180 },
-  { id: "guesthall.table2", kind: "sidetable", room: "guesthall", x: -13.0, z: 0.95, rot: 180 },
-  { id: "guesthall.painting1", kind: "painting", room: "guesthall", x: -13.0, z: -1.2, rot: 0, variant: "b" },
-  { id: "guesthall.painting2", kind: "painting", room: "guesthall", x: -13.0, z: 1.2, rot: 180, variant: "a" },
-  { id: "guesthall.painting3", kind: "painting", room: "guesthall", x: -18.0, z: -1.2, rot: 0, variant: "b" },
-  { id: "guesthall.window", kind: "window", room: "guesthall", x: WING.x0 + 0.1, z: 0, rot: 90 },
-  { id: "guesthall.plant1", kind: "pot", room: "guesthall", x: -22.65, z: -0.95, rot: 0, variant: "fern" },
-  { id: "guesthall.plant2", kind: "pot", room: "guesthall", x: -22.65, z: 0.95, rot: 0, variant: "fern" },
-  ...[-12.3, -17.7, -21.9].flatMap((x, i): Placement[] => [
+  { id: "guesthall.register", kind: "register", room: "guesthall", x: 17.0, z: -0.95, rot: 0, action: "note", note: "register" },
+  { id: "guesthall.clock", kind: "clock", room: "guesthall", x: 22.0, z: 0.95, rot: 180 },
+  { id: "guesthall.table2", kind: "sidetable", room: "guesthall", x: 17.0, z: 0.95, rot: 180 },
+  { id: "guesthall.painting1", kind: "painting", room: "guesthall", x: 17.0, z: -1.2, rot: 0, variant: "b" },
+  { id: "guesthall.painting2", kind: "painting", room: "guesthall", x: 17.0, z: 1.2, rot: 180, variant: "a" },
+  { id: "guesthall.painting3", kind: "painting", room: "guesthall", x: 22.0, z: -1.2, rot: 0, variant: "b" },
+  { id: "guesthall.window", kind: "window", room: "guesthall", x: WING.x1 - 0.1, z: 0, rot: 270 },
+  { id: "guesthall.plant1", kind: "pot", room: "guesthall", x: 26.65, z: -0.95, rot: 0, variant: "fern" },
+  { id: "guesthall.plant2", kind: "pot", room: "guesthall", x: 26.65, z: 0.95, rot: 0, variant: "fern" },
+  ...[16.3, 21.7, 25.9].flatMap((x, i): Placement[] => [
     { id: `guesthall.lampN${i}`, kind: "walllamp", room: "guesthall", x, z: WING.hall.z0 + 0.1, rot: 0 },
     { id: `guesthall.lampS${i}`, kind: "walllamp", room: "guesthall", x, z: WING.hall.z1 - 0.1, rot: 180 }
   ])
@@ -300,8 +309,7 @@ export const PLACEMENTS: Placement[] = [
   // ---------------------------------------------------------------- landing
   { id: "landing.balustrade", kind: "balustrade", room: "landing", x: 5.0, z: 0, rot: 0 },
   { id: "landing.runner", kind: "runner", room: "landing", x: -3.4, z: 0, rot: 0 },
-  // Moved from the west wall (now the Guest Wing doors) to the east wall, facing the top of the stairs.
-  { id: "landing.window", kind: "window", room: "landing", x: 7.9, z: 0, rot: 270 },
+  { id: "landing.window", kind: "window", room: "landing", x: -7.9, z: 0, rot: 90 },
   { id: "landing.bench", kind: "bench", room: "landing", x: -0.6, z: -3.6, rot: 0 },
   { id: "landing.side", kind: "sidetable", room: "landing", x: -0.6, z: 3.55, rot: 180 },
   { id: "landing.plant1", kind: "plant", room: "landing", x: -7.35, z: -3.35, rot: 0 },
@@ -312,6 +320,7 @@ export const PLACEMENTS: Placement[] = [
   { id: "landing.painting2", kind: "painting", room: "landing", x: -1.9, z: 3.9, rot: 180, variant: "a" },
   { id: "landing.chandelier", kind: "chandelier", room: "landing", x: -3.4, z: 0, rot: 0, variant: "small" },
   // ============================================================ guest wing
+  ...PASSAGE_PLACEMENTS,
   ...HALL_PLACEMENTS,
   ...GUEST_PLACEMENTS
 ];

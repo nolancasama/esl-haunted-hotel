@@ -1,22 +1,31 @@
 # Current State
 
 ## Status
-**2026-10-29: The Forgotten Guest Wing.** A real upstairs extension west of the landing:
-the landing's west window became the **GUEST ROOMS** double doors (the window moved to the
-east wall, facing the top of the stairs), a 2.6 m corridor runs west to x = -23, and six
-5 x 5 m guest rooms sit three a side (201/203/205 north, 202/204/206 south). The wing
-stands on stone piers over the front path, which is now a dry covered entrance
-(porte-cochère) with the rain kept out. Each room has its own identity (Tidy, Traveler's,
+**2026-10-30: The Guest Wing moved to the back; the front restored.** At the user's request the
+wing is now east of the landing: straight ahead from the top of the stairs an open archway
+(`u-e-lan`, no door) leads into a 4 m windowed hallway (`wingpassage`), and the GUEST ROOMS
+double doors at its far end (x = 12, 5.6 m from the top step) open on the corridor (x 12–27)
+and the six rooms. It stands on a closed stone base over the back garden (`wingBase` in
+`Outside.tsx`: plinth, string course, blind arches); two back-garden trees moved clear. The
+front is exactly as before the wing: the landing's west window, the open porch and path,
+the original trees and rain (`Outside.tsx`/`Rain.tsx` reverted, plus the east rain mask).
+**Bug fixed:** the deployed 2026-10-29 build hid the hotel's front (west) walls and front door,
+because the wing's renderer culling matched wall ids starting "w-" and the ground-floor west
+walls are "w-bed", "w-lob", "w-lib". The wing's walls are now "gw-..." and
+`world/wing.test.ts` checks that only the wing's own walls carry that prefix.
+
+**2026-10-29: The Forgotten Guest Wing.** A real upstairs extension with a corridor and six
+5 x 5 m guest rooms three a side (201/203/205 north, 202/204/206 south). Each room has its
+own identity (Tidy, Traveler's,
 Family, Garden, Old-Fashioned, Forgotten) and 11–12 hiding spots covering in/on/under/by.
 In the story the wing opens once Chapter 2 is finished; its doors open by hand (tap, E or
 walking into them), and the optional mystery "Who stayed in Room 206?" (register, note,
 suitcase, photo, painting, the 206 key, then a short scene with Pip's photograph) can be
 solved every playthrough. In Hide & Seek, **Guest Wing** is one challenge area with a picker
 for Rooms 201–206; the collection is now 72 (8 ghosts x 9 areas) and old records are kept.
-Typecheck, build and 777 unit tests pass; the full e2e run passed 75/76. The one failure,
-`chapter2.spec.ts` "the full adventure…", is a pre-existing flake (see Known Issues): it
+`chapter2.spec.ts` "the full adventure…" is a pre-existing flake (see Known Issues): it
 failed 1 of 3 repeats on this branch and 3 of 3 on the previous `main` build. Claude
-reviewed `.tmp/wing/` (story rooms, corridor, register, mystery, exterior, porch, pickers at
+reviewed `.tmp/wing/` (story rooms, corridor, register, mystery, exterior, front, pickers at
 1024x600 and 844x390) and `.tmp/wing/hideseek/` (all six rooms: overview, close-up question,
 first-person hiding).
 
@@ -76,8 +85,9 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
 
 ## What Exists
 - **Guest Wing (2026-10-29):** plan in `rooms.ts` (`WING`, `GUEST_ROOMS`, `guestBounds()`,
-  `GUEST_INFO`, generated `wingWalls()` and guest doors, `OPENABLE_DOORS`); room ids
-  `guesthall`, `g201`–`g206` (floor 1). Furniture in `furniture.ts` is laid out once per room
+  `GUEST_INFO`, `PASSAGE_RECT`, `WING_RECT`, `inWingFootprint()`, generated `wingWalls()`
+  ("gw-" ids) and guest doors, `OPENABLE_DOORS`); room ids `wingpassage` (the hallway from the
+  landing), `guesthall`, `g201`–`g206` (floor 1, x 8–27). Furniture in `furniture.ts` is laid out once per room
   in a "north" frame and mirrored for the south rooms (`guestRoom()`); new kinds `smallbed`,
   `walllamp`, `frame` (pictures, photos, note, key board; flat), `register`, `coatrack`,
   `opencase`, `pot`; the rocking chair gained an "on" seat; suitcases and trunks are `box`
@@ -91,12 +101,12 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
   `hh.guestwing.mystery.v1` (reward). Clue card `ui/WingNote.tsx`. Doors: brass number
   plaques on the corridor side, the glazed wing doors with their sign, padlocks only on
   doors that are really locked. Room 206's lamp flickers softly; the corridor's light follows
-  the player. Exterior: piers, beams and ceiling in `Outside.tsx` (`coveredEntrance`), trees
-  moved out, rain masks and drip-line splashes in `Rain.tsx`.
+  the player; the camera turns to look east down the hallway and corridor. Exterior: the
+  closed stone base in `Outside.tsx` (`wingBase`), rain masks in `Rain.tsx`.
 - **Rendering budget (2026-10-29):** wall pieces are merged per wall line (one mesh, three
   material groups; `lineView()` in `Hotel.tsx`), which cut draw calls in the original areas
   (landing east 170→106, bathroom 135→84, playroom 132→87). The wing is drawn only from
-  the landing's west half or inside it, and wing furniture only within 11 m along the
+  the east half of the upstairs or inside it, and wing furniture only within 11 m along the
   corridor; busiest view (corridor) ~270 calls, a guest room ~180.
 - **Hide & Seek in the wing:** `PLAY_ROOMS` / `CHALLENGE_AREAS` in `records.ts` (Guest Wing =
   one area, `rooms: GUEST_ROOMS`; informational per-room wins in `hh.hideseek.guestrooms.v1`,

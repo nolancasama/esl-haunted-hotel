@@ -21,7 +21,7 @@ function loadHideSeekLink(): HideSeekLink | null {
   if (params.get("mode") !== "hideseek") return null;
   const ghosts: Record<GhostId, true> = { sleepy: true, hungry: true, sneaky: true, mischief: true, bouncy: true, bubbles: true, melody: true, shadow: true };
   const rooms: Record<RoomId, true> = { lobby: true, bedroom: true, dining: true, storage: true, library: true, landing: true, playroom: true, bathroom: true, music: true, attic: true,
-    guesthall: true, g201: true, g202: true, g203: true, g204: true, g205: true, g206: true };
+    wingpassage: true, guesthall: true, g201: true, g202: true, g203: true, g204: true, g205: true, g206: true };
   const ghost = params.get("ghost");
   const room = params.get("room");
   const seed = params.get("seed");

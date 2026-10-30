@@ -15,7 +15,8 @@ export type RoomId =
   | "bathroom"
   | "music"
   | "attic"
-  // The Forgotten Guest Wing (upstairs, west of the landing): its corridor and six guest rooms.
+  // The Forgotten Guest Wing (upstairs, east of the landing): the hallway to it, its corridor and six guest rooms.
+  | "wingpassage"
   | "guesthall"
   | "g201"
   | "g202"

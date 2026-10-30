@@ -188,8 +188,8 @@ export function Door({ door }: { door: DoorDef }) {
         </mesh>
       )}
       {label && style === "wing" && (
-        // Axis-z door: local -z is world +x, the landing side.
-        <mesh material={label} position={[width / 2, head + 0.33, -(WALL_T / 2 + 0.05)]} rotation={[0, Math.PI, 0]}>
+        // Axis-z door: local +z is world -x, the hallway side (facing the stairs).
+        <mesh material={label} position={[width / 2, head + 0.33, WALL_T / 2 + 0.05]}>
           <planeGeometry args={[1.9, 0.42]} />
         </mesh>
       )}

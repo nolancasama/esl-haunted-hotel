@@ -66,6 +66,10 @@ export const ROOM_STYLE: Record<RoomId, { wall: WallStyle; floor: FloorStyle }> 
     wall: { paper: "#4f2638", pattern: "#6e3a50", kind: "damask", wainscot: "#3a2418", trim: "#1f130d" },
     floor: { base: "#5a3826", seam: "#2a190f", seed: 31 }
   },
+  wingpassage: {
+    wall: { paper: "#4f2638", pattern: "#6e3a50", kind: "damask", wainscot: "#3a2418", trim: "#1f130d" },
+    floor: { base: "#5a3826", seam: "#2a190f", seed: 31 }
+  },
   g201: { wall: { paper: "#3d5878", pattern: "#4b6a8e", kind: "stripes", wainscot: "#45301f", trim: "#24170f" }, floor: GUEST_FLOOR },
   g202: { wall: { paper: "#6a5232", pattern: "#7c6340", kind: "stripes", wainscot: "#45301f", trim: "#24170f" }, floor: GUEST_FLOOR },
   g203: { wall: { paper: "#3c6658", pattern: "#e6cf88", kind: "dots", wainscot: "#45301f", trim: "#24170f" }, floor: GUEST_FLOOR },

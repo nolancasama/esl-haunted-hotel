@@ -156,7 +156,7 @@ function tryDoor(id: string) {
 /** Open the doors between the player and a Guest Wing room. */
 function openWayInto(room: RoomId): "opened" | "locked" | "none" {
   let opened = false;
-  const doors = [...(inGuestWing(playerRoom()) ? [] : ["guestwing"]), ...(isGuestRoom(room) && playerRoom() !== room ? [room] : [])];
+  const doors = [...(inGuestWing(playerRoom()) || !inGuestWing(room) ? [] : ["guestwing"]), ...(isGuestRoom(room) && playerRoom() !== room ? [room] : [])];
   for (const id of doors) {
     if (isOpen(id)) continue;
     if (doorAccess(id) !== "open") {
@@ -184,12 +184,12 @@ let noteClosed: (() => void) | null = null;
 let lastRoom: RoomId | null = null;
 let nextWingSound = 0;
 
-/** Into the corridor from the landing the camera looks down its length; a clock ticks there, old boards creak in the rooms. */
+/** Into the hallway (and on into the corridor) the camera looks east down its length; a clock ticks there, old boards creak in the rooms. */
 function wingAmbience(room: RoomId | null) {
   if (room !== lastRoom) {
-    if (room === "guesthall" && lastRoom === "landing" && !busy) {
+    if (((room === "wingpassage" && lastRoom === "landing") || (room === "guesthall" && lastRoom === "wingpassage")) && !busy) {
       rt.camera.inputLock = rt.camera.yaw;
-      rt.camera.yawTarget = Math.PI / 2;
+      rt.camera.yawTarget = -Math.PI / 2;
     }
     lastRoom = room;
   }

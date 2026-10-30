@@ -45,19 +45,22 @@ async function atDoor(page: Page, room: string) {
 test("the Guest Wing stays locked until Chapter 2 has been finished", async ({ page }) => {
   const errors = await startUpstairs(page);
   expect((await wing(page)).unlocked).toBe(false);
-  await hook(page, "teleport", -7.2, 0, 1, -Math.PI / 2);
-  await hook(page, "setYaw", Math.PI * 0.62, 0.3);
+  // From the top of the stairs the archway is straight ahead; the hallway beyond it is open.
+  await hook(page, "teleport", 7.0, 0, 1, Math.PI / 2);
+  await hook(page, "setYaw", -Math.PI / 2, 0.3);
+  await settle(page);
+  await page.screenshot({ path: path.join(shotDir, "stairs-top.png") });
+  await hook(page, "teleport", 11.2, 0, 1, Math.PI / 2);
   await settle(page);
   await page.keyboard.press("KeyE");
   await expect.poll(async () => (await hook<{ lastToast: string | null }>(page, "state")).lastToast).toBe("wingLocked");
   expect((await wing(page)).doorsOpen).toEqual([]);
-  // Walking into the closed doors does not get you through (camera east of the player: W walks west).
-  await hook(page, "setYaw", Math.PI / 2, 0.3);
+  // Walking into the closed doors does not get you through (camera west of the player: W walks east).
   await page.keyboard.down("KeyW");
   await page.waitForTimeout(1200);
   await page.keyboard.up("KeyW");
   const s = await wing(page);
-  expect(s.room).toBe("landing");
+  expect(s.room).toBe("wingpassage");
   expect(s.doorsOpen).toEqual([]);
   await page.screenshot({ path: path.join(shotDir, "landing-locked.png") });
   expect(errors).toEqual([]);
@@ -68,17 +71,19 @@ test("the wing's doors open by hand; Room 206 needs its key; the mystery ends in
   const errors = await startUpstairs(page);
   await hook(page, "unlockWing");
 
-  // The double doors on the landing (E beside them).
-  await hook(page, "teleport", -7.2, 0, 1, -Math.PI / 2);
-  await hook(page, "setYaw", Math.PI * 0.62, 0.3);
+  // The double doors at the end of the hallway from the landing (E beside them).
+  await hook(page, "teleport", 9.6, 0, 1, Math.PI / 2);
+  await hook(page, "setYaw", -Math.PI * 0.62, 0.3);
   await settle(page);
-  await page.screenshot({ path: path.join(shotDir, "landing-doors.png") });
+  await page.screenshot({ path: path.join(shotDir, "wing-doors.png") });
+  await hook(page, "teleport", 11.2, 0, 1, Math.PI / 2);
+  await settle(page);
   await page.keyboard.press("KeyE");
   await expect.poll(async () => (await wing(page)).doorsOpen).toContain("guestwing");
   await settle(page, 4);
 
   // Into the corridor: the camera turns to look down its length.
-  await hook(page, "teleport", -9.0, 0, 1, -Math.PI / 2);
+  await hook(page, "teleport", 13.0, 0, 1, Math.PI / 2);
   await expect.poll(async () => (await wing(page)).room).toBe("guesthall");
   await page.waitForTimeout(1500);
   await page.screenshot({ path: path.join(shotDir, "corridor.png") });

@@ -37,36 +37,44 @@ export interface RoomDef {
  * landing's east end; upstairs the stairwell is an opening with a railing.
  */
 /**
- * The Forgotten Guest Wing: a corridor running west from the landing's west wall, with three
- * guest rooms on each side. It stands outside the original footprint, over the front path, which
- * becomes a covered entrance on stone piers (scene/Outside.tsx).
+ * The Forgotten Guest Wing, upstairs at the back of the hotel. The stairs arrive at the landing's
+ * east end; straight ahead an open archway in the east wall leads into a 4 m hallway (with a
+ * window each side), and at its far end the GUEST ROOMS double doors open on the wing's corridor,
+ * with three guest rooms on each side. It stands outside the original footprint, over the back
+ * garden, on a closed stone base (scene/Outside.tsx); the front of the hotel is unchanged.
  *
- *            x = -23          -18          -13           -8
- *   z = -6.3  +------------+------------+------------+
- *             |    205     |    203     |    201     |  (playroom beyond)
- *   z = -1.3  +----[ ]-----+----[ ]-----+----[ ]-----+
- *            [w]            corridor               [==] landing
- *   z =  1.3  +----[ ]-----+----[ ]-----+----[ ]-----+
- *             |    206     |    204     |    202     |  (music room beyond)
- *   z =  6.3  +------------+------------+------------+
+ *        x = 8     12           17           22           27
+ *   z = -6.3        +------------+------------+------------+
+ *                   |    201     |    203     |    205     |
+ *   z = -1.3 +------+----[ ]-----+----[ ]-----+----[ ]-----+
+ *  landing  (arch) hallway [==]        corridor            [w]
+ *   z =  1.3 +------+----[ ]-----+----[ ]-----+----[ ]-----+
+ *                   |    202     |    204     |    206     |
+ *   z =  6.3        +------------+------------+------------+
  */
 export const WING = {
-  x0: -23,
-  x1: -8,
+  /** The landing's east wall, with the open archway. */
+  landingX: 8,
+  /** The GUEST ROOMS double doors: the hallway from the landing ends here and the corridor starts. */
+  x0: 12,
+  /** The far (east) end of the corridor. */
+  x1: 27,
   hall: { z0: -1.3, z1: 1.3 },
   /** Guest rooms: 5 m along the corridor, 5 m deep. */
   roomW: 5,
   depth: 5,
   /** Guest-room doors are 1.2 m wide, centred on the room's corridor wall. */
   doorHalf: 0.6,
-  /** The double doors in the landing's west wall. */
-  entrance: { from: -0.9, to: 0.9 }
+  /** The double doors at the end of the hallway. */
+  entrance: { from: -0.9, to: 0.9 },
+  /** The archway from the landing (no door), and its height. */
+  arch: { from: -1.2, to: 1.2, top: 2.3 }
 };
 
 export const GUEST_ROOMS = ["g201", "g202", "g203", "g204", "g205", "g206"] as const;
 export type GuestRoomId = (typeof GUEST_ROOMS)[number];
 export const isGuestRoom = (room: string | null | undefined): room is GuestRoomId => GUEST_ROOMS.includes(room as GuestRoomId);
-/** The corridor or any guest room. */
+/** The corridor or any guest room (beyond the double doors). */
 export const inGuestWing = (room: string | null | undefined): boolean => room === "guesthall" || isGuestRoom(room);
 
 export interface GuestRoomInfo {
@@ -89,19 +97,30 @@ const GUEST_LAMPS: Record<GuestRoomId, string> = {
   g201: "#ffd29a", g202: "#ffc58a", g203: "#ffd8a8", g204: "#d8f0c8", g205: "#f2c890", g206: "#c8b8f0"
 };
 
-/** Bounds of a guest room: pairs (201/202, 203/204, 205/206) step west from the landing. */
+/** Bounds of a guest room: pairs (201/202, 203/204, 205/206) step east from the double doors. */
 export function guestBounds(id: GuestRoomId): Rect {
   const i = GUEST_ROOMS.indexOf(id);
-  const x1 = WING.x1 - Math.floor(i / 2) * WING.roomW;
+  const x0 = WING.x0 + Math.floor(i / 2) * WING.roomW;
   const north = i % 2 === 0;
   return north
-    ? { x0: x1 - WING.roomW, x1, z0: WING.hall.z0 - WING.depth, z1: WING.hall.z0 }
-    : { x0: x1 - WING.roomW, x1, z0: WING.hall.z1, z1: WING.hall.z1 + WING.depth };
+    ? { x0, x1: x0 + WING.roomW, z0: WING.hall.z0 - WING.depth, z1: WING.hall.z0 }
+    : { x0, x1: x0 + WING.roomW, z0: WING.hall.z1, z1: WING.hall.z1 + WING.depth };
 }
-/** Footprint of the whole wing (wall centre lines). */
+/** The hallway from the landing's archway to the double doors (wall centre lines). */
+export const PASSAGE_RECT: Rect = { x0: WING.landingX, x1: WING.x0, z0: WING.hall.z0, z1: WING.hall.z1 };
+/** Footprint of the wing beyond the double doors (wall centre lines). */
 export const WING_RECT: Rect = { x0: WING.x0, x1: WING.x1, z0: WING.hall.z0 - WING.depth, z1: WING.hall.z1 + WING.depth };
+/** Inside the hallway or the wing, upstairs (x/z only; walls included). */
+export function inWingFootprint(x: number, z: number, margin = 0): boolean {
+  const r = x < WING.x0 ? PASSAGE_RECT : WING_RECT;
+  return x > WING.landingX - margin && x < WING.x1 + margin && z > r.z0 - margin && z < r.z1 + margin;
+}
 
 const wingRooms = Object.fromEntries([
+  ["wingpassage", {
+    id: "wingpassage", name: "Hallway", nameJa: "ろうか", floor: 1, bounds: PASSAGE_RECT,
+    lamp: { x: (PASSAGE_RECT.x0 + PASSAGE_RECT.x1) / 2, y: WALL_H + 2.45, z: 0, color: "#ffcf9a", intensity: 8 }
+  }],
   ["guesthall", {
     id: "guesthall", name: "Guest Wing", nameJa: "きゃくしつの ろうか", floor: 1,
     bounds: { x0: WING.x0, x1: WING.x1, z0: WING.hall.z0, z1: WING.hall.z1 },
@@ -114,7 +133,7 @@ const wingRooms = Object.fromEntries([
       lamp: { x: (b.x0 + b.x1) / 2, y: WALL_H + 2.4, z: (b.z0 + b.z1) / 2, color: GUEST_LAMPS[id], intensity: 8 }
     }];
   })
-]) as Record<"guesthall" | GuestRoomId, RoomDef>;
+]) as Record<"wingpassage" | "guesthall" | GuestRoomId, RoomDef>;
 
 export const ROOMS: Record<RoomId, RoomDef> = {
   ...wingRooms,
@@ -317,50 +336,58 @@ const UPPER_WALLS: WallLine[] = [
   { id: "u-m2-att", floor: 1, axis: "x", at: 4, from: 0, to: 8, neg: "landing", pos: "attic", openings: [door(3.4, 4.6, "attic", ATTIC_DOOR_H)] },
   { id: "u-s-mus", openings: [win(-3.4)], floor: 1, axis: "x", at: 11, from: -8, to: 0, neg: "music", pos: null },
   { id: "u-s-att", openings: [win(5.6, ROUND_GLASS)], floor: 1, axis: "x", at: 11, from: 0, to: 8, neg: "attic", pos: null },
-  // West: the Guest Wing now adjoins the hotel here (its rooms 201/202 and corridor share this wall).
-  { id: "u-w-play", floor: 1, axis: "z", at: -8, from: -11, to: WING_RECT.z0, neg: null, pos: "playroom" },
-  { id: "u-w-play-201", floor: 1, axis: "z", at: -8, from: WING_RECT.z0, to: -4, neg: "g201", pos: "playroom" },
-  { id: "u-w-lan-201", floor: 1, axis: "z", at: -8, from: -4, to: WING.hall.z0, neg: "g201", pos: "landing" },
-  { id: "u-w-lan", floor: 1, axis: "z", at: -8, from: WING.hall.z0, to: WING.hall.z1, neg: "guesthall", pos: "landing",
-    openings: [door(WING.entrance.from, WING.entrance.to, "guestwing")] },
-  { id: "u-w-lan-202", floor: 1, axis: "z", at: -8, from: WING.hall.z1, to: 4, neg: "g202", pos: "landing" },
-  { id: "u-w-mus-202", floor: 1, axis: "z", at: -8, from: 4, to: WING_RECT.z1, neg: "g202", pos: "music" },
-  { id: "u-w-mus", floor: 1, axis: "z", at: -8, from: WING_RECT.z1, to: 11, neg: null, pos: "music" },
+  { id: "u-w-play", floor: 1, axis: "z", at: -8, from: -11, to: -4, neg: null, pos: "playroom" },
+  { id: "u-w-lan", openings: [win(0)], floor: 1, axis: "z", at: -8, from: -4, to: 4, neg: null, pos: "landing" },
+  { id: "u-w-mus", floor: 1, axis: "z", at: -8, from: 4, to: 11, neg: null, pos: "music" },
   { id: "u-e-bath", floor: 1, axis: "z", at: 8, from: -11, to: -4, neg: "bathroom", pos: null },
-  // The landing's window moved here from the west wall (now the Guest Wing doors), facing the top of the stairs.
-  { id: "u-e-lan", openings: [win(0)], floor: 1, axis: "z", at: 8, from: -4, to: 4, neg: "landing", pos: null },
+  // East: straight ahead from the top of the stairs, an open archway into the Guest Wing's hallway.
+  { id: "u-e-lan-n", floor: 1, axis: "z", at: 8, from: -4, to: WING.hall.z0, neg: "landing", pos: null },
+  { id: "u-e-lan", floor: 1, axis: "z", at: 8, from: WING.hall.z0, to: WING.hall.z1, neg: "landing", pos: "wingpassage",
+    openings: [{ from: WING.arch.from, to: WING.arch.to, top: WING.arch.top }] },
+  { id: "u-e-lan-s", floor: 1, axis: "z", at: 8, from: WING.hall.z1, to: 4, neg: "landing", pos: null },
   { id: "u-e-att", floor: 1, axis: "z", at: 8, from: 4, to: 11, neg: "attic", pos: null },
   { id: "u-x-up", floor: 1, axis: "z", at: 0, from: -11, to: -4, neg: "playroom", pos: "bathroom" },
   { id: "u-x-down", floor: 1, axis: "z", at: 0, from: 4, to: 11, neg: "music", pos: "attic" }
 ];
 
-/** The wing's walls, generated from its plan: corridor walls with the guest doors, outer walls with a window per room. */
+/** The wing's walls (ids "gw-..."), generated from its plan: the hallway, corridor walls with the guest doors, outer walls with a window per room. */
 function wingWalls(): WallLine[] {
-  const lines: WallLine[] = [];
+  const p = PASSAGE_RECT;
+  const lines: WallLine[] = [
+    // The hallway from the landing: a window each side, the double doors at its end.
+    { id: "gw-pass-n", floor: 1, axis: "x", at: p.z0, from: p.x0, to: p.x1, neg: null, pos: "wingpassage", openings: [win((p.x0 + p.x1) / 2)] },
+    { id: "gw-pass-s", floor: 1, axis: "x", at: p.z1, from: p.x0, to: p.x1, neg: "wingpassage", pos: null, openings: [win((p.x0 + p.x1) / 2)] },
+    { id: "gw-pass-doors", floor: 1, axis: "z", at: WING.x0, from: p.z0, to: p.z1, neg: "wingpassage", pos: "guesthall",
+      openings: [door(WING.entrance.from, WING.entrance.to, "guestwing")] }
+  ];
   for (const id of GUEST_ROOMS) {
     const b = guestBounds(id);
     const mid = (b.x0 + b.x1) / 2;
     const north = GUEST_INFO[id].north;
     lines.push({
-      id: `w-${id}-hall`, floor: 1, axis: "x", at: north ? b.z1 : b.z0, from: b.x0, to: b.x1,
+      id: `gw-${id}-hall`, floor: 1, axis: "x", at: north ? b.z1 : b.z0, from: b.x0, to: b.x1,
       neg: north ? id : "guesthall", pos: north ? "guesthall" : id,
       openings: [door(mid - WING.doorHalf, mid + WING.doorHalf, id)]
     });
     lines.push({
-      id: `w-${id}-out`, floor: 1, axis: "x", at: north ? b.z0 : b.z1, from: b.x0, to: b.x1,
+      id: `gw-${id}-out`, floor: 1, axis: "x", at: north ? b.z0 : b.z1, from: b.x0, to: b.x1,
       neg: north ? null : id, pos: north ? id : null, openings: [win(mid)]
     });
   }
-  // Between neighbours, and the west end (with a window at the end of the corridor).
-  for (const [west, east] of [["g203", "g201"], ["g205", "g203"], ["g204", "g202"], ["g206", "g204"]] as const) {
-    const b = guestBounds(east);
-    lines.push({ id: `w-${west}-${east}`, floor: 1, axis: "z", at: b.x0, from: b.z0, to: b.z1, neg: west, pos: east });
+  // The first rooms' outer side walls (beside the hallway), between neighbours, and the far end.
+  for (const id of ["g201", "g202"] as const) {
+    const b = guestBounds(id);
+    lines.push({ id: `gw-${id}-west`, floor: 1, axis: "z", at: b.x0, from: b.z0, to: b.z1, neg: null, pos: id });
   }
-  const w205 = guestBounds("g205");
-  const w206 = guestBounds("g206");
-  lines.push({ id: "w-g205-west", floor: 1, axis: "z", at: WING.x0, from: w205.z0, to: w205.z1, neg: null, pos: "g205" });
-  lines.push({ id: "w-hall-west", floor: 1, axis: "z", at: WING.x0, from: WING.hall.z0, to: WING.hall.z1, neg: null, pos: "guesthall", openings: [win(0)] });
-  lines.push({ id: "w-g206-west", floor: 1, axis: "z", at: WING.x0, from: w206.z0, to: w206.z1, neg: null, pos: "g206" });
+  for (const [west, east] of [["g201", "g203"], ["g203", "g205"], ["g202", "g204"], ["g204", "g206"]] as const) {
+    const b = guestBounds(east);
+    lines.push({ id: `gw-${west}-${east}`, floor: 1, axis: "z", at: b.x0, from: b.z0, to: b.z1, neg: west, pos: east });
+  }
+  const e205 = guestBounds("g205");
+  const e206 = guestBounds("g206");
+  lines.push({ id: "gw-g205-east", floor: 1, axis: "z", at: WING.x1, from: e205.z0, to: e205.z1, neg: "g205", pos: null });
+  lines.push({ id: "gw-hall-east", floor: 1, axis: "z", at: WING.x1, from: WING.hall.z0, to: WING.hall.z1, neg: "guesthall", pos: null, openings: [win(0)] });
+  lines.push({ id: "gw-g206-east", floor: 1, axis: "z", at: WING.x1, from: e206.z0, to: e206.z1, neg: "g206", pos: null });
   return lines;
 }
 
@@ -393,7 +420,7 @@ export const DOORS: DoorDef[] = [
   { id: "bathroom", floor: 1, axis: "x", at: -4, from: 3.2, to: 4.8, room: "bathroom" },
   { id: "music", floor: 1, axis: "x", at: 4, from: -4.8, to: -3.2, room: "music" },
   { id: "attic", floor: 1, axis: "x", at: 4, from: 3.4, to: 4.6, room: "attic", height: ATTIC_DOOR_H, style: "attic" },
-  { id: "guestwing", floor: 1, axis: "z", at: WING.x1, from: WING.entrance.from, to: WING.entrance.to, room: "guesthall", double: true, style: "wing" },
+  { id: "guestwing", floor: 1, axis: "z", at: WING.x0, from: WING.entrance.from, to: WING.entrance.to, room: "guesthall", double: true, style: "wing" },
   ...GUEST_ROOMS.map((id): DoorDef => {
     const b = guestBounds(id);
     const mid = (b.x0 + b.x1) / 2;
@@ -471,7 +498,7 @@ export function wallPieces(lines: WallLine[] = WALL_LINES): WallPiece[] {
 // Ghost rooms first so a doorway counts as the room you are stepping into.
 const LOOKUP: Record<Floor, RoomId[]> = {
   0: ["bedroom", "dining", "storage", "library", "lobby"],
-  1: ["playroom", "bathroom", "music", "attic", ...GUEST_ROOMS, "landing", "guesthall"]
+  1: ["playroom", "bathroom", "music", "attic", ...GUEST_ROOMS, "landing", "wingpassage", "guesthall"]
 };
 
 export function roomAt(x: number, z: number, floor: Floor = 0): RoomId | null {

@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { rt } from "../game/runtime";
 import { sunrise } from "./Outside";
-import { FLOOR_Y, WALL_H, WALL_LINES, WING_RECT } from "../game/world/rooms";
+import { FLOOR_Y, WALL_H, WALL_LINES, WING, inWingFootprint } from "../game/world/rooms";
 
 /** Outside each window (the real holes in the outer walls): where its warm room light spills out. */
 const WINDOW_LIGHTS: THREE.Vector3[] = WALL_LINES.flatMap((line) =>
@@ -78,9 +78,9 @@ const rainVertex = /* glsl */ `
   }
 `;
 
-// The hotel's footprint (walls included), and the Guest Wing with the covered entrance under it: no rain there.
+// The hotel's footprint (walls included), and the Guest Wing behind it: no rain inside them.
 const indoors = /* glsl */ `((abs(vWorld.x) < 8.3 && abs(vWorld.z) < 11.3) ||
-  (vWorld.x > ${(WING_RECT.x0 - 0.3).toFixed(2)} && vWorld.x < -7.9 && abs(vWorld.z) < ${(WING_RECT.z1 + 0.3).toFixed(2)}))`;
+  (vWorld.x > 7.9 && vWorld.x < ${(WING.x1 + 0.3).toFixed(2)} && abs(vWorld.z) < (vWorld.x < ${WING.x0.toFixed(2)} ? ${(WING.hall.z1 + 0.3).toFixed(2)} : ${(WING.hall.z1 + WING.depth + 0.3).toFixed(2)})))`;
 
 const rainFragment = /* glsl */ `
   uniform float ceiling;
@@ -160,10 +160,11 @@ function layout(random: () => number): Drop[] {
     }
   });
   while (drops.length < NEAR + LIGHTS * PER_WINDOW + RING) {
-    const x = -20 + random() * 36;
+    // West to the porch, east past the Guest Wing behind the hotel.
+    const x = -20 + random() * 50;
     const z = -21 + random() * 42;
     if (Math.abs(x) < 8.5 && Math.abs(z) < 11.5) continue;
-    if (x > WING_RECT.x0 - 0.5 && x < -7.5 && Math.abs(z) < WING_RECT.z1 + 0.5) continue;
+    if (inWingFootprint(x, z, 0.5)) continue;
     drops.push({ x, z, near: false, top: 7 });
   }
   return drops;
@@ -197,13 +198,12 @@ export function Rain() {
     rainGeometry.setAttribute("top", new THREE.InstancedBufferAttribute(tops, 1));
     rainGeometry.instanceCount = drops.length;
 
-    // Splashes: along the drip line of the covered entrance (the porch and path are dry under the
-    // Guest Wing), and the ground under the ground-floor windows.
+    // Splashes: the porch, the path, and the ground under the ground-floor windows.
     const splashes: number[] = [];
-    for (let i = 0; i < 160; i++) {
-      const side = i % 4;
-      if (side < 2) splashes.push(WING_RECT.x0 + random() * (WING_RECT.x1 - WING_RECT.x0), (side ? 1 : -1) * (WING_RECT.z1 + 0.35 + random() * 0.4));
-      else splashes.push(WING_RECT.x0 - 0.35 - random() * 0.4, (random() - 0.5) * (WING_RECT.z1 - WING_RECT.z0));
+    for (let i = 0; i < 80; i++) splashes.push(-11.0 + random() * 2.6, (random() - 0.5) * 4.6);
+    for (let i = 0; i < 80; i++) {
+      const x = -21.1 + random() * 9.9;
+      splashes.push(x, Math.sin(((-11.6 - x) / 1.15) * 0.7) * 0.25 + (random() - 0.5) * 0.8);
     }
     for (const line of WALL_LINES) {
       if (line.floor !== 0 || line.neg !== null) continue;
@@ -270,8 +270,7 @@ export function Rain() {
     // out over the walls, and streaks between it and the room would look like rain in the room.
     const c = rt.camera.pos;
     const p = rt.player;
-    const inHotel = (x: number, z: number) =>
-      (Math.abs(x) < 8.25 && Math.abs(z) < 11.25) || (x > WING_RECT.x0 - 0.25 && x < -7.9 && Math.abs(z) < WING_RECT.z1 + 0.25);
+    const inHotel = (x: number, z: number) => (Math.abs(x) < 8.25 && Math.abs(z) < 11.25) || inWingFootprint(x, z, 0.25);
     const inside = inHotel(c.x, c.z) || (rt.camera.mode === "follow" && inHotel(p.x, p.z));
     batches.rainMaterial.uniforms.ceiling.value = inside ? FLOOR_Y[rt.view.floor] + WALL_H : 100;
   });

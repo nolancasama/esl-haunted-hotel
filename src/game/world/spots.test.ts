@@ -184,8 +184,8 @@ describe("clues are unambiguous", () => {
     }
   });
 
-  it("the lobby, the landing and the guest corridor have nothing to search (ghosts hide only in rooms)", () => {
-    expect(WORLD.spots.some((s) => s.room === "lobby" || s.room === "landing" || s.room === "guesthall")).toBe(false);
+  it("the lobby, the landing and the Guest Wing hallway and corridor have nothing to search (ghosts hide only in rooms)", () => {
+    expect(WORLD.spots.some((s) => s.room === "lobby" || s.room === "landing" || s.room === "wingpassage" || s.room === "guesthall")).toBe(false);
   });
 
   it("the fan switch is something to use, not a hiding place", () => {
@@ -207,8 +207,8 @@ interface Cell {
  * the top and bottom of the stairs. Returns reachable cell centres.
  */
 function reachable(start: { x: number; z: number }, openDoors: (id: string) => boolean, startFloor: Floor = 0): Cell[] {
-  // The whole hotel, including the Guest Wing west of the landing.
-  const b = { x0: WING.x0, x1: 8, z0: -11, z1: 11 };
+  // The whole hotel, including the Guest Wing east of the landing.
+  const b = { x0: -8, x1: WING.x1, z0: -11, z1: 11 };
   const step = 0.1;
   const nx = Math.round((b.x1 - b.x0) / step);
   const nz = Math.round((b.z1 - b.z0) / step);
@@ -283,10 +283,13 @@ describe("every searchable object can be reached", () => {
     }
   });
 
-  it("with only the gate open you can climb to the landing, but no further", () => {
+  it("with only the gate open you can climb to the landing (and its open hallway east), but no further", () => {
     const cells = reachable(STORY_START, (id) => id === "stairs");
     expect(cells.some((c) => c.floor === 1)).toBe(true);
-    for (const c of cells) expect(roomAt(c.x, c.z, c.floor), `${c.x},${c.z},${c.floor}`).toMatch(/^(lobby|landing)$/);
+    expect(cells.some((c) => roomAt(c.x, c.z, c.floor) === "wingpassage")).toBe(true);
+    // The Guest Wing's double doors keep its corridor and rooms shut.
+    // (A cell exactly on the archway's line belongs to neither room.)
+    for (const c of cells) expect(String(roomAt(c.x, c.z, c.floor)), `${c.x},${c.z},${c.floor}`).toMatch(/^(lobby|landing|wingpassage|null)$/);
   });
 
 });
@@ -304,11 +307,22 @@ describe("walking the stairs", () => {
   }
 
   it("walking east from the lobby climbs to the landing, rising steadily", () => {
-    const { end, ys } = walk({ x: 2.8, z: 0 }, 0, 0.05, 120);
+    const { end, ys } = walk({ x: 2.8, z: 0 }, 0, 0.05, 90);
     expect(end.floor).toBe(1);
     expect(end.y).toBeCloseTo(FLOOR_Y[1]);
     expect(roomAt(end.x, end.z, end.floor)).toBe("landing");
     for (let i = 1; i < ys.length; i++) expect(ys[i]).toBeGreaterThanOrEqual(ys[i - 1] - 1e-9);
+  });
+
+  it("straight on from the top of the stairs, through the archway, to the Guest Wing's doors", () => {
+    // The stairs gate open, the Guest Wing's doors shut.
+    let s = { x: 2.8, z: 0, floor: 0 as Floor };
+    for (let i = 0; i < 260; i++) s = moveBody(s.x + 0.05, s.z, s.floor, (id) => id === "stairs");
+    expect(roomAt(s.x, s.z, s.floor)).toBe("wingpassage");
+    // Stopped by the closed double doors, well clear of the stairs.
+    expect(s.x).toBeLessThan(WING.x0);
+    expect(s.x).toBeGreaterThan(WING.x0 - 0.6);
+    expect(WING.x0 - STAIRS.rect.x1).toBeGreaterThan(5);
   });
 
   it("walking west from the landing goes back down to the lobby", () => {

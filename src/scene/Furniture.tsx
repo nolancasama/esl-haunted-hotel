@@ -112,7 +112,7 @@ function FurnitureItem({ obj, hideSeek = false }: { obj: WorldObject; hideSeek?:
     if (!r) return;
     // Only the floor you are on is drawn (the staircase belongs to both).
     let visible = obj.floor === rt.view.floor || Boolean(obj.spec.bothFloors);
-    // The Guest Wing is only drawn from the west half of the landing or inside it (Chromebook budget).
+    // The Guest Wing is only drawn from the east half of the upstairs or inside it (Chromebook budget).
     // Down the corridor, only what is within 11 m (the far end is deep in the fog by then).
     if (visible && wing && !hideSeek) visible = nearGuestWing() && Math.abs(obj.x - rt.player.x) < 11;
     // Things hanging on a wall disappear with it in the cutaway view.

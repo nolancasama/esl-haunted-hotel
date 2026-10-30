@@ -6,7 +6,7 @@ import { PartBuilder } from "./partBuilder";
 import { glowPartMaterial, glowSpriteMaterial } from "./materials";
 import { beamTexture, glowTexture } from "./textures";
 import { Rain } from "./Rain";
-import { WALL_T, WING_RECT } from "../game/world/rooms";
+import { PASSAGE_RECT, WALL_T, WING_RECT } from "../game/world/rooms";
 import { director } from "../game/director";
 import { isCanvasTap } from "../input/tap";
 
@@ -58,15 +58,15 @@ function porchGeometry(): THREE.BufferGeometry {
     b.sphere(s, x, s * 0.7, z, "#2f5a34", [1.3, 1, 1.3], 10);
   }
   for (const [x, z] of [
-    // (clear of the covered entrance under the Guest Wing)
-    [-14.5, -9.2],
-    [-16.5, 8.8],
+    [-14.5, -4.5],
+    [-15.5, 4.2],
     [-2.0, -16.0],
     [4.8, -15.4],
     [-5.5, 15.6],
     [3.0, 16.2],
-    [13.0, -3.0],
-    [12.6, 7.5]
+    // (clear of the Guest Wing's base behind the hotel)
+    [13.0, -8.6],
+    [29.5, 3.0]
   ] as const) {
     b.cyl(0.18, 0.24, 1.6, x, 0, z, "#4a3020", 8);
     b.cone(1.2, 2.6, x, 1.4, z, "#2c5a38", 10);
@@ -74,43 +74,41 @@ function porchGeometry(): THREE.BufferGeometry {
   }
   // sign above the entrance (outside face)
   b.box(0.08, 0.5, 2.6, -8.16, 2.25, 0, "#3a2418");
-  coveredEntrance(b);
+  wingBase(b);
   return b.build();
 }
 
 /**
- * The Guest Wing stands on stone piers over the front path: a covered entrance (porte-cochère).
- * Piers at the outer corners and between the rooms, beams along the edges, and a panelled
- * ceiling just under the wing's floor. The ground floor gains no rooms.
+ * The Guest Wing stands on a closed stone base behind the hotel (no rooms inside): the same outer
+ * walls as the hotel, a darker plinth, blind arched windows and a string course under the wing's
+ * floor. Its top is just below the wing's floor; the front of the hotel is untouched.
  */
-function coveredEntrance(b: PartBuilder) {
-  const w = WING_RECT;
+function wingBase(b: PartBuilder) {
   const t = WALL_T / 2;
-  const x0 = w.x0 - t;
-  const x1 = w.x1 - t;
-  const stone = "#544c62";
-  const cap = "#6a6278";
-  const beam = "#3a2a2e";
-  const top = 2.62;
-  for (const x of [w.x0 + 0.15, -18, -13, w.x1 - 0.35]) {
-    for (const z of [w.z0 + 0.15, w.z1 - 0.15]) {
-      b.box(0.5, 0.12, 0.5, x, 0, z, cap);
-      b.box(0.42, top - 0.3, 0.42, x, 0.12, z, stone);
-      b.box(0.52, 0.18, 0.52, x, top - 0.18, z, cap);
+  const top = 2.79;
+  const wall = "#2a2238";
+  const plinth = "#3a3248";
+  const course = "#4a4058";
+  const blind = "#1a1426";
+  for (const r of [
+    { x0: PASSAGE_RECT.x0 + t, x1: PASSAGE_RECT.x1, z0: PASSAGE_RECT.z0 - t, z1: PASSAGE_RECT.z1 + t },
+    { x0: WING_RECT.x0, x1: WING_RECT.x1 + t, z0: WING_RECT.z0 - t, z1: WING_RECT.z1 + t }
+  ]) {
+    const cx = (r.x0 + r.x1) / 2;
+    const cz = (r.z0 + r.z1) / 2;
+    const w = r.x1 - r.x0;
+    const d = r.z1 - r.z0;
+    b.box(w, top, d, cx, 0, cz, wall);
+    b.box(w + 0.08, 0.35, d + 0.08, cx, 0, cz, plinth);
+    b.box(w + 0.1, 0.12, d + 0.1, cx, top - 0.18, cz, course);
+    // blind arched windows along the long sides
+    for (let x = r.x0 + 1.2; x < r.x1 - 0.8; x += 2.5) {
+      for (const z of [r.z0 - 0.01, r.z1 + 0.01]) {
+        b.box(0.9, 1.2, 0.02, x, 0.7, z, blind);
+        b.cylAt(0.45, 0.02, [x, 1.9, z], [Math.PI / 2, 0, 0], blind);
+      }
     }
   }
-  // A pair of piers framing the end of the path at the far end.
-  for (const z of [-1.7, 1.7]) {
-    b.box(0.5, 0.12, 0.5, w.x0 + 0.15, 0, z, cap);
-    b.box(0.42, top - 0.3, 0.42, w.x0 + 0.15, 0.12, z, stone);
-    b.box(0.52, 0.18, 0.52, w.x0 + 0.15, top - 0.18, z, cap);
-  }
-  // Beams along the three open sides, and the ceiling (its top just under the wing's floor).
-  b.box(x1 - x0, 0.2, 0.34, (x0 + x1) / 2, top - 0.02, w.z0 + 0.12, beam);
-  b.box(x1 - x0, 0.2, 0.34, (x0 + x1) / 2, top - 0.02, w.z1 - 0.12, beam);
-  b.box(0.34, 0.2, w.z1 - w.z0, w.x0 + 0.12, top - 0.02, 0, beam);
-  b.box(x1 - x0, 0.03, w.z1 - w.z0 + 2 * t, (x0 + x1) / 2, 2.765, 0, "#2e2230");
-  for (let x = w.x0 + 1.5; x < w.x1 - 0.5; x += 1.5) b.box(0.08, 0.06, w.z1 - w.z0, x, 2.705, 0, beam);
 }
 
 function lampGlowGeometry(): THREE.BufferGeometry {
