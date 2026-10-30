@@ -7,7 +7,7 @@ import "./styles.css";
 
 const params = new URLSearchParams(location.search);
 if (params.get("e2e") === "1") installE2eHook();
-if (import.meta.env.DEV || params.get("debug") === "1") installDebugKeys();
+installDebugKeys(import.meta.env.DEV || params.get("debug") === "1");
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

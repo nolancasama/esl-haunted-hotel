@@ -90,8 +90,9 @@ npm run e2e        # build + Playwright playthroughs
 npm run build      # production build in dist/ (relative paths, works on GitHub Pages)
 ```
 
-Debug keys (dev server, or any build with `?debug=1`): `]` next ghost, `[`
-previous ghost, `}` (Shift+]) jump to the ending.
+Debug mode: **Ctrl+Shift+D** turns it on/off on any build (already on with
+the dev server or `?debug=1`). While it is on: `]` next ghost, `[` previous
+ghost, `}` (Shift+]) jump to the ending.
 
 Visual checks (dev server on port 5199): `node scripts/shots.mjs`,
 `node scripts/reveals.mjs` (every hiding spot's reveal) and
