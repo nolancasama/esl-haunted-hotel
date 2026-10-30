@@ -2,9 +2,12 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { installE2eHook } from "./game/e2e";
+import { installDebugKeys } from "./input/debugKeys";
 import "./styles.css";
 
-if (new URLSearchParams(location.search).get("e2e") === "1") installE2eHook();
+const params = new URLSearchParams(location.search);
+if (params.get("e2e") === "1") installE2eHook();
+if (import.meta.env.DEV || params.get("debug") === "1") installDebugKeys();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
