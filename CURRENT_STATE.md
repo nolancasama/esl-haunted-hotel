@@ -13,7 +13,9 @@ walking into them), and the optional mystery "Who stayed in Room 206?" (register
 suitcase, photo, painting, the 206 key, then a short scene with Pip's photograph) can be
 solved every playthrough. In Hide & Seek, **Guest Wing** is one challenge area with a picker
 for Rooms 201–206; the collection is now 72 (8 ghosts x 9 areas) and old records are kept.
-Typecheck, build, 777 unit tests and every e2e spec pass (see the run below). Claude
+Typecheck, build and 777 unit tests pass; the full e2e run passed 75/76. The one failure,
+`chapter2.spec.ts` "the full adventure…", is a pre-existing flake (see Known Issues): it
+failed 1 of 3 repeats on this branch and 3 of 3 on the previous `main` build. Claude
 reviewed `.tmp/wing/` (story rooms, corridor, register, mystery, exterior, porch, pickers at
 1024x600 and 844x390) and `.tmp/wing/hideseek/` (all six rooms: overview, close-up question,
 first-person hiding).
@@ -219,6 +221,11 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
   the old entrance shot that faded the player out during the reaction.
 
 ## Known Issues
+- `chapter2.spec.ts` "the full adventure catches all eight ghosts" is flaky under repeated
+  SwiftShader load (2026-10-30): a search-marker click sometimes never reaches the answer
+  phase (bathroom basket, attic table seen). The previous `main` build failed it 3/3 with
+  `--repeat-each=3`, this branch 1/3; it passes alone. Probably the 1.3 s close-up settle in
+  `openCloseUp` is too short at ~3 fps. Not fixed here.
 - Guest Wing: software rendering (SwiftShader) shows the mystery scene's camera mid-blend in
   screenshots because frames are slow; on real hardware it settles in under a second. Not
   yet heard on speakers: the corridor clock tick and floor creaks. Old saves that finished
