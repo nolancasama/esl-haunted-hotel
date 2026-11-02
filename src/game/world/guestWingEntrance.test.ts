@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getGame, setGame } from "../store";
 import { doorAccess } from "../guestWing";
 import { WORLD } from "./world";
+import { ROOM_STYLE } from "../../scene/materials";
 import { PASSAGE_RECT, ROOMS, WALL_LINES, WING, roomAt } from "./rooms";
 
 describe("Guest Wing entrance revision", () => {
@@ -20,6 +21,38 @@ describe("Guest Wing entrance revision", () => {
     expect(walls).toHaveLength(0);
     expect(WALL_LINES.find((line) => line.id === "gw-pass-n")?.at).toBe(-4);
     expect(WALL_LINES.find((line) => line.id === "gw-pass-s")?.at).toBe(4);
+  });
+
+  it("has exactly one wall face per x=12 entry segment (no z-fighting)", () => {
+    const lines = WALL_LINES.filter((line) =>
+      line.floor === 1 && line.axis === "z" && line.at === WING.x0 &&
+      line.from < WING.hall.z1 + 5 && line.to > WING.hall.z0 - 5);
+    const byStart = lines.sort((a, b) => a.from - b.from);
+    expect(byStart.map((line) => line.id)).toEqual([
+      "gw-g201-west-outer", "gw-g201-west-entry", "gw-pass-doors",
+      "gw-g202-west-entry", "gw-g202-west-outer"
+    ]);
+    expect(byStart[0].from).toBe(-6.3);
+    for (let i = 0; i < byStart.length - 1; i++)
+      expect(byStart[i].to, byStart[i].id).toBeCloseTo(byStart[i + 1].from);
+    expect(byStart.at(-1)!.to).toBe(6.3);
+    expect(byStart.find((line) => line.id === "gw-g201-west-entry")?.neg).toBe("wingpassage");
+    expect(byStart.find((line) => line.id === "gw-g202-west-entry")?.neg).toBe("wingpassage");
+  });
+
+  it("matches the landing wallpaper, floor grain and ambient light", () => {
+    expect(ROOM_STYLE.wingpassage.wall).toEqual(ROOM_STYLE.landing.wall);
+    expect(ROOM_STYLE.wingpassage.floor).toEqual(ROOM_STYLE.landing.floor);
+    expect(ROOMS.wingpassage.lamp.color).toBe(ROOMS.landing.lamp.color);
+    expect(ROOMS.wingpassage.lamp.intensity).toBe(ROOMS.landing.lamp.intensity);
+  });
+
+  it("moves both pots to the actual new vestibule corners", () => {
+    expect(WORLD.objectById.has("landing.plant3")).toBe(false);
+    expect(WORLD.objectById.has("landing.plant4")).toBe(false);
+    for (const [id, z] of [["wingpassage.plantN", -3.35], ["wingpassage.plantS", 3.35]] as const) {
+      expect(WORLD.objectById.get(id), id).toMatchObject({ room: "wingpassage", x: 11.35, z });
+    }
   });
 
   it("removes the approach carpet and keeps the luggage trolley out of the walking lane", () => {

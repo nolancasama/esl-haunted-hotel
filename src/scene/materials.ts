@@ -66,9 +66,11 @@ export const ROOM_STYLE: Record<RoomId, { wall: WallStyle; floor: FloorStyle }> 
     wall: { paper: "#4f2638", pattern: "#6e3a50", kind: "damask", wainscot: "#3a2418", trim: "#1f130d" },
     floor: { base: "#5a3826", seam: "#2a190f", seed: 31 }
   },
+  // The vestibule is physically an extension of the upstairs landing, not
+  // part of the burgundy Guest Wing: identical wallpaper/wood tone and grain.
   wingpassage: {
-    wall: { paper: "#4f2638", pattern: "#6e3a50", kind: "damask", wainscot: "#3a2418", trim: "#1f130d" },
-    floor: { base: "#5a3826", seam: "#2a190f", seed: 31 }
+    wall: { paper: "#2f3a72", pattern: "#3f4d90", kind: "damask", wainscot: "#3a2a44", trim: "#1f1628" },
+    floor: { base: "#5c3c2c", seam: "#2c1b14", seed: 21 }
   },
   g201: { wall: { paper: "#3d5878", pattern: "#4b6a8e", kind: "stripes", wainscot: "#45301f", trim: "#24170f" }, floor: GUEST_FLOOR },
   g202: { wall: { paper: "#6a5232", pattern: "#7c6340", kind: "stripes", wainscot: "#45301f", trim: "#24170f" }, floor: GUEST_FLOOR },
@@ -181,6 +183,9 @@ export function floorMaterial(room: RoomId, w: number, d: number): THREE.MeshLam
   const tex = floorTexture(ROOM_STYLE[room].floor).clone();
   tex.needsUpdate = true;
   tex.repeat.set(w / 2.2, d / 2.2);
+  // The widened passage continues the landing's floorboards. Align the texture
+  // phase across their shared x=8 boundary instead of restarting the pattern.
+  if (room === "wingpassage") tex.offset.x = 16 / 2.2;
   return new THREE.MeshLambertMaterial({ map: tex });
 }
 

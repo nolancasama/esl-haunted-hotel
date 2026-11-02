@@ -119,7 +119,7 @@ export function inWingFootprint(x: number, z: number, margin = 0): boolean {
 const wingRooms = Object.fromEntries([
   ["wingpassage", {
     id: "wingpassage", name: "Hallway", nameJa: "ろうか", floor: 1, bounds: PASSAGE_RECT,
-    lamp: { x: (PASSAGE_RECT.x0 + PASSAGE_RECT.x1) / 2, y: WALL_H + 2.45, z: 0, color: "#ffcf9a", intensity: 8 }
+    lamp: { x: (PASSAGE_RECT.x0 + PASSAGE_RECT.x1) / 2, y: WALL_H + 2.45, z: 0, color: "#c9b8ff", intensity: 9 }
   }],
   ["guesthall", {
     id: "guesthall", name: "Guest Wing", nameJa: "きゃくしつの ろうか", floor: 1,
@@ -354,7 +354,10 @@ function wingWalls(): WallLine[] {
     // The hallway from the landing: a window each side, the double doors at its end.
     { id: "gw-pass-n", floor: 1, axis: "x", at: p.z0, from: p.x0, to: p.x1, neg: null, pos: "wingpassage", openings: [win((p.x0 + p.x1) / 2)] },
     { id: "gw-pass-s", floor: 1, axis: "x", at: p.z1, from: p.x0, to: p.x1, neg: "wingpassage", pos: null, openings: [win((p.x0 + p.x1) / 2)] },
-    { id: "gw-pass-doors", floor: 1, axis: "z", at: WING.x0, from: p.z0, to: p.z1, neg: "wingpassage", pos: "guesthall",
+    // The central partition is ONLY the corridor's actual width. Extending it
+    // to the vestibule width duplicated the first guest rooms' west walls.
+    { id: "gw-pass-doors", floor: 1, axis: "z", at: WING.x0,
+      from: WING.hall.z0, to: WING.hall.z1, neg: "wingpassage", pos: "guesthall",
       openings: [door(WING.entrance.from, WING.entrance.to, "guestwing")] }
   ];
   for (const id of GUEST_ROOMS) {
@@ -374,7 +377,17 @@ function wingWalls(): WallLine[] {
   // The first rooms' outer side walls (beside the hallway), between neighbours, and the far end.
   for (const id of ["g201", "g202"] as const) {
     const b = guestBounds(id);
-    lines.push({ id: `gw-${id}-west`, floor: 1, axis: "z", at: b.x0, from: b.z0, to: b.z1, neg: null, pos: id });
+    const north = GUEST_INFO[id].north;
+    // West-facing walls beyond the widened passage remain exterior.
+    lines.push({ id: `gw-${id}-west-outer`, floor: 1, axis: "z", at: b.x0,
+      from: north ? b.z0 : PASSAGE_RECT.z1,
+      to: north ? PASSAGE_RECT.z0 : b.z1, neg: null, pos: id });
+    // The section bordering the passage is interior on BOTH sides.
+    // No section overlaps the central guestwing door wall.
+    lines.push({ id: `gw-${id}-west-entry`, floor: 1, axis: "z", at: b.x0,
+      from: north ? PASSAGE_RECT.z0 : WING.hall.z1,
+      to: north ? WING.hall.z0 : PASSAGE_RECT.z1,
+      neg: "wingpassage", pos: id });
   }
   for (const [west, east] of [["g201", "g203"], ["g203", "g205"], ["g202", "g204"], ["g204", "g206"]] as const) {
     const b = guestBounds(east);

@@ -60,11 +60,14 @@ export const upstairsModels: BuilderSet = {
   bench(_obj, b) {
     const { w } = KINDS.bench;
     b.box(w, 0.06, 0.45, 0, 0.38, 0, C.woodRed);
-    b.box(w - 0.06, 0.08, 0.4, 0, 0.44, 0.02, "#6a3a78");
+    // Raise the cushion just clear of the wooden seat: no coplanar faces.
+    b.box(w - 0.06, 0.08, 0.4, 0, 0.442, 0.02, "#6a3a78");
     b.box(w, 0.4, 0.06, 0, 0.5, -0.2, C.woodRed);
     for (const sx of [-1, 1]) {
       b.box(0.06, 0.38, 0.4, sx * (w / 2 - 0.05), 0, 0, C.woodDark);
-      b.box(0.06, 0.35, 0.06, sx * (w / 2 - 0.05), 0.44, -0.2, C.woodDark);
+      // Set the backrest post behind the rear panel; it previously shared
+      // its front/back planes with the panel and visibly z-fought.
+      b.box(0.06, 0.35, 0.06, sx * (w / 2 - 0.05), 0.44, -0.255, C.woodDark);
     }
   },
 

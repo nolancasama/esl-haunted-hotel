@@ -25,8 +25,7 @@ const CORNERS: Array<[number, number, number, number, Floor]> = [
   [8, 4, -1, 1, 1], // attic NE
   [8, 11, -1, -1, 1], // attic SE
   [0, 11, 1, -1, 1], // attic SW
-  [-8, 4, 1, -1, 1], // landing SW
-  [8, -4, -1, 1, 1] // landing NE
+  [-8, 4, 1, -1, 1] // landing SW
 ];
 
 /** One web hanging in a corner: radial threads plus a few sagging rings. */

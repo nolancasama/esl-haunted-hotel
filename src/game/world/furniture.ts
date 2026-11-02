@@ -315,8 +315,10 @@ export const PLACEMENTS: Placement[] = [
   { id: "landing.side", kind: "sidetable", room: "landing", x: -0.6, z: 3.55, rot: 180 },
   { id: "landing.plant1", kind: "plant", room: "landing", x: -7.35, z: -3.35, rot: 0 },
   { id: "landing.plant2", kind: "plant", room: "landing", x: -7.35, z: 3.35, rot: 0 },
-  { id: "landing.plant3", kind: "plant", room: "landing", x: 7.35, z: -3.35, rot: 0 },
-  { id: "landing.plant4", kind: "plant", room: "landing", x: 7.35, z: 3.35, rot: 0 },
+  // The old x=8 corners opened into the widened Guest Wing vestibule.
+  // Place these two pots at the actual new x=12 corners instead.
+  { id: "wingpassage.plantN", kind: "plant", room: "wingpassage", x: 11.35, z: -3.35, rot: 0 },
+  { id: "wingpassage.plantS", kind: "plant", room: "wingpassage", x: 11.35, z: 3.35, rot: 0 },
   { id: "landing.painting1", kind: "painting", room: "landing", x: -6.2, z: -3.9, rot: 0, variant: "b" },
   { id: "landing.painting2", kind: "painting", room: "landing", x: -1.9, z: 3.9, rot: 180, variant: "a" },
   { id: "landing.chandelier", kind: "chandelier", room: "landing", x: -3.4, z: 0, rot: 0, variant: "small" },
