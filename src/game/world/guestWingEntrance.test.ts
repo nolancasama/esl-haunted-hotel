@@ -57,6 +57,39 @@ describe("Guest Wing entrance revision", () => {
     expect(partition[0].rect.x0).toBeCloseTo(WING.x0 - WALL_T / 2);
   });
 
+  it("prevents the TWO long corridor wall ends from sticking through the Guest Wing doorway", () => {
+    const pieces = wallPieces(WALL_LINES);
+    const face = WING.x0 + WALL_T / 2;
+    for (const id of ["gw-g201-hall", "gw-g202-hall"]) {
+      const ends = pieces.filter((piece) => piece.line.id === id);
+      expect(ends.length, id).toBeGreaterThan(0);
+      expect(Math.min(...ends.map((p) => p.rect.x0)), id).toBeCloseTo(face);
+      expect(ends.every((p) => p.rect.x0 >= face - 0.001), id).toBe(true);
+    }
+  });
+
+  it("joins the widened entry wall to both guest wings without gaps or overlaps", () => {
+    const pieces = wallPieces(WALL_LINES);
+    const span = (id: string) => {
+      const parts = pieces.filter((p) => p.line.id === id);
+      expect(parts.length, id).toBeGreaterThan(0);
+      return {
+        from: Math.min(...parts.map((p) => p.rect.z0)),
+        to: Math.max(...parts.map((p) => p.rect.z1))
+      };
+    };
+    const ids = [
+      "gw-g201-west-outer", "gw-g201-west-entry", "gw-pass-doors",
+      "gw-g202-west-entry", "gw-g202-west-outer"
+    ];
+    for (let i = 0; i < ids.length - 1; i++) {
+      expect(span(ids[i]).to, `${ids[i]} -> ${ids[i + 1]}`)
+        .toBeCloseTo(span(ids[i + 1]).from);
+    }
+    expect(span("gw-pass-doors").from).toBeCloseTo(WING.hall.z0 - WALL_T / 2);
+    expect(span("gw-pass-doors").to).toBeCloseTo(WING.hall.z1 + WALL_T / 2);
+  });
+
   it("matches the landing wallpaper, floor grain and ambient light", () => {
     expect(ROOM_STYLE.wingpassage.wall).toEqual(ROOM_STYLE.landing.wall);
     expect(ROOM_STYLE.wingpassage.floor).toEqual(ROOM_STYLE.landing.floor);

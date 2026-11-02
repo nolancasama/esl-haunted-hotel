@@ -29,11 +29,20 @@ export function CameraRig() {
     const screen = getGame().screen;
     if (screen === "game" && c.mode === "follow" && !c.shot) {
       const view = automaticView(rt.player.x, rt.player.z, rt.player.floor, rt.player.stairs);
-      if (lastZone.current !== view.zone) {
+      const zoneChanged = lastZone.current !== view.zone;
+      const angleDifference = (a: number, b: number) =>
+        Math.atan2(Math.sin(a - b), Math.cos(a - b));
+      // Another story event may assign yawTarget after the room changes. The
+      // fixed exploration camera must keep its cardinal view, even then.
+      const wrongTarget = c.yawTarget !== null &&
+        Math.abs(angleDifference(c.yawTarget, view.yaw)) > 0.04;
+      const drifted = c.yawTarget === null &&
+        Math.abs(angleDifference(c.yaw, view.yaw)) > 0.04;
+      if (zoneChanged || wrongTarget || drifted) {
         lastZone.current = view.zone;
-        // While an input is held, retain its original world-space heading until
-        // release, so an automatic camera turn never unexpectedly reverses walking.
-        if (Math.abs(view.yaw - c.yaw) > 0.08) c.inputLock = c.yaw;
+        // Maintain the original world-space movement heading while turning.
+        if (zoneChanged && Math.abs(angleDifference(view.yaw, c.yaw)) > 0.08)
+          c.inputLock = c.yaw;
         c.yawTarget = view.yaw;
       }
       const ease = 1 - Math.exp(-dt * 2.5);

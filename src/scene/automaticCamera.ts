@@ -16,9 +16,11 @@ export interface AutomaticView {
 
 const views: Record<string, Omit<AutomaticView, "zone">> = {
   lobby: { yaw: 0.35, pitch: 0.9, distance: 7.4 },
-  landing: { yaw: 0.9, pitch: 0.96, distance: 7.6 },
-  wingpassage: { yaw: -Math.PI / 2, pitch: 0.92, distance: 7.0 },
-  guesthall: { yaw: -Math.PI / 2, pitch: 1.0, distance: 8.1 },
+  // Keep the landing and both horizontal guest hallways in the same
+  // orthogonal side view: the long x-axis walls project perfectly level.
+  landing: { yaw: 0, pitch: 0.96, distance: 7.6 },
+  wingpassage: { yaw: 0, pitch: 0.92, distance: 7.0 },
+  guesthall: { yaw: 0, pitch: 1.0, distance: 8.1 },
   bedroom: { yaw: 0, pitch: 0.92, distance: 6.9 },
   dining: { yaw: 0, pitch: 0.92, distance: 6.9 },
   storage: { yaw: Math.PI, pitch: 0.9, distance: 6.9 },

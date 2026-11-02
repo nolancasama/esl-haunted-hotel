@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as THREE from "three";
 import { automaticView } from "./automaticCamera";
 
 describe("automatic Story Mode camera", () => {
@@ -14,11 +15,31 @@ describe("automatic Story Mode camera", () => {
     const guest202 = automaticView(14, 4, 1, false);
     expect([landing.zone, vestibule.zone, corridor.zone, guest201.zone, guest202.zone])
       .toEqual(["landing", "wingpassage", "guesthall", "g201", "g202"]);
-    expect(landing.yaw).not.toBe(vestibule.yaw);
-    expect(vestibule.yaw).toBe(corridor.yaw);
+    expect(landing.yaw).toBe(0);
+    expect(vestibule.yaw).toBe(0);
+    expect(corridor.yaw).toBe(0);
     expect(guest201.yaw).toBe(0);
     expect(guest202.yaw).toBe(Math.PI);
   });
+  it("keeps the long hallway walls exactly parallel to the screen bottom", () => {
+    for (const [x, z] of [[10, 0], [18, 0], [24, 0]] as const) {
+      const view = automaticView(x, z, 1, false);
+      // With yaw 0 the camera looks straight across the hall's z axis.
+      // Two points on a wall running east-west (the x axis) must have
+      // exactly the same screen-space y, with no diagonal vanishing line.
+      const cam = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 100);
+      const height = 1.0 + view.distance * Math.sin(view.pitch);
+      cam.position.set(x, height, z + view.distance * Math.cos(view.pitch));
+      cam.lookAt(x, 1.0, z);
+      cam.updateMatrixWorld();
+      cam.updateProjectionMatrix();
+      const left = new THREE.Vector3(x - 2, 2, z - 1).project(cam);
+      const right = new THREE.Vector3(x + 2, 2, z - 1).project(cam);
+      expect(left.y).toBeCloseTo(right.y, 8);
+      expect(left.x).toBeLessThan(right.x);
+    }
+  });
+
   it("uses an elevated side angle on the stairs then restores the landing shot", () => {
     expect(automaticView(6, 0, 1, true).zone).toBe("stairs");
     expect(automaticView(6, 0, 1, false).zone).toBe("landing");

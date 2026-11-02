@@ -484,14 +484,27 @@ export function wallPieces(lines: WallLine[] = WALL_LINES): WallPiece[] {
     // (two coplanar overlapping boxes would flicker).
     const continues = (v: number) =>
       lines.some((o) => o !== line && o.floor === line.floor && o.axis === "x" && o.at === line.at && (o.from === v || o.to === v));
-    const start = line.axis === "x" ? line.from - (continues(line.from) ? 0 : WALL_T / 2) : line.from + WALL_T / 2;
+    // The first guest-room corridor walls (at z=+/-1.3) meet the back of
+    // the entrance partition at x=12. The old default extended them WEST
+    // to x=11.9, visibly poking through the double-door wall into the
+    // vestibule. Butt their ends against the EAST face at x=12.1 instead.
+    const isGuestCorridorStart = line.id === "gw-g201-hall" || line.id === "gw-g202-hall";
+    // The x=12 partition is one continuous wall with an entrance: the door
+    // wall must meet the two room-side segments and the exterior segments
+    // WITHOUT a gap at each T-junction. Its long pieces butt against their
+    // neighbours at the exact wall face, never extend into the corridor.
+    const extendZStart = line.id === "gw-pass-doors" || line.id === "gw-g201-west-entry";
+    const extendZEnd = line.id === "gw-pass-doors" || line.id === "gw-g202-west-entry";
+    const start = line.axis === "x"
+      ? line.from + (isGuestCorridorStart ? WALL_T / 2 : continues(line.from) ? 0 : -WALL_T / 2)
+      : line.from + (extendZStart ? -WALL_T / 2 : WALL_T / 2);
     // The two side walls of the widened Guest Wing entrance must finish at the
     // inner face of the perpendicular door partition. Extending their caps
     // beyond x=12 makes them visibly stick through the first guest-room walls.
     const flushGuestWingEnd = line.id === "gw-pass-n" || line.id === "gw-pass-s";
     const end = line.axis === "x"
       ? line.to + (flushGuestWingEnd ? -WALL_T / 2 : continues(line.to) ? 0 : WALL_T / 2)
-      : line.to - WALL_T / 2;
+      : line.to + (extendZEnd ? WALL_T / 2 : -WALL_T / 2);
     const openings = [...(line.openings ?? [])].sort((a, b) => a.from - b.from);
     let cursor = start;
     let n = 0;
