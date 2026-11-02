@@ -191,7 +191,9 @@ function loadSettings(): Settings {
 
 const CH2_KEY = "hh.ch2.v1";
 const HIDE_SEEK_KEY = "hh.hideseek.v1";
-const GUEST_WING_KEY = "hh.guestwing.v1";
+// Legacy v1 stored the Guest Wing as permanently open on some earlier builds.
+// Invalidate that stale permission once: completing Chapter 2 again grants v2.
+const GUEST_WING_KEY = "hh.guestwing.chapter2.v2";
 const WING_MYSTERY_KEY = "hh.guestwing.mystery.v1";
 /** Written at every story finish from this version on, so an older save can be told apart. */
 const FINISH_MARK_KEY = "hh.finish.v2";
@@ -243,10 +245,11 @@ export function saveWingMysterySolved() {
   setGame({ wingMysterySolved: true });
 }
 
-/** Only a confirmed Chapter 2 completion unlocks the Guest Wing. A legacy generic
- * replay flag cannot establish which chapter was finished, so never infer access.
+/** Only a Chapter 2 completion recorded by the current, explicit unlock path
+ * grants Guest Wing access. Ignore older v1 flags; do not delete story progress,
+ * Hide & Seek achievements, or chapter selection unlocks.
  */
-function loadGuestWingUnlocked(): boolean {
+export function loadGuestWingUnlocked(): boolean {
   return loadFlag(GUEST_WING_KEY);
 }
 
