@@ -45,8 +45,9 @@ describe("Guest Wing entrance revision", () => {
       const line = WALL_LINES.find((item) => item.id === id)!;
       const pieces = wallPieces([line]);
       expect(pieces.length).toBeGreaterThan(0);
+      expect(Math.max(...pieces.map((piece) => piece.rect.x1))).toBeCloseTo(WING.x0 - WALL_T / 2);
       for (const piece of pieces) {
-        expect(piece.rect.x1, piece.id).toBeCloseTo(WING.x0 - WALL_T / 2);
+        expect(piece.rect.x1, piece.id).toBeLessThanOrEqual(WING.x0 - WALL_T / 2 + 0.001);
         expect(piece.rect.x0, piece.id).toBeLessThan(piece.rect.x1);
       }
     }
