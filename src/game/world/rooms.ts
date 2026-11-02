@@ -38,7 +38,7 @@ export interface RoomDef {
  */
 /**
  * The Forgotten Guest Wing, upstairs at the back of the hotel. The stairs arrive at the landing's
- * east end; straight ahead an open archway in the east wall leads into a 4 m hallway (with a
+ * east end; straight ahead a full-width opening leads into a 4 m hallway (with a
  * window each side), and at its far end the GUEST ROOMS double doors open on the wing's corridor,
  * with three guest rooms on each side. It stands outside the original footprint, over the back
  * garden, on a closed stone base (scene/Outside.tsx); the front of the hotel is unchanged.
@@ -47,13 +47,13 @@ export interface RoomDef {
  *   z = -6.3        +------------+------------+------------+
  *                   |    201     |    203     |    205     |
  *   z = -1.3 +------+----[ ]-----+----[ ]-----+----[ ]-----+
- *  landing  (arch) hallway [==]        corridor            [w]
+ *  landing (open)  hallway [==]        corridor            [w]
  *   z =  1.3 +------+----[ ]-----+----[ ]-----+----[ ]-----+
  *                   |    202     |    204     |    206     |
  *   z =  6.3        +------------+------------+------------+
  */
 export const WING = {
-  /** The landing's east wall, with the open archway. */
+  /** The landing's east edge, where the connecting passage now continues full-width. */
   landingX: 8,
   /** The GUEST ROOMS double doors: the hallway from the landing ends here and the corridor starts. */
   x0: 12,
@@ -67,8 +67,8 @@ export const WING = {
   doorHalf: 0.6,
   /** The double doors at the end of the hallway. */
   entrance: { from: -0.9, to: 0.9 },
-  /** The archway from the landing (no door), and its height. */
-  arch: { from: -1.2, to: 1.2, top: 2.3 }
+  /** Full-width connecting passage, aligned with the landing's north and south walls. */
+  passage: { z0: -4, z1: 4 }
 };
 
 export const GUEST_ROOMS = ["g201", "g202", "g203", "g204", "g205", "g206"] as const;
@@ -107,7 +107,7 @@ export function guestBounds(id: GuestRoomId): Rect {
     : { x0, x1: x0 + WING.roomW, z0: WING.hall.z1, z1: WING.hall.z1 + WING.depth };
 }
 /** The hallway from the landing's archway to the double doors (wall centre lines). */
-export const PASSAGE_RECT: Rect = { x0: WING.landingX, x1: WING.x0, z0: WING.hall.z0, z1: WING.hall.z1 };
+export const PASSAGE_RECT: Rect = { x0: WING.landingX, x1: WING.x0, z0: WING.passage.z0, z1: WING.passage.z1 };
 /** Footprint of the wing beyond the double doors (wall centre lines). */
 export const WING_RECT: Rect = { x0: WING.x0, x1: WING.x1, z0: WING.hall.z0 - WING.depth, z1: WING.hall.z1 + WING.depth };
 /** Inside the hallway or the wing, upstairs (x/z only; walls included). */
@@ -340,11 +340,8 @@ const UPPER_WALLS: WallLine[] = [
   { id: "u-w-lan", openings: [win(0)], floor: 1, axis: "z", at: -8, from: -4, to: 4, neg: null, pos: "landing" },
   { id: "u-w-mus", floor: 1, axis: "z", at: -8, from: 4, to: 11, neg: null, pos: "music" },
   { id: "u-e-bath", floor: 1, axis: "z", at: 8, from: -11, to: -4, neg: "bathroom", pos: null },
-  // East: straight ahead from the top of the stairs, an open archway into the Guest Wing's hallway.
-  { id: "u-e-lan-n", floor: 1, axis: "z", at: 8, from: -4, to: WING.hall.z0, neg: "landing", pos: null },
-  { id: "u-e-lan", floor: 1, axis: "z", at: 8, from: WING.hall.z0, to: WING.hall.z1, neg: "landing", pos: "wingpassage",
-    openings: [{ from: WING.arch.from, to: WING.arch.to, top: WING.arch.top }] },
-  { id: "u-e-lan-s", floor: 1, axis: "z", at: 8, from: WING.hall.z1, to: 4, neg: "landing", pos: null },
+  // The landing and the connecting passage are one continuous, full-height opening.
+  // No wall segments, arch frame or overhead lintel at x=8.
   { id: "u-e-att", floor: 1, axis: "z", at: 8, from: 4, to: 11, neg: "attic", pos: null },
   { id: "u-x-up", floor: 1, axis: "z", at: 0, from: -11, to: -4, neg: "playroom", pos: "bathroom" },
   { id: "u-x-down", floor: 1, axis: "z", at: 0, from: 4, to: 11, neg: "music", pos: "attic" }

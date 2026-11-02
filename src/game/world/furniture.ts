@@ -147,13 +147,14 @@ const GUEST_PLACEMENTS: Placement[] = [
   ])
 ];
 
-/** The hallway from the landing: a window each side, a runner, a bench and wall lamps. */
+/** Bare floor in the wide entry vestibule. A lone old luggage trolley replaces the carpet;
+ * its model is drawn in scene/GuestWingEntrance.tsx, set aside along the south wall.
+ */
 const PASSAGE_PLACEMENTS: Placement[] = [
-  { id: "wingpassage.runner", kind: "runner", room: "wingpassage", x: 10, z: 0, rot: 0, variant: "guest" },
-  { id: "wingpassage.windowN", kind: "window", room: "wingpassage", x: 10, z: WING.hall.z0 + 0.1, rot: 0 },
-  { id: "wingpassage.windowS", kind: "window", room: "wingpassage", x: 10, z: WING.hall.z1 - 0.1, rot: 180 },
-  { id: "wingpassage.lampN", kind: "walllamp", room: "wingpassage", x: 11.4, z: WING.hall.z0 + 0.1, rot: 0 },
-  { id: "wingpassage.lampS", kind: "walllamp", room: "wingpassage", x: 11.4, z: WING.hall.z1 - 0.1, rot: 180 }
+  { id: "wingpassage.windowN", kind: "window", room: "wingpassage", x: 10, z: WING.passage.z0 + 0.1, rot: 0 },
+  { id: "wingpassage.windowS", kind: "window", room: "wingpassage", x: 10, z: WING.passage.z1 - 0.1, rot: 180 },
+  { id: "wingpassage.lampN", kind: "walllamp", room: "wingpassage", x: 11.4, z: WING.passage.z0 + 0.1, rot: 0 },
+  { id: "wingpassage.lampS", kind: "walllamp", room: "wingpassage", x: 11.4, z: WING.passage.z1 - 0.1, rot: 180 }
 ];
 
 /** The corridor: runner, wall lamps, paintings, a clock, the guest register and a window at the far end. */

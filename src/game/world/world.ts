@@ -194,6 +194,8 @@ export function buildWorld(placements: Placement[] = PLACEMENTS): World {
           : { x0: d.at - WALL_T / 2, x1: d.at + WALL_T / 2, z0: d.from, z1: d.to }
     })),
     ...objects.filter((o) => o.spec.solid).map((o) => ({ id: o.id, rect: o.rect, floor: o.floor })),
+    // The decorative hotel trolley in the wide entrance is solid (it is drawn separately).
+    { id: "wingpassage.luggagecart", floor: 1, rect: { x0: 9.16, x1: 10.44, z0: 2.61, z1: 3.49 } },
     ...STAIR_COLLIDERS
   ];
   return {

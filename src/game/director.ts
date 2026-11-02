@@ -75,6 +75,8 @@ let cutscene: "intro" | "chapter2" | null = null;
 let nextSteam = 0;
 let fanHinted = false;
 let chapterCardKey = 0;
+/** The upstairs beacon introduction plays only on the first physical stair arrival per run. */
+let upstairsArrivalShown = false;
 
 const params = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
 const fixedSeed = params.has("seed") ? Number(params.get("seed")) || 1 : null;
@@ -608,6 +610,39 @@ function pointTheWay() {
     rt.beaconDoor = ROOM_DOOR[enc.room] ?? null;
     showHint("goDoor");
   }
+}
+
+/** Freeze the student briefly, then guide the camera to the next glowing doorway.
+ * Triggered once when walking UP the stairs in the full Chapter 2 adventure.
+ * Do not consume a search, change story progress or require microphone input.
+ */
+async function showUpstairsDestination() {
+  const marker = rt.beaconDoor ? beaconSpot(rt.beaconDoor) : null;
+  if (!marker || marker.floor !== 1) return;
+  const token = gen;
+  busy = true;
+  rt.player.frozen = true;
+  rt.player.walkTo = null;
+  rt.player.speed = 0;
+  rt.destination.visible = false;
+  rt.move.x = rt.move.y = 0;
+  rt.joy.x = rt.joy.y = 0;
+  rt.joy.active = false;
+  const towardZ = marker.z < 0 ? 1 : -1;
+  rt.camera.mode = "shot";
+  rt.camera.shot = {
+    pos: { x: marker.x + (marker.x < 0 ? 3.0 : -3.0), y: FLOOR_Y[1] + 4.2, z: marker.z + towardZ * 3.0 },
+    target: { x: marker.x, y: FLOOR_Y[1] + 0.55, z: marker.z }
+  };
+  caption("Follow the glowing circle!", "info", 2600);
+  audio.play("sparkle");
+  await sleep(2550);
+  alive(token);
+  rt.camera.mode = "follow";
+  rt.camera.shot = null;
+  rt.player.frozen = false;
+  busy = false;
+  touchActivity();
 }
 
 /** The current ghost's turn begins: open its room and wait for the student to walk in. */
@@ -1382,6 +1417,16 @@ function tick() {
   }
 
   if (g.phase !== "explore" && g.phase !== "search") return;
+  // First time the player finishes climbing upstairs: stop walking and show
+  // the next room's glowing entrance. Chapter 2 direct-start has no stair climb.
+  if (!upstairsArrivalShown && !busy && awaitingEntry && g.phase === "explore" &&
+      g.chapter === 2 && g.scope !== "ch2" &&
+      rt.player.floor === 1 && !rt.player.stairs && room === "landing") {
+    upstairsArrivalShown = true;
+    pointTheWay();
+    run(showUpstairsDestination);
+    return;
+  }
   wingAmbience(room);
 
   if (awaitingEntry && !busy) {
@@ -1572,6 +1617,7 @@ function planFor(mode: Mode, scope: Scope): Encounter[] {
 
 function stopStory() {
   gen++;
+  upstairsArrivalShown = false;
   busy = false;
   awaitingEntry = false;
   outroWalk = false;
@@ -1613,6 +1659,7 @@ export const director = {
     fanHinted = false;
     stopListening?.();
     resetRuntime();
+    upstairsArrivalShown = false;
     if (fixedSeed !== null) rng = mulberry32(fixedSeed);
     if (mode === "practice") scope = "ch1";
     const settings = getGame().settings;

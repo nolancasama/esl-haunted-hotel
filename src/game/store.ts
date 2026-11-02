@@ -243,12 +243,11 @@ export function saveWingMysterySolved() {
   setGame({ wingMysterySolved: true });
 }
 
-/**
- * Saves from before the Guest Wing existed only record "a story was finished", not which part.
- * Those players keep their progress and find the wing open; from now on it opens with Chapter 2.
+/** Only a confirmed Chapter 2 completion unlocks the Guest Wing. A legacy generic
+ * replay flag cannot establish which chapter was finished, so never infer access.
  */
 function loadGuestWingUnlocked(): boolean {
-  return loadFlag(GUEST_WING_KEY) || (loadFlag(REPLAY_KEY) && !loadFlag(FINISH_MARK_KEY));
+  return loadFlag(GUEST_WING_KEY);
 }
 
 export const EMPTY_ANSWER: AnswerUi = {

@@ -10,6 +10,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { Beacon, Door } from "./Doors";
 import { GhostBoard } from "./GhostBoard";
 import { Outside } from "./Outside";
+import { GuestWingEntrance } from "./GuestWingEntrance";
 import { lineFade, nearGuestWing } from "./wallFade";
 import type { Rect, RoomId } from "../game/types";
 import { director } from "../game/director";
@@ -323,6 +324,7 @@ export function Hotel({ roomId }: { roomId?: RoomId }) {
       ))}
       <Beacon />
       <GhostBoard />
+      <GuestWingEntrance />
       <Outside />
       </>}
     </group>
