@@ -21,6 +21,18 @@ describe("automatic Story Mode camera", () => {
     expect(guest201.yaw).toBe(0);
     expect(guest202.yaw).toBe(Math.PI);
   });
+  it("gives the first-floor hallway the exact second-floor landing angle", () => {
+    const first = automaticView(0, 0, 0, false);
+    const second = automaticView(0, 0, 1, false);
+    expect(first.zone).toBe("lobby");
+    expect(second.zone).toBe("landing");
+    expect({ yaw: first.yaw, pitch: first.pitch, distance: first.distance })
+      .toEqual({ yaw: second.yaw, pitch: second.pitch, distance: second.distance });
+    for (const x of [-6, -2, 2, 6]) {
+      expect(automaticView(x, 0, 0, false).yaw).toBe(0);
+    }
+  });
+
   it("keeps the long hallway walls exactly parallel to the screen bottom", () => {
     for (const [x, z] of [[10, 0], [18, 0], [24, 0]] as const) {
       const view = automaticView(x, z, 1, false);

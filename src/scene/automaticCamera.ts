@@ -15,7 +15,9 @@ export interface AutomaticView {
 }
 
 const views: Record<string, Omit<AutomaticView, "zone">> = {
-  lobby: { yaw: 0.35, pitch: 0.9, distance: 7.4 },
+  // Both the first-floor lobby corridor and second-floor landing run east-west.
+  // Use the exact same orthogonal view so their long walls stay horizontal.
+  lobby: { yaw: 0, pitch: 0.96, distance: 7.6 },
   // Keep the landing and both horizontal guest hallways in the same
   // orthogonal side view: the long x-axis walls project perfectly level.
   landing: { yaw: 0, pitch: 0.96, distance: 7.6 },
