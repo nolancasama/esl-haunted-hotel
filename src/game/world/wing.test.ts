@@ -31,11 +31,15 @@ describe("the Guest Wing's place in the hotel", () => {
     expect(WORLD.objects.filter((o) => o.floor === 0).every((o) => o.rect.x1 <= 8.2)).toBe(true);
   });
 
-  it("the landing keeps its west window and gains an open archway (no door) in the east wall", () => {
+  it("keeps the west window and removes the old east arch/header entirely", () => {
     const west = WALL_LINES.find((l) => l.id === "u-w-lan")!;
     expect(west.openings?.some((o) => o.bottom !== undefined)).toBe(true);
-    const east = WALL_LINES.find((l) => l.id === "u-e-lan")!;
-    expect(east.openings).toEqual([{ from: WING.arch.from, to: WING.arch.to, top: WING.arch.top }]);
+    // The passage must be open floor to ceiling and as wide as the landing;
+    // a lintel would appear as an unwanted header above the player.
+    expect(WALL_LINES.some((line) => line.floor === 1 && line.axis === "z" && line.at === 8 &&
+      line.from < 4 && line.to > -4)).toBe(false);
+    expect(PASSAGE_RECT.z0).toBe(ROOMS.landing.bounds.z0);
+    expect(PASSAGE_RECT.z1).toBe(ROOMS.landing.bounds.z1);
     expect(WORLD.objectById.get("landing.window")).toMatchObject({ x: -7.9, rot: 90 });
     expect(FLOOR_Y[1]).toBeGreaterThan(0);
   });
