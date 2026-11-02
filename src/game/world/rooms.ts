@@ -485,7 +485,13 @@ export function wallPieces(lines: WallLine[] = WALL_LINES): WallPiece[] {
     const continues = (v: number) =>
       lines.some((o) => o !== line && o.floor === line.floor && o.axis === "x" && o.at === line.at && (o.from === v || o.to === v));
     const start = line.axis === "x" ? line.from - (continues(line.from) ? 0 : WALL_T / 2) : line.from + WALL_T / 2;
-    const end = line.axis === "x" ? line.to + (continues(line.to) ? 0 : WALL_T / 2) : line.to - WALL_T / 2;
+    // The two side walls of the widened Guest Wing entrance must finish at the
+    // inner face of the perpendicular door partition. Extending their caps
+    // beyond x=12 makes them visibly stick through the first guest-room walls.
+    const flushGuestWingEnd = line.id === "gw-pass-n" || line.id === "gw-pass-s";
+    const end = line.axis === "x"
+      ? line.to + (flushGuestWingEnd ? -WALL_T / 2 : continues(line.to) ? 0 : WALL_T / 2)
+      : line.to - WALL_T / 2;
     const openings = [...(line.openings ?? [])].sort((a, b) => a.from - b.from);
     let cursor = start;
     let n = 0;

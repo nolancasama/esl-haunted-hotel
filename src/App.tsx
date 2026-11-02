@@ -9,18 +9,15 @@ import { WingNote } from "./ui/WingNote";
 import { installKeyboard } from "./input/keyboard";
 import { director } from "./game/director";
 import { getGame, setGame, useGame } from "./game/store";
-import { rt } from "./game/runtime";
 import { tapGesture } from "./input/tap";
 import { warmNav } from "./game/world/nav";
 
-/** Drag anywhere on the 3D view to turn the camera (mouse or touch). */
-function useCameraDrag(ref: React.RefObject<HTMLDivElement | null>) {
+/** Track drag distance so moving a finger never accidentally selects a 3D object.\n * The story camera itself is automatic; only Hide & Seek has independent view controls. */
+function useCanvasTapTracking(ref: React.RefObject<HTMLDivElement | null>) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     let id: number | null = null;
-    let lx = 0;
-    let ly = 0;
     const down = (e: PointerEvent) => {
       if (e.pointerType === "touch") setGame({ touch: true });
       const target = e.target as HTMLElement;
@@ -33,24 +30,12 @@ function useCameraDrag(ref: React.RefObject<HTMLDivElement | null>) {
       tapGesture.started = performance.now();
       tapGesture.travel = 0;
       id = e.pointerId;
-      lx = e.clientX;
-      ly = e.clientY;
     };
     const move = (e: PointerEvent) => {
       if (e.pointerId !== id) return;
       tapGesture.travel = Math.max(tapGesture.travel, Math.hypot(e.clientX - tapGesture.x, e.clientY - tapGesture.y));
       if (performance.now() - tapGesture.started > 450 && tapGesture.travel > 3) tapGesture.cancelled = true;
-      const dx = e.clientX - lx;
-      const dy = e.clientY - ly;
-      lx = e.clientX;
-      ly = e.clientY;
-      const g = getGame();
-      if (g.screen !== "game" || g.phase !== "explore" || rt.camera.mode !== "follow") return;
-      const s = g.settings.cameraSensitivity;
-      rt.camera.yawTarget = null;
-      rt.camera.inputLock = null;
-      rt.camera.yaw -= dx * 0.0055 * s;
-      rt.camera.pitch = Math.min(1.15, Math.max(0.62, rt.camera.pitch + dy * 0.0028 * s));
+      // A drag only cancels taps; it never changes the story camera angle.
     };
     const up = (e: PointerEvent) => {
       tapGesture.pointers = Math.max(0, tapGesture.pointers - 1);
@@ -93,7 +78,7 @@ export function App() {
   useEffect(() => {
     if (window.matchMedia?.("(pointer: coarse)").matches) setGame({ touch: true });
   }, []);
-  useCameraDrag(wrap);
+  useCanvasTapTracking(wrap);
   return (
     <div className="app" ref={wrap}>
       <GameScene />

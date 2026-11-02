@@ -88,17 +88,10 @@ export function SettingsModal() {
           </section>
           <section className="settings-section">
             <h3>Camera <small lang="ja">カメラ</small></h3>
-            <Row label="Camera speed" ja="カメラの はやさ">
-              <input
-                type="range"
-                min={0.3}
-                max={2}
-                step={0.1}
-                value={s.cameraSensitivity}
-                style={{ "--fill": `${((s.cameraSensitivity - 0.3) / 1.7) * 100}%` } as CSSProperties}
-                onChange={(e) => set({ cameraSensitivity: Number(e.target.value) })}
-              />
-            </Row>
+            <p className="note" data-testid="automatic-camera-note">
+              Automatic views: the camera changes perspective when you enter a room or hallway.
+              <small lang="ja">カメラは じどうで うごきます。</small>
+            </p>
           </section>
           <section className="settings-section">
             <h3>Hide &amp; Seek <small lang="ja">かくれんぼ</small></h3>

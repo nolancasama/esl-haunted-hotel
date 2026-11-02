@@ -3,7 +3,7 @@ import { getGame, setGame } from "../store";
 import { doorAccess } from "../guestWing";
 import { WORLD } from "./world";
 import { ROOM_STYLE } from "../../scene/materials";
-import { PASSAGE_RECT, ROOMS, WALL_LINES, WING, roomAt } from "./rooms";
+import { PASSAGE_RECT, ROOMS, WALL_LINES, WING, roomAt, wallPieces, WALL_T } from "./rooms";
 
 describe("Guest Wing entrance revision", () => {
   it("makes the hall entrance as wide as the upstairs landing", () => {
@@ -38,6 +38,22 @@ describe("Guest Wing entrance revision", () => {
     expect(byStart.at(-1)!.to).toBe(6.3);
     expect(byStart.find((line) => line.id === "gw-g201-west-entry")?.neg).toBe("wingpassage");
     expect(byStart.find((line) => line.id === "gw-g202-west-entry")?.neg).toBe("wingpassage");
+  });
+
+  it("trims both passage side walls flush before the door partition", () => {
+    for (const id of ["gw-pass-n", "gw-pass-s"]) {
+      const line = WALL_LINES.find((item) => item.id === id)!;
+      const pieces = wallPieces([line]);
+      expect(pieces.length).toBeGreaterThan(0);
+      for (const piece of pieces) {
+        expect(piece.rect.x1, piece.id).toBeCloseTo(WING.x0 - WALL_T / 2);
+        expect(piece.rect.x0, piece.id).toBeLessThan(piece.rect.x1);
+      }
+    }
+    // The perpendicular entrance partition begins here; no passage wall ends
+    // behind or sticks through the doorway into a guest-room wall.
+    const partition = wallPieces(WALL_LINES.filter((item) => item.id === "gw-pass-doors"));
+    expect(partition[0].rect.x0).toBeCloseTo(WING.x0 - WALL_T / 2);
   });
 
   it("matches the landing wallpaper, floor grain and ambient light", () => {

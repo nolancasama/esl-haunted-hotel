@@ -3,6 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { rt } from "../game/runtime";
 import { getGame } from "../game/store";
+import { automaticView } from "./automaticCamera";
 
 /** The live camera, for projecting markers to the screen (keyboard navigation). */
 export const cameraRef: { current: THREE.PerspectiveCamera | null } = { current: null };
@@ -19,12 +20,30 @@ export function CameraRig() {
   const want = useRef(new THREE.Vector3());
   const wantLook = useRef(new THREE.Vector3());
   const ready = useRef(false);
+  const lastZone = useRef<string | null>(null);
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1);
     cameraRef.current = camera as THREE.PerspectiveCamera;
     const c = rt.camera;
     const screen = getGame().screen;
+    if (screen === "game" && c.mode === "follow" && !c.shot) {
+      const view = automaticView(rt.player.x, rt.player.z, rt.player.floor, rt.player.stairs);
+      if (lastZone.current !== view.zone) {
+        lastZone.current = view.zone;
+        // While an input is held, retain its original world-space heading until
+        // release, so an automatic camera turn never unexpectedly reverses walking.
+        if (Math.abs(view.yaw - c.yaw) > 0.08) c.inputLock = c.yaw;
+        c.yawTarget = view.yaw;
+      }
+      const ease = 1 - Math.exp(-dt * 2.5);
+      c.pitch += (view.pitch - c.pitch) * ease;
+      c.dist += (view.distance - c.dist) * ease;
+    } else {
+      // A scripted close-up always wins. Reapply the appropriate automatic
+      // view as soon as ordinary exploration resumes.
+      lastZone.current = null;
+    }
     if (c.yawTarget !== null) {
       let d = c.yawTarget - c.yaw;
       while (d > Math.PI) d -= Math.PI * 2;
