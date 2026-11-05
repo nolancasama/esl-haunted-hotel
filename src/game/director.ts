@@ -1184,6 +1184,12 @@ async function intro() {
   await sayWait("Oh no! Four ghosts are hiding!");
   rt.camera.shot = SHOT_BOARD;
   await sayWait("Find the four ghosts!");
+  // While the camera is still on the missing-ghosts wall, turn the player
+  // toward Boo. The reverse shot should show them listening to the ghost,
+  // not still staring at the entrance door after the earlier startle.
+  if (rt.boo.target) {
+    rt.player.yaw = Math.atan2(rt.boo.target.x - rt.player.x, rt.boo.target.z - rt.player.z);
+  }
   rt.camera.shot = SHOT_BOO;
   await sayWait("Then you can go home!");
   await afterIntro(enc0);

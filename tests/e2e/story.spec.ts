@@ -93,6 +93,24 @@ test("the intro: walk in, the door slams once you are inside, a hop and a smooth
   expect(errors).toEqual([]);
 });
 
+test("returning from the missing-ghosts wall shows the player facing Boo, not the door", async ({ page }) => {
+  const errors = await boot(page, "&mode=story");
+  await page.getByTestId("start").click();
+  await expect(page.getByTestId("subtitle")).toContainText("Oh no! Four ghosts are hiding!", { timeout: 60_000 });
+  await page.getByTestId("next").click();
+  await expect(page.getByTestId("subtitle")).toContainText("Find the four ghosts!");
+  await page.getByTestId("next").click();
+  await expect(page.getByTestId("subtitle")).toContainText("Then you can go home!");
+
+  const scene = (await story(page)) as StoryState & { player: { x: number; z: number; yaw: number } };
+  // Intro Boo's scripted position, rather than an arbitrary world direction.
+  const intended = Math.atan2(-5.4 - scene.player.x, -0.7 - scene.player.z);
+  const delta = Math.atan2(Math.sin(scene.player.yaw - intended), Math.cos(scene.player.yaw - intended));
+  expect(Math.abs(delta)).toBeLessThan(0.02);
+  expect(Math.sin(scene.player.yaw)).toBeGreaterThan(0); // not looking west toward the entrance
+  expect(errors).toEqual([]);
+});
+
 test("the intro plays, can be skipped, and opens only the bedroom", async ({ page }) => {
   const errors = await boot(page, "&mode=story");
   // The default 120 ms voice + fast pause is shorter than expect's polling interval.
