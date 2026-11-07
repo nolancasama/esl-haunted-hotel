@@ -15,6 +15,16 @@ function bodyGeometry(): THREE.BufferGeometry {
   b.add(new THREE.CylinderGeometry(0.2, 0.27, 0.2, 14), COAT_DARK, [0, 0.47, 0]);
   // buttons
   for (const y of [0.78, 0.66, 0.54]) b.sphere(0.022, 0, y, 0.19, "#3b6fd6");
+  return b.build();
+}
+
+/** Neck pivot height: the head turns about this point (built in figure space, then moved onto it). */
+const NECK_Y = 0.9;
+/** Hip pivot height: the torso leans and the legs swing from here. */
+const HIP_Y = 0.4;
+
+function headGeometry(): THREE.BufferGeometry {
+  const b = new PartBuilder(0.3);
   // head and hood
   b.sphere(0.2, 0, 1.06, 0.01, SKIN, [1, 0.95, 0.95], 16);
   b.add(new THREE.SphereGeometry(0.23, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), COAT, [0, 1.07, -0.035], [-0.35, 0, 0]);
@@ -27,14 +37,32 @@ function bodyGeometry(): THREE.BufferGeometry {
   b.sphere(0.03, -0.12, 1.0, 0.16, "#ff9aa2", [1, 0.6, 0.4]);
   b.sphere(0.03, 0.12, 1.0, 0.16, "#ff9aa2", [1, 0.6, 0.4]);
   b.sphere(0.02, 0, 0.99, 0.195, "#b0475a", [1.4, 0.7, 0.6]);
+  return b.build().translate(0, -NECK_Y, 0);
+}
+
+/**
+ * The leg in three jointed pieces (thigh, shin, foot) so the knee can bend. Each is built in
+ * hip space, where the old one-piece leg was, then moved onto its own joint.
+ */
+const KNEE_Y = -0.17;
+const ANKLE_Y = -0.33;
+
+function thighGeometry(): THREE.BufferGeometry {
+  const b = new PartBuilder(0);
+  b.add(new THREE.CapsuleGeometry(0.075, 0.055, 4, 8), "#3a4fa8", [0, -0.0975, 0]);
   return b.build();
 }
 
-function legGeometry(): THREE.BufferGeometry {
+function shinGeometry(): THREE.BufferGeometry {
   const b = new PartBuilder(0);
-  b.add(new THREE.CapsuleGeometry(0.075, 0.18, 4, 8), "#3a4fa8", [0, -0.16, 0]);
-  b.add(new THREE.CapsuleGeometry(0.085, 0.08, 4, 8), "#e8483f", [0, -0.33, 0.03], [Math.PI / 2, 0, 0], [1, 1.2, 1]);
-  return b.build();
+  b.add(new THREE.CapsuleGeometry(0.072, 0.036, 4, 8), "#3a4fa8", [0, -0.24, 0]);
+  return b.build().translate(0, -KNEE_Y, 0);
+}
+
+function footGeometry(): THREE.BufferGeometry {
+  const b = new PartBuilder(0);
+  b.add(new THREE.CapsuleGeometry(0.085, 0.08, 4, 8), "#e8483f", [0, ANKLE_Y, 0.03], [Math.PI / 2, 0, 0], [1, 1.2, 1]);
+  return b.build().translate(0, -ANKLE_Y, 0);
 }
 
 function armGeometry(): THREE.BufferGeometry {
@@ -58,7 +86,10 @@ function lanternGeometry(): THREE.BufferGeometry {
 
 export function useHumanFigure() {
   const body = useMemo(bodyGeometry, []);
-  const leg = useMemo(legGeometry, []);
+  const head = useMemo(headGeometry, []);
+  const thigh = useMemo(thighGeometry, []);
+  const shin = useMemo(shinGeometry, []);
+  const foot = useMemo(footGeometry, []);
   const arm = useMemo(armGeometry, []);
   const lantern = useMemo(lanternGeometry, []);
   const mat = useMemo(() => new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true }), []);
@@ -72,42 +103,68 @@ export function useHumanFigure() {
   const root = useRef<THREE.Group>(null);
   const halo = useRef<THREE.Sprite>(null);
   const bob = useRef<THREE.Group>(null);
+  // Joints left at rest by a controller keep the original rigid-legged figure.
+  const torso = useRef<THREE.Group>(null);
+  const neck = useRef<THREE.Group>(null);
   const legL = useRef<THREE.Group>(null);
   const legR = useRef<THREE.Group>(null);
+  const kneeL = useRef<THREE.Group>(null);
+  const kneeR = useRef<THREE.Group>(null);
+  const footL = useRef<THREE.Group>(null);
+  const footR = useRef<THREE.Group>(null);
   const armL = useRef<THREE.Group>(null);
   const armR = useRef<THREE.Group>(null);
   const lanternRef = useRef<THREE.Group>(null);
   const light = useRef<THREE.PointLight>(null);
-  return { body, leg, arm, lantern, mat, coreMat, fade, haloMat, shadowMat, root, halo, bob, legL, legR, armL, armR, lanternRef, light };
+  return {
+    body, head, thigh, shin, foot, arm, lantern, mat, coreMat, fade, haloMat, shadowMat,
+    root, halo, bob, torso, neck, legL, legR, kneeL, kneeR, footL, footR, armL, armR, lanternRef, light
+  };
+}
+
+function Leg({ rig, side }: { rig: HumanRig; side: "L" | "R" }) {
+  const { thigh, shin, foot, mat } = rig;
+  return (
+    <group ref={side === "L" ? rig.legL : rig.legR} position={[side === "L" ? -0.09 : 0.09, HIP_Y, 0]}>
+      <mesh geometry={thigh} material={mat} />
+      <group ref={side === "L" ? rig.kneeL : rig.kneeR} position={[0, KNEE_Y, 0]}>
+        <mesh geometry={shin} material={mat} />
+        <group ref={side === "L" ? rig.footL : rig.footR} position={[0, ANKLE_Y - KNEE_Y, 0]}>
+          <mesh geometry={foot} material={mat} />
+        </group>
+      </group>
+    </group>
+  );
 }
 
 export type HumanRig = ReturnType<typeof useHumanFigure>;
 
 /** Shared visual rig: the story controller and detective animate the same figure. */
 export function HumanFigure({ rig }: { rig: HumanRig }) {
-  const { body, leg, arm, lantern, mat, coreMat, haloMat, shadowMat, root, halo, bob, legL, legR, armL, armR, lanternRef, light } = rig;
+  const { body, head, arm, lantern, mat, coreMat, haloMat, shadowMat, root, halo, bob, torso, neck, armL, armR, lanternRef, light } = rig;
   return (
     <group ref={root}>
       <group ref={bob}>
-        <mesh geometry={body} material={mat} />
-        <group ref={legL} position={[-0.09, 0.4, 0]}>
-          <mesh geometry={leg} material={mat} />
-        </group>
-        <group ref={legR} position={[0.09, 0.4, 0]}>
-          <mesh geometry={leg} material={mat} />
-        </group>
-        <group ref={armL} position={[-0.25, 0.82, 0]} rotation={[0, 0, -0.15]}>
-          <mesh geometry={arm} material={mat} />
-        </group>
-        <group ref={armR} position={[0.25, 0.82, 0]} rotation={[0.35, 0, 0.15]}>
-          <mesh geometry={arm} material={mat} />
-          <group ref={lanternRef} position={[0, -0.5, 0.02]} rotation={[-0.35, 0, -0.15]}>
-            <mesh geometry={lantern} material={mat} />
-            <mesh position={[0, 0.07, 0]} material={coreMat}>
-              <sphereGeometry args={[0.05, 12, 10]} />
-            </mesh>
-            <sprite ref={halo} material={haloMat} position={[0, 0.07, 0]} scale={[0.55, 0.55, 1]} />
-            <pointLight ref={light} position={[0, 0.1, 0]} color="#ffcf8a" intensity={2.6} distance={4.5} decay={1.6} />
+        <Leg rig={rig} side="L" />
+        <Leg rig={rig} side="R" />
+        <group ref={torso} position={[0, HIP_Y, 0]}>
+          <mesh geometry={body} material={mat} position={[0, -HIP_Y, 0]} />
+          <group ref={neck} position={[0, NECK_Y - HIP_Y, 0]}>
+            <mesh geometry={head} material={mat} />
+          </group>
+          <group ref={armL} position={[-0.25, 0.82 - HIP_Y, 0]} rotation={[0, 0, -0.15]}>
+            <mesh geometry={arm} material={mat} />
+          </group>
+          <group ref={armR} position={[0.25, 0.82 - HIP_Y, 0]} rotation={[0.35, 0, 0.15]}>
+            <mesh geometry={arm} material={mat} />
+            <group ref={lanternRef} position={[0, -0.5, 0.02]} rotation={[-0.35, 0, -0.15]}>
+              <mesh geometry={lantern} material={mat} />
+              <mesh position={[0, 0.07, 0]} material={coreMat}>
+                <sphereGeometry args={[0.05, 12, 10]} />
+              </mesh>
+              <sprite ref={halo} material={haloMat} position={[0, 0.07, 0]} scale={[0.55, 0.55, 1]} />
+              <pointLight ref={light} position={[0, 0.1, 0]} color="#ffcf8a" intensity={2.6} distance={4.5} decay={1.6} />
+            </group>
           </group>
         </group>
       </group>

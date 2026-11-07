@@ -1,5 +1,28 @@
 # Design Decisions
 
+## 2026-11-07 — The detective crouches with real knees
+
+- **The leg is jointed (thigh, shin, foot) and solved with two-bone IK.** The old
+  crouch rotated each one-piece leg 1.55 rad at the hip and tilted the whole figure
+  from the floor, so the legs stuck straight out and the feet left the floor. Now the
+  hips drop and move back, the feet stay where they stood, the knees bend forward and
+  open a little outward (the leg turns about its hip-ankle line, which keeps the foot
+  fixed), and the feet are turned back flat. The knees open outward because the long
+  raincoat otherwise hides them completely. Rejected: an animation library or
+  skinned mesh (heavy, and the figure is a few merged primitives).
+- **The torso leans at the hip and the head tilts at the neck.** `HumanFigure` gained
+  `torso`, `neck`, `knee*` and `foot*` joints. Each piece is built where it was in
+  figure space and then moved onto its joint, so colours and proportions are
+  unchanged. The story player never moves the new joints and looks as before.
+- **The pose comes from the hiding place** (`scene/crouchPose.ts`): under → deep
+  crouch with the lantern low; in → squat for a low box, standing for a wardrobe;
+  on → by the surface height (a rug: squat; a table: stand and look down; a high
+  shelf: look up); by → by object height. Heights are object `spec.h`, or the
+  ghost's surface for "on".
+- **Lower, hold, rise is presentation only.** An eased ramp lowers him in 0.45 s and
+  raises him in 0.55 s, inside the core's 2 s search and 0.8 s react. Search timing,
+  rules, suspicion and AI are unchanged.
+
 ## 2026-10-27 — First-person hiding, heartbeat, and the clock door
 
 The teacher's plan, with Claude's changes marked **(changed)** or **(added)**.
