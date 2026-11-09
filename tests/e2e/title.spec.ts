@@ -11,7 +11,7 @@ type TitleState = HhState & {
 const titleState = (page: Page) => state(page) as Promise<TitleState>;
 
 for (const viewport of [{ width: 1366, height: 768 }, { width: 1024, height: 600 }, { width: 844, height: 390 }]) {
-  test(`the two stage cards and replay controls fit at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+  test(`the three stage cards and replay controls fit at ${viewport.width}x${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.addInitScript(() => {
       localStorage.setItem("hh.ch2.v1", "1");
@@ -23,8 +23,8 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 1024, height: 600
     await expect(stages, "HARNESS_PRECONDITION_FAILED: stage list did not open").toBeVisible();
     await expect(page.getByTestId("replay-mode"), "HARNESS_PRECONDITION_FAILED: replay toggle is not unlocked").toBeVisible();
     await expect(page.getByTestId("choice-hideseek")).toBeEnabled();
-    await expect(stages.locator('[data-testid^="choice-"]')).toHaveCount(2);
-    const boxes = await Promise.all(["stages", "choice-all", "choice-hideseek", "replay-mode", "stages-back"].map((id) => page.getByTestId(id).boundingBox()));
+    await expect(stages.locator('[data-testid^="choice-"]')).toHaveCount(3);
+    const boxes = await Promise.all(["stages", "choice-all", "choice-hard", "choice-hideseek", "replay-mode", "stages-back"].map((id) => page.getByTestId(id).boundingBox()));
     for (const box of boxes) {
       expect(box, "HARNESS_PRECONDITION_FAILED: stage element has no bounds").not.toBeNull();
       expect(box!.x).toBeGreaterThanOrEqual(0);
@@ -52,7 +52,7 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 1024, height: 600
   });
 }
 
-test("Start opens exactly two stages; Back returns and All Levels starts the full adventure", async ({ page }) => {
+test("Start opens exactly three stages; Back returns and Normal Story starts the full adventure", async ({ page }) => {
   const errors = await boot(page, "&intro=0");
   await expect(page.getByTestId("title")).toContainText("in Matsubara");
   await expect(page.getByTestId("choice-all")).toHaveCount(0);
@@ -60,8 +60,10 @@ test("Start opens exactly two stages; Back returns and All Levels starts the ful
   await page.getByTestId("start").click();
   const stages = page.getByTestId("stages");
   await expect(stages, "HARNESS_PRECONDITION_FAILED: stage list did not open").toBeVisible();
-  await expect(stages.locator('[data-testid^="choice-"]')).toHaveCount(2);
-  await expect(page.getByTestId("choice-all")).toContainText("All Levels");
+  await expect(stages.locator('[data-testid^="choice-"]')).toHaveCount(3);
+  await expect(page.getByTestId("choice-all")).toContainText("Normal Story");
+  await expect(page.getByTestId("choice-hard")).toContainText("Hard Story");
+  await expect(page.getByTestId("choice-hard")).toBeDisabled();
   await expect(page.getByTestId("choice-all")).toContainText("Find all eight ghosts!");
   await expect(page.getByTestId("choice-hideseek")).toContainText("Hide & Seek");
   await expect(page.getByTestId("choice-all")).toBeFocused();

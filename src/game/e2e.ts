@@ -133,6 +133,12 @@ export function installE2eHook() {
         sunriseT0: rt.sunriseT0,
         time: rt.time,
         replayUnlocked: g.replayUnlocked,
+        hard: g.hard,
+        hardUnlocked: g.hardUnlocked,
+        hardClue: s?.hardClue ?? null,
+        searched: s?.searchedThisClue ?? [],
+        wrongSearches: s?.wrongSearchesThisClue ?? 0,
+        medal: g.medal?.medal ?? null,
         ...director.debug()
       };
     },

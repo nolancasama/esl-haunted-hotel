@@ -1,5 +1,51 @@
 # Design Decisions
 
+## 2026-11-09 — Hard Story: the ghost could be in any room
+
+The user's plan, with Claude's changes marked **(changed)** or **(added)**.
+
+- **A separate difficulty, not a new mode.** `GameState.hard` with `mode: "story"` and
+  `scope: "all"`, so the intro, the Chapter 2 cutscene and stairs, the ending and the
+  spoken answer (mic and word buttons) are the Normal Story's own. Normal Story, random
+  replay and Hide & Seek take no Hard code path (their plans have no `searchRooms`).
+- **(changed) Unlock needs a new key.** No existing flag proves the full story was finished:
+  `hh.replay.v1` and `hh.finish.v2` are also written by Chapter 1 alone and by random
+  replays. Hard opens only from `hh.hardstory.v1`, written when the full Normal Story with
+  fixed hiding places ends with all eight caught (`earnsHardStory`). Old saves stay locked.
+  The stage list shows Normal Story / Hard Story (locked: "Finish Normal Story to unlock!")
+  / Hide & Seek; the first stage list after unlocking plays a one-time sparkle
+  (`hh.hardstory.seen.v1`).
+- **Plans are pre-generated and seeded** (`logic/hard.ts` `hardPlan`): same ghosts, same
+  order, Chapter 1 downstairs and Chapter 2 upstairs. A room is picked first (so rooms,
+  not just spots, are random), then a spot. A clue must describe exactly one place in its
+  room (so searching that place settles the room) and preferably fit 2+ rooms of the
+  chapter; every current preposition has such clues on both floors.
+- **(added) Ghosts never move while hidden.** Relocation after empty searches is off.
+  Finale ghosts (Mischief, Shadow) still re-hide after each correct answer, now anywhere in
+  the chapter, with a new preposition each time (pre-chosen in the plan).
+- **(changed) Clues keep "It's ..."** (not "He's"), because the answer frame is "It's ___
+  the ...". Room clues: after 2 empty searches "It's not in the <room>." (only a room the
+  ghost is not in), after 4 "It's in the <room>."; as soon as only one room can be left,
+  Boo names it. They show under the clue card and replay with it. Room clues are target
+  English, so no Japanese (as with all clues); Boo's instructions have Japanese.
+- **Searching:** a miss anywhere in the chapter counts; the same place again costs nothing
+  and its marker is dimmed. Misses show a crossed-out ghost (an original SVG, **(changed)**
+  from emoji, which some devices cannot draw). Boo speaks a room clue without holding the
+  close-up. Object/spot glow help only after the room has been named (6 and 8 misses).
+- **No beacon to the ghost's room.** Only the stairs glow when the chapter is upstairs and
+  the player is downstairs; the upstairs "follow the glowing circle" shot is skipped.
+- **(added) Room-specific ghost tricks are off in Hard** (storage rattles, playroom toys,
+  instruments, bathroom steam, the entry cue in the room): they would give the room away.
+  A quiet, non-positional voice (snore, munch or giggle) replaces them. Shadow's escape
+  rattles the room it was found in.
+- **Notebook** (top right, under the gear): the chapter's four rooms as Not checked /
+  Checked (n) / No ghost / It's here!. "No ghost" only when certain: Boo said so, Boo named
+  another room, or the one place there the clue names was searched.
+- **Medals** per ghost from empty searches before each find (a finale ghost: the average):
+  gold 0–1, silver 2–3, bronze 4+. Shown for a moment at capture, on the results portraits,
+  and in a "Ghost Hunter Report" above the usual stats. Play Again replays Hard. No timer.
+- **The Guest Wing keeps its own rules** and is not part of Hard; its spots are "elsewhere".
+
 ## 2026-11-07 — The detective crouches with real knees
 
 - **The leg is jointed (thigh, shin, foot) and solved with two-bone IK.** The old

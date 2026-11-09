@@ -1,6 +1,24 @@
 # Current State
 
 ## Status
+**2026-11-09: Hard Story ("the ghost could be in any room").** A third stage card, locked
+until the full Normal Story (all eight ghosts, fixed hiding places) is finished on this
+device (new key `hh.hardstory.v1`; old saves stay locked because no older flag proves a
+full finish). Same story, ghosts and order, but every room of the chapter is open, nothing
+glows at the ghost's room (only the stairs, when the chapter is upstairs), and Boo's clue
+("It's by the window.") fits 2+ rooms. After 2 empty searches Boo rules out a room, after 4
+names it, earlier if only one room is left. Ghosts never move while hidden; Mischief and
+Shadow re-hide anywhere in the chapter after each answer. A notebook (top right) tracks the
+four rooms; misses show a crossed-out ghost; each capture earns a gold/silver/bronze medal
+(0–1 / 2–3 / 4+ empty searches), with a "Ghost Hunter Report" on the results. Pure logic in
+`logic/hard.ts` (plan generator, clue ladder, notebook, medals); `Encounter.searchRooms` and
+`HuntState.hardClue` in `hunt.ts`; `GameState.hard` (mode stays `story`). Typecheck, build
+and 826 unit tests pass (20 new in `hard.test.ts`); new `tests/e2e/hard.spec.ts` 7/7. Both
+test files were checked against planted bugs. Full e2e run: 77 passed, 7 failed — exactly the
+seven pre-existing failures listed under Known Issues; Hard specs and `title.spec` (updated
+for three cards) all pass. Claude reviewed screenshots at 1024x600 and 1366x768 (stage list, miss caption,
+notebook, medal pop, results) in `.tmp/hard/`.
+
 **2026-11-07: The detective crouches with real knees.** In Hide & Seek the detective's legs
 are now jointed (thigh, shin, foot; new `torso`/`neck`/`knee*`/`foot*` joints in
 `HumanFigure`) and solved by two-bone IK in `scene/crouchPose.ts`: feet planted, hips down
@@ -276,6 +294,10 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
   because `jump` skips the earlier answers.
 
 ## Next Steps
+000. Play Hard Story with students on a real Chromebook: are the room clues understood, is
+   two/four misses the right pace for hints, do the medals feel fair for Mischief/Shadow
+   (averaged over four finds), and is the notebook used. Tuning: `nextHardHint` and
+   `medalFor` in `logic/hard.ts`.
 00. On a real Chromebook: walk the Guest Wing (frame rate in the corridor, the camera in the
    narrow corridor and rooms, door taps by touch) and solve the 206 mystery with a student.
 0. On a real Chromebook: listen to the heartbeat and footsteps (loudness against the
@@ -288,6 +310,8 @@ sizes (`.tmp/ui/`, no clipping/overlap reported) and `node scripts/doors.mjs` (`
    touch sizes, results scrolling at 390 px.
 
 ## Codex / Delegated Work
+Hard Story (2026-11-09) was written by Claude directly at the user's request ("do yourself",
+"no router"); nothing delegated, nothing pending.
 First-person hiding/heartbeat/clock door (2026-10-27) was written by Claude directly at the
 user's request ("do yourself"); nothing delegated, nothing pending.
 Hide & Seek (2026-10-25) was written by Codex (routed) in four orders: simulation core,

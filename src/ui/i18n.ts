@@ -35,7 +35,11 @@ export const LINE_JA: Record<string, string> = {
   "Play with me!": "いっしょに あそぼう！",
   "Splish splash!": "ちゃぷちゃぷ！",
   "La la la!": "ラララ〜♪",
-  "Find me!": "みつけてごらん！"
+  "Find me!": "みつけてごらん！",
+  // Hard Story
+  "The ghost could be in any room!": "おばけは どの へやに いるか わからないよ！",
+  "Look everywhere!": "ぜんぶの へやを さがそう！",
+  "Next ghost!": "つぎの おばけだよ！"
 };
 
 export const HINT = {

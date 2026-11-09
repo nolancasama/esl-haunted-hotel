@@ -4,6 +4,10 @@ import { WORLD } from "../game/world/world";
 import { director } from "../game/director";
 import { currentEncounter, currentSpot } from "../game/logic/hunt";
 import { clueText } from "../game/logic/clues";
+import { hardHintLines, MEDAL_NAME, notebook, type NoteStatus } from "../game/logic/hard";
+import { MedalIcon, NoGhost } from "./HardIcons";
+import { ROOMS } from "../game/world/rooms";
+import { GHOSTS } from "../game/ghosts";
 import { GhostPortrait } from "./GhostPortrait";
 import { PrepIcon } from "./PrepIcon";
 import { PrepText, Ja } from "./Text";
@@ -105,6 +109,12 @@ function ClueCard() {
       </div>
       <div className="clue-text" data-testid="clue-text">
         <PrepText text={clueText(spot)} />
+        {hardHintLines(hunt).map((line) => (
+          <div className={`clue-room ${line.includes(" not ") ? "not" : "in"}`} key={line} data-testid="clue-room">
+            {line.includes(" not ") && <NoGhost size={22} />}
+            <PrepText text={line} />
+          </div>
+        ))}
       </div>
       {help >= 2 && (
         <div className="clue-pic" data-testid="clue-pic">
@@ -178,9 +188,11 @@ function ChapterTitle() {
 
 function Caption() {
   const caption = useGame((s) => s.caption);
+  const hard = useGame((s) => s.hard);
   if (!caption) return null;
   return (
     <div className={`caption ${caption.tone}`} key={caption.id} data-testid="caption">
+      {hard && caption.tone === "empty" && <NoGhost />}
       <PrepText text={caption.text} />
     </div>
   );
@@ -230,6 +242,78 @@ function HintBar() {
   );
 }
 
+const NOTE_TEXT: Record<NoteStatus, { en: string; ja: string }> = {
+  unchecked: { en: "Not checked", ja: "まだ" },
+  checked: { en: "Checked", ja: "しらべた" },
+  clear: { en: "No ghost", ja: "いない" },
+  here: { en: "It's here!", ja: "ここ！" }
+};
+
+/** Hard Story: the detective notebook - the chapter's rooms and what is known about each. */
+function Notebook() {
+  const hard = useGame((s) => s.hard);
+  const hunt = useGame((s) => s.hunt);
+  const open = useGame((s) => s.notebookOpen);
+  const ja = useGame((s) => s.settings.japanese);
+  if (!hard || !hunt || hunt.status === "done") return null;
+  const rows = notebook(hunt);
+  return (
+    <>
+      <button
+        className={`icon-button notebook-button ${open ? "open" : ""}`}
+        onClick={() => setGame({ notebookOpen: !open })}
+        aria-label="Ghost Hunt Notes"
+        aria-expanded={open}
+        data-testid="notebook-button"
+      >
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+          <rect x="5" y="3" width="14" height="18" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
+          <path d="M9 8h6M9 12h6M9 16h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path d="M3 7h3M3 12h3M3 17h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </button>
+      {open && (
+        <div className="notebook panel" data-testid="notebook">
+          <div className="notebook-title">
+            Ghost Hunt Notes
+            {ja && <small lang="ja">ゴーストハンター ノート</small>}
+          </div>
+          <ul>
+            {rows.map((r) => (
+              <li key={r.room} className={`note-row ${r.status}`} data-testid={`note-${r.room}`} data-status={r.status}>
+                <span className="note-room">{ROOMS[r.room].name}</span>
+                <span className="note-status">
+                  {r.status === "clear" && <NoGhost size={20} />}
+                  {NOTE_TEXT[r.status].en}
+                  {r.status === "checked" && ` (${r.searched.length})`}
+                  {ja && <small lang="ja">{NOTE_TEXT[r.status].ja}</small>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <button className="btn-secondary notebook-close" onClick={() => setGame({ notebookOpen: false })} data-testid="notebook-close">
+            Close {ja && <small lang="ja">とじる</small>}
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Hard Story: the medal for the ghost just caught. */
+function MedalPop() {
+  const medal = useGame((s) => s.medal);
+  if (!medal) return null;
+  return (
+    <div className={`medal-pop ${medal.medal}`} key={medal.key} data-testid="medal-pop" data-medal={medal.medal}>
+      <MedalIcon medal={medal.medal} size={48} />
+      <span>
+        {MEDAL_NAME[medal.medal]}! <small>{GHOSTS[medal.ghost].name}</small>
+      </span>
+    </div>
+  );
+}
+
 export function Hud() {
   const screen = useGame((s) => s.screen);
   if (screen !== "game") return null;
@@ -238,10 +322,12 @@ export function Hud() {
       <Counter />
       <ClueCard />
       <div className="top-right">
+        <Notebook />
         <button className="icon-button" onClick={() => setGame({ settingsOpen: true })} aria-label="Settings" data-testid="settings">
           <GearIcon />
         </button>
       </div>
+      <MedalPop />
       <Caption />
       <ChapterTitle />
       <SkipButton />

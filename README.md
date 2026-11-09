@@ -48,6 +48,14 @@ each. **All 8** plays both in one go. Chapter 2 on its own unlocks after Chapter
 is finished. After you finish, **Random hiding places** hides the ghosts in new
 places (always valid, unambiguous ones).
 
+**Hard Story** unlocks after the full Normal Story (all eight ghosts). Boo still
+says where the ghost is (*"It's by the window."*) but not which room: every room
+of the chapter is open and the ghost could be in any of them. After two empty
+searches Boo rules out a room (*"It's not in the library."*), after four Boo names
+it. The 📓 notebook keeps track of the rooms, and each ghost earns a gold, silver
+or bronze medal for finding it with few empty searches. No timer, same four
+prepositions.
+
 ## Controls
 
 | | Keyboard / mouse | Touch |

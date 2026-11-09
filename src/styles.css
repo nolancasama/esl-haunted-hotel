@@ -2548,3 +2548,221 @@ input[type="range"]::-moz-range-thumb {
 @media (max-width: 600px) and (min-height: 451px) {
   .hs-guest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ------------------------------------------------------------ Hard Story */
+.mode-choice.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 560px) and (min-height: 521px) {
+  .mode-choice.three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.stage-card .chip.just-unlocked {
+  border-color: var(--gold);
+  animation: hard-unlock 1.4s ease-out 2;
+}
+.choice-badge.new {
+  background: var(--gold-light);
+  color: var(--plum-900);
+  animation: hard-badge 1.2s ease-in-out infinite alternate;
+}
+@keyframes hard-unlock {
+  0% { box-shadow: 0 0 0 0 rgba(255, 211, 107, 0.75); transform: scale(0.97); }
+  40% { transform: scale(1.03); }
+  100% { box-shadow: 0 0 0 18px rgba(255, 211, 107, 0); transform: scale(1); }
+}
+@keyframes hard-badge {
+  from { transform: rotate(-12deg) scale(0.9); }
+  to { transform: rotate(12deg) scale(1.15); }
+}
+.no-ghost {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-right: 0.3em;
+}
+.caption .no-ghost svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+.hard-medals span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.note-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.note-row.clear .note-status {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  column-gap: 4px;
+}
+.note-row.clear .note-status small {
+  width: 100%;
+  text-align: right;
+}
+.clue-room {
+  margin-top: 2px;
+  font-size: 0.62em;
+  color: var(--gold-light);
+}
+.clue-room.in {
+  color: var(--good);
+}
+.top-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.top-right > button {
+  order: 0;
+}
+.notebook-button {
+  order: 1;
+}
+.notebook-button.open {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.notebook {
+  order: 2;
+  width: min(300px, calc(100vw - 32px));
+  padding: 10px 12px;
+  pointer-events: auto;
+  animation: rise-in 200ms ease-out;
+}
+.notebook-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+.notebook-title small {
+  display: block;
+  font-size: 12px;
+  color: var(--gold-light);
+}
+.notebook ul {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.note-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
+  background: var(--plum-800);
+  font-size: 15px;
+  font-weight: 700;
+}
+.note-room {
+  color: var(--ivory);
+}
+.note-status {
+  text-align: right;
+  color: var(--lavender);
+  font-size: 14px;
+}
+.note-status small {
+  display: block;
+  font-size: 11px;
+}
+.note-row.clear {
+  opacity: 0.75;
+}
+.note-row.clear .note-room {
+  text-decoration: line-through;
+}
+.note-row.here {
+  outline: 2px solid var(--good);
+}
+.note-row.here .note-status {
+  color: var(--good);
+}
+.notebook-close {
+  width: 100%;
+  min-height: 40px;
+}
+.medal-pop {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 22px;
+  border: 2px solid var(--gold);
+  border-radius: 999px;
+  background: var(--panel-bg);
+  color: var(--ivory);
+  font-size: clamp(22px, 2.8vw, 32px);
+  font-weight: 800;
+  animation: medal-in 500ms cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.medal-pop small {
+  font-size: 0.6em;
+  color: var(--gold-light);
+}
+@keyframes medal-in {
+  from { opacity: 0; transform: translateX(-50%) scale(0.4); }
+  to { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+.result-portrait-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.result-medal {
+  position: absolute;
+  right: -12px;
+  bottom: -8px;
+  line-height: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+.many .result-medal {
+  right: -10px;
+  bottom: -6px;
+}
+.hard-summary {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border: 1.5px dashed var(--brass);
+  border-radius: var(--r-sm);
+}
+.hard-summary-title {
+  font-weight: 800;
+  color: var(--gold);
+  text-align: center;
+}
+.hard-summary-title small,
+.hard-deductions small {
+  display: block;
+  font-size: 12px;
+  color: var(--gold-light);
+}
+.hard-medals {
+  display: flex;
+  gap: 16px;
+  font-size: 20px;
+  font-weight: 800;
+}
+.hard-deductions {
+  font-size: 14px;
+  text-align: center;
+}

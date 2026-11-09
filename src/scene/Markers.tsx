@@ -14,6 +14,8 @@ import { markerTexture } from "./textures";
 function Marker({ spot }: { spot: HidingSpot }) {
   const selected = useGame((s) => s.selectedSpot === spot.id);
   const active = useGame((s) => s.phase === "search");
+  // Hard Story remembers places already found empty for this clue: they fade.
+  const searched = useGame((s) => s.hard && Boolean(s.hunt?.searchedThisClue.includes(spot.id)));
   const ref = useRef<THREE.Sprite>(null);
   const mat = useMemo(
     () =>
@@ -34,10 +36,10 @@ function Marker({ spot }: { spot: HidingSpot }) {
     const help = rt.helpSpot === spot.id;
     mat.map = markerTexture(selected || help);
     const pulse = help ? 1 + Math.sin(rt.time * 8) * 0.15 : 1;
-    const base = selected ? 0.5 : 0.38;
+    const base = (selected ? 0.5 : 0.38) * (searched && !selected ? 0.75 : 1);
     s.scale.setScalar(base * pulse);
     s.position.set(spot.marker.x, spot.marker.y + Math.sin(rt.time * 2.5 + phase.current) * 0.035, spot.marker.z);
-    mat.opacity = active ? 1 : 0;
+    mat.opacity = active ? (searched ? 0.35 : 1) : 0;
     s.visible = active;
   });
 

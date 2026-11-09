@@ -3,9 +3,11 @@ import { tts } from "../audio/tts";
 import { HARD_ERRORS, recognition, requestMicPermission } from "../audio/recognition";
 import {
   EMPTY_ANSWER,
+  earnsHardStory,
   getGame,
   saveCh2Unlocked,
   saveGuestWingUnlocked,
+  saveHardUnlocked,
   saveReplayUnlocked,
   saveWingMysterySolved,
   saveSettings,
@@ -17,7 +19,8 @@ import {
   type Settings
 } from "./store";
 import { rattle, resetRuntime, rt, type Gag } from "./runtime";
-import { answerPrep, createHunt, currentEncounter, currentSpot, searchHelpLevel, searchSpot, type Encounter, type HuntState } from "./logic/hunt";
+import { answerPrep, createHunt, currentEncounter, currentSpot, searchHelpLevel, searchRoomsOf, searchSpot, type Encounter, type HuntState } from "./logic/hunt";
+import { applyHardHint, hardHintLines, hardPlan, hintText, medalFor, nextHardHint } from "./logic/hard";
 import { chapterBreakAfter, practicePlan, storyPlan } from "./logic/plans";
 import { replayPlan } from "./logic/replay";
 import { clueSpoken, emptyCaption, QUESTION, sentenceWith } from "./logic/clues";
@@ -101,6 +104,8 @@ function run(fn: () => Promise<void>) {
 const hunt = (): HuntState => getGame().hunt!;
 const setAnswer = (patch: Partial<AnswerUi>) => setGame({ answer: { ...getGame().answer, ...patch } });
 const isStory = () => getGame().mode !== "practice";
+const isHard = () => getGame().hard;
+let medalKey = 0;
 const playerRoom = (): RoomId | null => roomAt(rt.player.x, rt.player.z, rt.player.floor);
 const isOpen = (id: string) => rt.doorsOpen.has(id);
 
@@ -380,6 +385,7 @@ async function sayClue() {
   rt.boo.talking = true;
   try {
     await tts.speak(clueSpoken(spot), { pitch: 1.2 });
+    for (const line of hardHintLines(hunt())) await tts.speak(line, { pitch: 1.2 });
   } finally {
     rt.boo.talking = false;
     setGame({ clueSpeaking: false });
@@ -415,7 +421,9 @@ function touchActivity() {
 
 function applyHelp() {
   const s = hunt();
-  const level = s.status === "hunting" ? searchHelpLevel(s) : 0;
+  let level: number = s.status === "hunting" ? searchHelpLevel(s) : 0;
+  // Hard Story: Boo's room clues come first; nothing glows until the room has been named.
+  if (s.hardClue) level = s.status !== "hunting" ? 0 : s.hardClue.roomTold && s.wrongSearchesThisClue >= 6 ? (s.wrongSearchesThisClue >= 8 ? 4 : 3) : Math.min(level, 2);
   // Sleepy is the tutorial: the picture hint is there from the start.
   const tutorial = getGame().mode === "story" && currentEncounter(s).ghost === "sleepy";
   setGame({ helpLevel: tutorial ? Math.max(level, 2) : level });
@@ -571,10 +579,11 @@ function playInstrument() {
   }
 }
 
-/** Shadow makes the attic's furniture rattle. */
-function atticRattles(count: number) {
+/** Shadow makes the furniture rattle (the attic; in Hard Story, the room Shadow was found in). */
+function atticRattles(count: number, room: RoomId = "attic") {
   const ghostObj = currentSpot(hunt()).objectId;
-  const things = WORLD.objects.filter((o) => o.room === "attic" && o.id !== ghostObj && !o.spec.flat && !o.spec.wallMounted);
+  const things = WORLD.objects.filter((o) => o.room === room && o.id !== ghostObj && !o.spec.flat && !o.spec.wallMounted);
+  if (!things.length) return;
   for (let i = 0; i < count; i++) {
     window.setTimeout(() => {
       const o = pick(rng, things);
@@ -603,6 +612,15 @@ function useFan() {
 function pointTheWay() {
   const enc = currentEncounter(hunt());
   const upstairs = ROOMS[enc.room].floor === 1;
+  if (isHard()) {
+    // Hard Story never points at the ghost's room: only up the stairs, when the chapter is upstairs.
+    const stairs = upstairs && rt.player.floor === 0;
+    rt.beaconDoor = stairs ? "stairs" : null;
+    const hint = getGame().hint;
+    if (stairs) showHint("goStairs");
+    else if (hint === "goStairs" || hint === "goDoor") showHint(null);
+    return;
+  }
   if (upstairs && rt.player.floor === 0) {
     rt.beaconDoor = "stairs";
     showHint("goStairs");
@@ -660,6 +678,10 @@ async function beginEncounter(first: boolean) {
     await giveClue("first");
     return;
   }
+  if (isHard()) {
+    await beginHardEncounter(enc, first);
+    return;
+  }
   const door = ROOM_DOOR[enc.room];
   if (door && !rt.doorsOpen.has(door)) {
     audio.play("unlock");
@@ -674,6 +696,30 @@ async function beginEncounter(first: boolean) {
     pointTheWay();
     if (!first) await say("Next room!");
   }
+}
+
+/**
+ * Hard Story: every room of the chapter opens, the ghost announces itself (no room-specific
+ * effects - they would give the room away), and Boo gives the clue without naming the room.
+ */
+async function beginHardEncounter(enc: Encounter, first: boolean) {
+  awaitingEntry = false;
+  const closed = searchRoomsOf(enc).map((r) => ROOM_DOOR[r]).filter((d): d is NonNullable<typeof d> => Boolean(d) && !rt.doorsOpen.has(d!));
+  if (closed.length) {
+    audio.play("unlock");
+    await sleep(350);
+    for (const d of closed) rt.doorsOpen.set(d, rt.time);
+    audio.play("creak");
+  }
+  pointTheWay();
+  nextAmbient = rt.time + 10;
+  const ghost = GHOSTS[enc.ghost];
+  audio.play("giggle", { pitch: ghost.voice });
+  await sleep(600);
+  if (!first) await say("Next ghost!");
+  await say("The ghost could be in any room!");
+  await say("Look everywhere!");
+  await giveClue("entry");
 }
 
 /** Turn the camera (once, gently) so it looks into the room from its door. */
@@ -787,7 +833,7 @@ async function doSearch(spotId: string) {
     audio.play("poof");
     caption(emptyCaption(spot), "empty", 2000);
     // Bouncy makes a toy nearby move - atmosphere, never the answer.
-    if (result.kind === "empty" && currentEncounter(before).ghost === "bouncy" && rng() < 0.6) {
+    if (result.kind === "empty" && currentEncounter(before).ghost === "bouncy" && spot.room === "playroom" && rng() < 0.6) {
       window.setTimeout(() => wiggleToy(spot), 450 * pace);
     }
     await sleep(1150);
@@ -795,6 +841,20 @@ async function doSearch(spotId: string) {
 
     if (result.kind === "empty" && result.relocatedTo) {
       await relocate(before.spotId);
+      return;
+    }
+    if (result.kind === "empty" && state.hardClue) {
+      // Hard Story: Boo narrows it down (a room it is not in, then the room).
+      const hint = nextHardHint(state, rng);
+      if (hint) setGame({ hunt: applyHardHint(state, hint) });
+      applyHelp();
+      setGame({ phase: "search" });
+      if (hint) {
+        // Spoken without holding the close-up: the student may leave or search on while Boo talks.
+        audio.play(hint.kind === "in" ? "sparkle" : "poof");
+        run(() => say(hintText(hint).replace(/\.$/, "!")));
+        touchActivity();
+      }
       return;
     }
     applyHelp();
@@ -1011,6 +1071,7 @@ function resolveCorrect(prep: Prep) {
     sparkle(rt.lantern, ghost.glow, 30, { speed: 1, up: 1.2 });
     setGame({ lantern: [...getGame().lantern, ghost.id], revealed: null });
     rt.search = null;
+    if (isHard()) showMedal(ghost.id, state);
     await say(pick(rng, PRAISE));
     if (last) {
       if (isStory()) await outro();
@@ -1034,6 +1095,16 @@ function resolveCorrect(prep: Prep) {
   });
 }
 
+/** Hard Story: the medal for the ghost just caught (gold, silver or bronze), shown for a moment. */
+function showMedal(ghost: GhostId, state: HuntState) {
+  const key = ++medalKey;
+  const medal = medalFor(state.answers.filter((a) => a.ghost === ghost));
+  setGame({ medal: { key, ghost, medal } });
+  window.setTimeout(() => {
+    if (getGame().medal?.key === key) setGame({ medal: null });
+  }, 3200 * pace);
+}
+
 /** Correct answer, but the ghost has more rounds: it escapes to a new spot. */
 async function escapeAfterRound(spot: HidingSpot) {
   const s = hunt();
@@ -1051,13 +1122,14 @@ async function escapeAfterRound(spot: HidingSpot) {
     rt.blackoutT0 = rt.time;
     audio.play("blackout");
     audio.play("whoosh");
-    atticRattles(4);
+    atticRattles(4, spot.room);
     await sleep(1700);
     audio.play("poof");
     enterExplore();
     setGame({ phase: "busy" });
     await sleep(500);
     await say("Oh no! It ran away!");
+    if (isHard()) await say("The ghost could be in any room!");
     await giveClue("next");
     enterExplore();
     return;
@@ -1071,6 +1143,7 @@ async function escapeAfterRound(spot: HidingSpot) {
   setGame({ phase: "busy" });
   await sleep(300);
   await say("Oh no! It ran away!");
+  if (isHard()) await say("The ghost could be in any room!");
   await giveClue("next");
   enterExplore();
 }
@@ -1394,6 +1467,8 @@ async function finishGame() {
     }
     // Chapter 2 is done (alone or in the full adventure): the Guest Wing upstairs opens.
     if (g.scope !== "ch1") saveGuestWingUnlocked();
+    // Only the full Normal Story with its fixed hiding places opens Hard Story.
+    if (earnsHardStory(g)) saveHardUnlocked();
   }
   if (getGame().finishedAt === null) setGame({ finishedAt: performance.now() });
   setGame({ fade: 1 });
@@ -1462,7 +1537,19 @@ function tick() {
   }
 
   const enc = currentEncounter(g.hunt);
-  const hunting = !awaitingEntry && g.hunt.status === "hunting" && room === enc.room;
+  if (g.hard) {
+    // Up (or back down) the stairs: the only beacon Hard Story shows.
+    const wantStairs = ROOMS[enc.room].floor === 1 && rt.player.floor === 0;
+    if (wantStairs !== (rt.beaconDoor === "stairs")) pointTheWay();
+    // The ghost's own noise, from nowhere in particular: its room-specific tricks would give it away.
+    if (g.hunt.status === "hunting" && g.clueShown && rt.time > nextAmbient && !tts.isSpeaking() && !busy) {
+      nextAmbient = rt.time + 11 + Math.random() * 6;
+      if (enc.ghost === "sleepy") audio.play("snore", { gain: 0.5 });
+      else if (enc.ghost === "hungry") audio.play("munch", { gain: 0.5 });
+      else audio.play("giggle", { pitch: GHOSTS[enc.ghost].voice, gain: 0.5 });
+    }
+  }
+  const hunting = !g.hard && !awaitingEntry && g.hunt.status === "hunting" && room === enc.room;
 
   // Bubbles' steam rises now and then (unless the fan is running); a shape drifts through it.
   if (hunting && enc.ghost === "bubbles") {
@@ -1613,7 +1700,8 @@ function onKey(code: string) {
   }
 }
 
-function planFor(mode: Mode, scope: Scope): Encounter[] {
+function planFor(mode: Mode, scope: Scope, hard = false): Encounter[] {
+  if (hard) return hardPlan(rng, WORLD);
   if (mode === "practice") return practicePlan();
   if (mode === "replay") return replayPlan(rng, WORLD, scope);
   return storyPlan(scope);
@@ -1652,7 +1740,7 @@ export const director = {
    * Start from the title screen (must be called from a click: unlocks audio and asks for the mic once).
    * `scope` picks the full adventure, Chapter 1 or Chapter 2 on its own.
    */
-  async startGame(mode: Mode = "story", scope: Scope = "all") {
+  async startGame(mode: Mode = "story", scope: Scope = "all", hard = false) {
     audio.unlock();
     tts.setRate(getGame().settings.slowVoice ? 0.8 : 1);
     gen++;
@@ -1668,9 +1756,14 @@ export const director = {
     upstairsArrivalShown = false;
     if (fixedSeed !== null) rng = mulberry32(fixedSeed);
     if (mode === "practice") scope = "ch1";
+    // Hard Story is always the whole story (both chapters, fixed order of ghosts).
+    if (hard) {
+      mode = "story";
+      scope = "all";
+    }
     const settings = getGame().settings;
     audio.setVolumes(settings.music, settings.sfx);
-    setGame({ screen: "game", phase: "busy", mode, scope, fade: 0 });
+    setGame({ screen: "game", phase: "busy", mode, scope, hard, notebookOpen: false, medal: null, fade: 0 });
 
     let micState = getGame().micState;
     if (!recognition.supported) micState = "unsupported";
@@ -1679,7 +1772,7 @@ export const director = {
       micState = p === "denied" || p === "unavailable" ? "blocked" : "ready";
     }
 
-    const state = createHunt(planFor(mode, scope));
+    const state = createHunt(planFor(mode, scope, hard));
     const enc0 = currentEncounter(state);
     rt.ghost.id = enc0.ghost;
     if (mode === "practice") placePlayer(PRACTICE_START.x, PRACTICE_START.z, 0, Math.PI);
@@ -1806,7 +1899,9 @@ export const director = {
       toast: null,
       fade: 0,
       lantern: [],
-      chapterCard: null
+      chapterCard: null,
+      notebookOpen: false,
+      medal: null
     });
   },
 
@@ -2005,8 +2100,10 @@ export const director = {
     const path = [enc.start, ...(enc.roundSpots ?? [])];
     const usedPreps = path.slice(0, round).map((id) => WORLD.spotById.get(id)!.prep);
     for (const e of encs.slice(0, index)) {
-      const door = ROOM_DOOR[e.room];
-      if (door) rt.doorsOpen.set(door, rt.time - 5);
+      for (const r of searchRoomsOf(e)) {
+        const door = ROOM_DOOR[r];
+        if (door) rt.doorsOpen.set(door, rt.time - 5);
+      }
     }
     const upstairs = ROOMS[enc.room].floor === 1;
     if (upstairs) rt.doorsOpen.set("stairs", rt.time - 5);

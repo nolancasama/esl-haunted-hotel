@@ -3,6 +3,7 @@ import type { WingNoteId } from "./world/furniture";
 import type { GhostId, Prep, RoomId } from "./types";
 import type { HuntState } from "./logic/hunt";
 import type { Scope } from "./logic/plans";
+import type { Medal } from "./logic/hard";
 
 export type { Scope };
 
@@ -144,6 +145,16 @@ export interface GameState {
   touch: boolean;
   fade: number;
   replayUnlocked: boolean;
+  /** Hard Story: the ghost may be in any room of its chapter (mode stays "story", scope "all"). */
+  hard: boolean;
+  /** Hard Story opens once the full Normal Story (all eight ghosts) has been finished here. */
+  hardUnlocked: boolean;
+  /** The stage list has shown the Hard Story unlock celebration. */
+  hardCelebrated: boolean;
+  /** Hard Story: the detective notebook is open. */
+  notebookOpen: boolean;
+  /** Hard Story: the medal shown for a moment after a capture. */
+  medal: { key: number; ghost: GhostId; medal: Medal } | null;
   /** Which part of the hotel this game covers. */
   scope: Scope;
   /** The chapter being played (the HUD shows only this chapter's ghosts until Chapter 2 opens). */
@@ -197,6 +208,13 @@ const GUEST_WING_KEY = "hh.guestwing.chapter2.v2";
 const WING_MYSTERY_KEY = "hh.guestwing.mystery.v1";
 /** Written at every story finish from this version on, so an older save can be told apart. */
 const FINISH_MARK_KEY = "hh.finish.v2";
+/**
+ * Written only when the full Normal Story (fixed hiding places, all eight ghosts) is finished.
+ * No older key can prove that (replay and finish marks are also written for Chapter 1 alone
+ * or random replays), so older saves stay locked until a fresh full finish.
+ */
+const HARD_KEY = "hh.hardstory.v1";
+const HARD_SEEN_KEY = "hh.hardstory.seen.v1";
 
 function loadFlag(key: string): boolean {
   try {
@@ -238,6 +256,25 @@ export function saveReplayUnlocked() {
 export function saveGuestWingUnlocked() {
   saveFlag(GUEST_WING_KEY);
   setGame({ guestWingUnlocked: true });
+}
+
+export function loadHardUnlocked(): boolean {
+  return loadFlag(HARD_KEY);
+}
+
+/** A finished game opens Hard Story only if it was the full Normal Story with all eight ghosts caught. */
+export function earnsHardStory(g: Pick<GameState, "mode" | "scope" | "hard" | "hunt">): boolean {
+  return g.mode === "story" && g.scope === "all" && !g.hard && g.hunt?.status === "done" && g.hunt.captured.length === 8;
+}
+
+export function saveHardUnlocked() {
+  saveFlag(HARD_KEY);
+  setGame({ hardUnlocked: true });
+}
+
+export function saveHardCelebrated() {
+  saveFlag(HARD_SEEN_KEY);
+  setGame({ hardCelebrated: true });
 }
 
 export function saveWingMysterySolved() {
@@ -290,6 +327,11 @@ export const useGame = create<GameState>(() => ({
   touch: false,
   fade: 0,
   replayUnlocked: loadFlag(REPLAY_KEY),
+  hard: false,
+  hardUnlocked: loadHardUnlocked(),
+  hardCelebrated: loadFlag(HARD_SEEN_KEY),
+  notebookOpen: false,
+  medal: null,
   scope: "all",
   chapter: 1,
   ch2Unlocked: loadFlag(CH2_KEY),

@@ -25,6 +25,11 @@ export interface Encounter {
   maxRelocations: number;
   /** Scripted spots for rounds 2+ (story mode). Missing entries are chosen randomly. */
   roundSpots?: string[];
+  /**
+   * Hard Story: every room the ghost may be in (its whole chapter). Searches in any of
+   * them count, and `room` is only where it starts. Unset: the ghost's own room only.
+   */
+  searchRooms?: RoomId[];
 }
 
 export type HuntStatus = "hunting" | "found" | "done";
@@ -43,6 +48,8 @@ export interface AnswerRecord {
   prep: Prep;
   noun: string;
   firstTry: boolean;
+  /** Empty searches before this find (Hard Story medals). */
+  searchMisses?: number;
 }
 
 export interface HuntState {
@@ -62,6 +69,13 @@ export interface HuntState {
   stats: Stats;
   answers: AnswerRecord[];
   captured: GhostId[];
+  /** Hard Story only: the extra room clues Boo has given for this hiding place. */
+  hardClue?: { notIn: RoomId[]; roomTold: boolean };
+}
+
+/** The rooms an encounter's ghost can be searched for in. */
+export function searchRoomsOf(e: Encounter): RoomId[] {
+  return e.searchRooms ?? [e.room];
 }
 
 export function createHunt(encounters: Encounter[], world: World = WORLD): HuntState {
@@ -69,6 +83,9 @@ export function createHunt(encounters: Encounter[], world: World = WORLD): HuntS
   for (const e of encounters) {
     const spot = getSpot(e.start, world);
     if (spot.room !== e.room) throw new Error(`${e.start} is not in ${e.room}`);
+    for (const id of e.roundSpots ?? []) {
+      if (!searchRoomsOf(e).includes(getSpot(id, world).room)) throw new Error(`${id} is outside ${e.ghost}'s rooms`);
+    }
   }
   return {
     encounters,
@@ -84,7 +101,8 @@ export function createHunt(encounters: Encounter[], world: World = WORLD): HuntS
     status: "hunting",
     stats: { correctAnswers: 0, firstTryAnswers: 0, wrongAnswers: 0, wrongSearches: 0, relocations: 0 },
     answers: [],
-    captured: []
+    captured: [],
+    ...(encounters[0].searchRooms ? { hardClue: { notIn: [], roomTold: false } } : {})
   };
 }
 
@@ -124,7 +142,14 @@ export function chooseSpot(
 }
 
 function resetClue(s: HuntState): HuntState {
-  return { ...s, clueId: s.clueId + 1, wrongSearchesThisClue: 0, searchedThisClue: [], answerMisses: 0 };
+  return {
+    ...s,
+    clueId: s.clueId + 1,
+    wrongSearchesThisClue: 0,
+    searchedThisClue: [],
+    answerMisses: 0,
+    ...(s.hardClue ? { hardClue: { notIn: [], roomTold: false } } : {})
+  };
 }
 
 export type SearchResult =
@@ -143,9 +168,13 @@ export function searchSpot(
   if (s.status !== "hunting") return { state: s, result: { kind: "ignored" } };
   const spot = getSpot(spotId, world);
   const enc = currentEncounter(s);
-  if (spot.room !== enc.room) return { state: s, result: { kind: "elsewhere", spot } };
+  if (!searchRoomsOf(enc).includes(spot.room)) return { state: s, result: { kind: "elsewhere", spot } };
   if (spotId === s.spotId) {
     return { state: { ...s, status: "found", answerMisses: 0 }, result: { kind: "found", spot } };
+  }
+  // Hard Story: a place already found empty is remembered, so looking again costs nothing.
+  if (enc.searchRooms && s.searchedThisClue.includes(spotId)) {
+    return { state: s, result: { kind: "empty", spot, relocatedTo: null } };
   }
 
   let next: HuntState = {
@@ -197,7 +226,7 @@ export function answerPrep(
 
   const enc = currentEncounter(s);
   const firstTry = s.answerMisses === 0;
-  const record: AnswerRecord = { ghost: enc.ghost, spotId: spot.id, prep, noun: spot.noun, firstTry };
+  const record: AnswerRecord = { ghost: enc.ghost, spotId: spot.id, prep, noun: spot.noun, firstTry, searchMisses: s.wrongSearchesThisClue };
   const stats = {
     ...s.stats,
     correctAnswers: s.stats.correctAnswers + 1,
@@ -213,7 +242,7 @@ export function answerPrep(
     const allowed = PREPS.filter((p) => !usedPreps.includes(p));
     const scriptedSpot = scripted ? getSpot(scripted, world) : null;
     const target =
-      scriptedSpot && scriptedSpot.room === enc.room && allowed.includes(scriptedSpot.prep) && scriptedSpot.id !== spot.id
+      scriptedSpot && searchRoomsOf(enc).includes(scriptedSpot.room) && allowed.includes(scriptedSpot.prep) && scriptedSpot.id !== spot.id
         ? scriptedSpot
         : chooseSpot(spotsInRoom(enc.room, world), spot, allowed, rng);
     next = resetClue({ ...next, spotId: target.id, status: "hunting", relocationsThisRound: 0 });
